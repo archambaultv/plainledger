@@ -10,7 +10,7 @@ import Data.Text as T
 import Data.Decimal
 import Data.Time
 import qualified Data.Set as S
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Text.Megaparsec (SourcePos)
 
 data Tag = Tag {
@@ -38,7 +38,7 @@ data AccountType = Asset
                  | Equity
                  | Revenue
                  | Expense
-                 deriving (Show)
+                 deriving (Show, Eq, Ord)
 
 type Quantity = Decimal
 
@@ -66,6 +66,8 @@ data Transaction = Transaction {
   }
   deriving (Show)
 
+type Balance = M.Map Commodity Quantity
+
 data AccountInfo = AccountInfo {
   aOpenDate :: Day,
   aCloseDate :: Maybe Day,
@@ -73,8 +75,9 @@ data AccountInfo = AccountInfo {
   aTags :: [Tag],
   aType :: AccountType,
   aNumber :: Maybe Integer,
-  aCommodities :: S.Set Commodity,
-  aDefaultCommodity :: Commodity
+  aAllowedCommodities :: S.Set Commodity,
+  aDefaultCommodity :: Commodity,
+  aBalance :: Balance
   }
   deriving (Show)
 
@@ -87,17 +90,13 @@ data Configuration = Configuration {
   deriving (Show)
 
 data Ledger = Ledger {
-  lFromDate :: Day,
-  lToDate :: Day,
+  lStartDate :: Day,
+  lEndDate :: Day,
   lConfiguration :: Configuration,
   lTransactions :: [Transaction],
-  lAccountNamesSet :: S.Set QualifiedName,
-  lAccountNamesList :: [QualifiedName],
-  lAccountInfos :: M.Map QualifiedName AccountInfo,
-  lBalance :: M.Map QualifiedName (M.Map Commodity Quantity)
+  lAccountInfos :: M.Map QualifiedName AccountInfo
   }
   deriving (Show)
-
 
 -- The following datatypes represents what the user can input in its
 -- journal file. They are like the above types but some fields are

@@ -18,6 +18,10 @@ import Plainledger.Data.Type
 import Plainledger.Error
 
 
+(<?>) :: Either Error a -> Error -> Either Error a
+Left _ <?> msg = Left msg
+x <?> _ = x
+
 sexp2list :: Sexp -> Either Error [Sexp]
 sexp2list (SList _ s) = return s
 sexp2list x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a sexp"
@@ -170,12 +174,23 @@ sexp2RawJournal j (SList _ ((SSymbol _ "open") : date : xs)) = do
 
 sexp2RawJournal j (SList pos ((SSymbol _ "transaction") : date : xs))  = do
   day <- sexp2day date
-  keyValue <- sexp2keyvalue xs
-  tags <- maybe (return []) sexp2tags $ M.lookup ":tags" keyValue
-  postings <- maybe noPostingError sexp2postings $ M.lookup ":postings" keyValue
-  return $ j{rjTransactions = (RawTransaction day tags postings pos) : rjTransactions j}
+  keyValueParse day <> positionParse day <?> "Expecting key values or first the postings, the tags and other key value"
 
-  where noPostingError = Left $ sourcePosPretty pos ++ " No postings in transaction"
+  where keyValueParse day = do
+          keyValue <- sexp2keyvalue xs
+          tags <- maybe (return []) sexp2tags $ M.lookup ":tags" keyValue
+          postings <- maybe noPostingError sexp2postings $ M.lookup ":postings" keyValue
+          return $ j{rjTransactions = (RawTransaction day tags postings pos) : rjTransactions j}
+
+        noPostingError = Left $ sourcePosPretty pos ++ " No postings in transaction"
+
+        positionParse day = do
+          case xs of
+            (rawPostings : rawTags : _) -> do
+                tags <- sexp2tags rawTags
+                postings <- sexp2postings rawPostings
+                return $ j{rjTransactions = (RawTransaction day tags postings pos) : rjTransactions j}
+            _ -> Left $ sourcePosPretty pos ++ " Expecting the postings, the tags and other key value"
 
 sexp2RawJournal j (SList pos ((SSymbol _ "balance") : date : name : quantity : comm)) = do
   day <- sexp2day date

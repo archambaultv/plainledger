@@ -26,7 +26,7 @@ parseCommand :: Parser Command
 parseCommand = Command
     <$> argument (maybeReader str2CommandName)  (metavar "COMMAND" <> help "The command to be executed")
     <*> argument str (metavar "JOURNAL-FILE" <> help "The journal file to analyse")
-    <*> option auto (short 'o' <> long "output" <> metavar "OUTPUT-FILE" <> help "The output file" <> value Nothing)  
+    <*> strOption (short 'o' <> long "output" <> metavar "OUTPUT-FILE" <> help "The output file")  
     <*> startDate 
     <*> endDate
 

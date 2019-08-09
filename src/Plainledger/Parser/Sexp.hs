@@ -19,6 +19,7 @@ import Data.Text hiding (count, empty, unwords)
 import Text.Read
 import Text.Megaparsec
 import Text.Megaparsec.Char hiding (symbolChar)
+import qualified Control.Applicative as A
 import qualified Text.Megaparsec.Char.Lexer as L
 
 --------------------------------------------------------------------------------
@@ -53,7 +54,9 @@ spaceConsumerNewline = L.space space1 lineComment blockComment
 
 -- Consumes everything until the end of line included
 line :: Parser ()
-line = takeWhileP Nothing (== '\n') >> takeP Nothing 1 >> return ()
+line = do
+  _ <- takeWhileP Nothing (/= '\n')
+  eof <|> (takeP Nothing 1 >> return ())
 
 -- Consumes all white space and block comment. Then stops if the first
 -- caracter is '(' (open parenthesis).  Otherwise it skips the rest of
@@ -64,10 +67,10 @@ line = takeWhileP Nothing (== '\n') >> takeP Nothing 1 >> return ()
 -- behavior for line comment is the standard one (with usage of --)
 literateSpaceConsumer :: Parser ()
 literateSpaceConsumer = do
-  L.space space1 (return ()) blockComment
+  L.space space1 A.empty blockComment
   stop <|> (line >> literateSpaceConsumer)
 
-  where stop = lookAhead (char '(') >> return ()        
+  where stop = eof <|> (lookAhead (char '(') >> return ())
 
 -- Helper with whitespace
 --lexeme :: Parser a -> Parser a
