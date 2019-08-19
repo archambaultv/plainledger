@@ -23,7 +23,7 @@ run :: Command -> IO ()
 run c = runExceptT (runT c) >>= either putStrLn return
 
 runT :: Command -> ExceptT Error IO () 
-runT (Command command input output startDate endDate) = do
+runT (Command command input output startDate endDate useDebitCredit) = do
   lift $ putStrLn "Reading input file"
   stream <- lift $ T.readFile input
 
@@ -39,7 +39,7 @@ runT (Command command input output startDate endDate) = do
 
   lift $ putStrLn "Executing the command"
   res <- case command of
-           BalanceSheet -> return $ printBalanceSheet adjustedLedger
+           BalanceSheet -> return $ printBalanceSheet adjustedLedger useDebitCredit
            IncomeStatement -> return "NotImplemented"
            TrialBalance -> return "NotImplemented"
            SpendingReport -> return "NotImplemented"

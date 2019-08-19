@@ -27,8 +27,12 @@ parseCommand = Command
     <$> argument (maybeReader str2CommandName)  (metavar "COMMAND" <> help "The command to be executed")
     <*> argument str (metavar "JOURNAL-FILE" <> help "The journal file to analyse")
     <*> strOption (short 'o' <> long "output" <> metavar "OUTPUT-FILE" <> help "The output file")  
-    <*> startDate 
+    <*> startDate
     <*> endDate
+    <*> switch
+        (long "useDebitCredit"
+         <> short 'd'
+         <> help "Whether to use debit and credit instead of + or -")
 
 opts :: ParserInfo Command
 opts = info

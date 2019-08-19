@@ -15,20 +15,47 @@ csvOptions = defaultEncodeOptions {
       encUseCrLf = False
     }
 
-printBalanceSheet :: Ledger -> B.ByteString
-printBalanceSheet l =
-  let accounts = lAccountSortedByType l
-      serialize :: (QualifiedName, AccountInfo) -> [[T.Text]]
-      serialize (n, info) = map (\(c, q) -> [qualifiedName2Text n,
-                                             T.pack $ show q,
-                                             c,
-                                             maybe "" (T.pack . show) (aNumber info)])
-                                (M.toList $ aBalance info)
+printBalanceSheet :: Ledger -> Bool -> B.ByteString
+printBalanceSheet l useDebitCredit =
+  let accounts :: [(QualifiedName, AccountInfo)]
+      accounts = lAccountSortedByType l 
+
+      rawlines :: [(QualifiedName, AccountInfo, Commodity, Quantity)]
+      rawlines = concatMap (\(name, info) -> map (\(comm, quant) -> (name, info, comm, quant)) (M.toList $ aBalance info))
+                           accounts
+
+      serializeAmount :: AccountInfo -> Quantity -> [T.Text]
+      serializeAmount info q | useDebitCredit =
+         if isDebit q (aType info)
+         then [T.pack $ show q, ""]
+         else ["", T.pack $ show $ negate q]
+      serializeAmount _ q = [T.pack $ show q]
+                            
+      serialize :: (QualifiedName, AccountInfo, Commodity, Quantity) -> [T.Text]
+      serialize (n, info, c, q) = qualifiedName2Text n :
+                                  (serializeAmount info q) ++
+                                  [c, maybe "" (T.pack . show) (aNumber info)]
+
+      amountTitle :: [T.Text]
+      amountTitle = if useDebitCredit
+                    then ["Debit", "Credit"]
+                    else ["Amount"]
+
+      total :: [[T.Text]]
+      total =
+        let infos = map snd accounts
+        in if useDebitCredit
+           then map (\(c,(d,cr)) -> ["Total",T.pack $ show d, T.pack $ show cr, c]) $
+                    M.toList $ totalBalanceDebitCredit infos
+           else map (\(c,s) -> ["Total",T.pack $ show s,c]) $
+                    M.toList $ totalBalance infos
+
       csvlines ::  [[T.Text]]
       csvlines =  ["Balance Sheet", "Start date", T.pack $ show $ lStartDate l,
                    "End date", T.pack $ show $ lEndDate l] :
                   [] :
-                  ["Account","Amount","Commodity","Account Number"] :
-                  concatMap serialize accounts
+                  ("Account" : amountTitle ++ ["Commodity","Account Number"]) :
+                  map serialize rawlines ++
+                  ([] : total)
   in
     encodeWith csvOptions csvlines

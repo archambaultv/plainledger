@@ -18,9 +18,9 @@ import Plainledger.Data.Type
 import Plainledger.Error
 
 
-(<?>) :: Either Error a -> Error -> Either Error a
-Left _ <?> msg = Left msg
-x <?> _ = x
+-- (<?>) :: Either Error a -> Error -> Either Error a
+-- Left _ <?> msg = Left msg
+-- x <?> _ = x
 
 sexp2list :: Sexp -> Either Error [Sexp]
 sexp2list (SList _ s) = return s
@@ -63,6 +63,9 @@ sexp2tag :: Sexp -> Either Error Tag
 sexp2tag (SString pos k) = return $ Tag k Nothing pos
 sexp2tag (SList pos [(SString _ k)]) = return $ Tag k Nothing pos
 sexp2tag (SList pos [(SString _ k),(SString _ v)]) = return $ Tag k (Just v) pos
+sexp2tag (SList pos [(SString _ k),(SSymbol _ s)]) = return $ Tag k (Just s) pos
+sexp2tag (SList pos [(SString _ k),(SDecimal _ n)]) = return $ Tag k (Just $ T.pack $ show n) pos
+sexp2tag (SList pos [(SString _ k),(SDate _ d)]) = return $ Tag k (Just $ T.pack $ show d) pos
 sexp2tag x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tag"
 
 sexp2tags :: Sexp -> Either Error [Tag]
@@ -174,7 +177,7 @@ sexp2RawJournal j (SList _ ((SSymbol _ "open") : date : xs)) = do
 
 sexp2RawJournal j (SList pos ((SSymbol _ "transaction") : date : xs))  = do
   day <- sexp2day date
-  keyValueParse day <> positionParse day <?> "Expecting key values or first the postings, the tags and other key value"
+  keyValueParse day
 
   where keyValueParse day = do
           keyValue <- sexp2keyvalue xs
@@ -183,14 +186,6 @@ sexp2RawJournal j (SList pos ((SSymbol _ "transaction") : date : xs))  = do
           return $ j{rjTransactions = (RawTransaction day tags postings pos) : rjTransactions j}
 
         noPostingError = Left $ sourcePosPretty pos ++ " No postings in transaction"
-
-        positionParse day = do
-          case xs of
-            (rawPostings : rawTags : _) -> do
-                tags <- sexp2tags rawTags
-                postings <- sexp2postings rawPostings
-                return $ j{rjTransactions = (RawTransaction day tags postings pos) : rjTransactions j}
-            _ -> Left $ sourcePosPretty pos ++ " Expecting the postings, the tags and other key value"
 
 sexp2RawJournal j (SList pos ((SSymbol _ "balance") : date : name : quantity : comm)) = do
   day <- sexp2day date

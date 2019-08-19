@@ -6,28 +6,36 @@ where
 -- Most data types are defined here.
 -- For the functions related to each type, see the corresponding modules
 
-import Data.Text as T
+import qualified Data.Text as T
 import Data.Decimal
 import Data.Time
+import Data.List
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Text.Megaparsec (SourcePos)
 
+-- The internal representation of an account is done
+-- using the plus (inflow) and minus (outflow) convention.
+-- But for reporting purposes it is usefull to convert
+-- to the standard debit credit convention
+data AccountingType = PlusMinus | DebitCredit
+                    deriving (Eq, Show)
+
 data Tag = Tag {
-  tagKey :: Text,
-  tagValue :: Maybe Text,
+  tagKey :: T.Text,
+  tagValue :: Maybe T.Text,
   tagSourcePos :: SourcePos
   } deriving (Show)
 
 -- Name of an account
-type AccountName = Text
+type AccountName = T.Text
 
 -- The account's parents name and its name
 -- ex : Asset:Banking:Bank Foo:Chequing ->
 --        ["Asset","Banking","Bank Foo","Chequing"]
 type QualifiedName = [AccountName]
 
-qualifiedName2Text :: QualifiedName -> Text 
+qualifiedName2Text :: QualifiedName -> T.Text 
 qualifiedName2Text = T.intercalate ":"
 
 qualifiedName2String :: QualifiedName -> String
@@ -42,7 +50,7 @@ data AccountType = Asset
 
 type Quantity = Decimal
 
-type Commodity = Text
+type Commodity = T.Text
 
 data Amount = Amount {
   aCommodity :: Commodity,
@@ -67,6 +75,7 @@ data Transaction = Transaction {
   deriving (Show)
 
 type Balance = M.Map Commodity Quantity
+type BalanceDebitCredit = M.Map Commodity (Quantity, Quantity)
 
 data AccountInfo = AccountInfo {
   aOpenDate :: Day,
@@ -80,6 +89,46 @@ data AccountInfo = AccountInfo {
   aBalance :: Balance
   }
   deriving (Show)
+
+
+totalBalance :: [AccountInfo] -> Balance
+totalBalance = foldl' (\b x -> M.unionWith (+) b (aBalance x)) M.empty
+
+totalBalanceDebitCredit :: [AccountInfo] -> BalanceDebitCredit
+totalBalanceDebitCredit =                
+ foldl' (\b x -> M.unionWith (\(d1, c1) (d2, c2) -> (d1 + d2, c1 + c2))
+                             b
+                             (fmap toDebitCredit' (aBalance x)))
+        M.empty
+
+toDebitCredit :: Quantity -> AccountType -> (Quantity, Quantity)
+toDebitCredit q a = if isDebit q a
+                    then (q, 0)
+                    else (0, q)
+                        
+toDebitCredit' :: Quantity -> (Quantity, Quantity)
+toDebitCredit' q = if isDebit' q
+                   then (q, 0)
+                   else (0, q)
+
+-- A positive amount is a debit
+-- A negative amount is a credit
+-- When the amount is equal to zero, we use it the account type
+isDebit :: Quantity -> AccountType -> Bool
+isDebit q _ | q > 0 = True
+isDebit q _ | q < 0 = False
+isDebit _ a = a `elem` [Asset, Expense]
+
+-- Same as isDebit, but a zero amount is considered
+-- a debit. Usefull for summing balances for example
+isDebit' :: Quantity -> Bool
+isDebit' q = q >= 0
+                     
+isCreditAccount :: AccountInfo -> Bool
+isCreditAccount a = aType a `elem` [Liability, Equity, Revenue]
+
+isDebitAccount :: AccountInfo -> Bool
+isDebitAccount a = aType a `elem` [Asset, Expense]
 
 data Configuration = Configuration {
   cDefaultCommodity :: Commodity,

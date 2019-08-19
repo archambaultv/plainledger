@@ -9,7 +9,7 @@ where
 import Data.Time
 import Data.Char
 
-data Command = Command CommandName FilePath FilePath (Maybe Day) (Maybe Day)
+data Command = Command CommandName FilePath FilePath (Maybe Day) (Maybe Day) Bool
              deriving (Show)
 
 data CommandName = BalanceSheet

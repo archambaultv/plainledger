@@ -103,17 +103,24 @@ findFullQualifiedName pos fullNames name =
          kmp = map (KMP.match $ KMP.build nameStr) fullNamesStr
          m = zip fullNames kmp
          matched = filter (not . null . snd) m
+         tieBreaker :: [QualifiedName] -> Either Error QualifiedName
+         tieBreaker ns =
+           case filter (\n -> name `isSuffixOf` n) ns of
+             [x] -> return x
+             _ -> Left $ sourcePosPretty pos ++
+                  " Account \"" ++ (intercalate ":" nameStr) ++ "\" is ambiguous.\n It can refer to \n  "
+                  ++ (let accs = map (intercalate ":" . map T.unpack) ns
+                       in intercalate " or\n  " accs)
+
      in case map fst matched of
           [] -> Left $ sourcePosPretty pos ++
                 " Account \"" ++ (intercalate ":" nameStr) ++ "\" has not been opened"
 
           [name'] -> return $ name'
 
-          matched' -> Left $ sourcePosPretty pos ++
-                     "Account " ++ (intercalate ":" nameStr) ++ " is ambiguous. It can refer to \n  "
-                     ++ (let accs = map (intercalate ":" . map T.unpack) matched'
-                         in intercalate " or\n  " accs)
-
+          matched' -> tieBreaker matched'
+       
+       
 updateCloseDate :: Ledger -> CloseAccount -> Either Error Ledger
 updateCloseDate l (CloseAccount day name sourcePos) =
   let accountInfos = lAccountInfos l
