@@ -39,9 +39,9 @@ runT (Command command input output startDate endDate useDebitCredit) = do
 
   lift $ putStrLn "Executing the command"
   res <- case command of
-           BalanceSheet -> return $ printBalanceSheet adjustedLedger useDebitCredit
+           BalanceSheet -> return  "NotImplemented"
            IncomeStatement -> return "NotImplemented"
-           TrialBalance -> return "NotImplemented"
+           TrialBalance -> return $ printTrialBalance adjustedLedger useDebitCredit
            SpendingReport -> return "NotImplemented"
            RevenuReport -> return "NotImplemented"
   case null output of

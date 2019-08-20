@@ -15,8 +15,8 @@ csvOptions = defaultEncodeOptions {
       encUseCrLf = False
     }
 
-printBalanceSheet :: Ledger -> Bool -> B.ByteString
-printBalanceSheet l useDebitCredit =
+printTrialBalance :: Ledger -> Bool -> B.ByteString
+printTrialBalance l useDebitCredit =
   let accounts :: [(QualifiedName, AccountInfo)]
       accounts = lAccountSortedByType l 
 
@@ -33,6 +33,7 @@ printBalanceSheet l useDebitCredit =
                             
       serialize :: (QualifiedName, AccountInfo, Commodity, Quantity) -> [T.Text]
       serialize (n, info, c, q) = qualifiedName2Text n :
+                                  last n :
                                   (serializeAmount info q) ++
                                   [c, maybe "" (T.pack . show) (aNumber info)]
 
@@ -45,16 +46,16 @@ printBalanceSheet l useDebitCredit =
       total =
         let infos = map snd accounts
         in if useDebitCredit
-           then map (\(c,(d,cr)) -> ["Total",T.pack $ show d, T.pack $ show cr, c]) $
+           then map (\(c,(d,cr)) -> ["", "Total",T.pack $ show d, T.pack $ show cr, c]) $
                     M.toList $ totalBalanceDebitCredit infos
-           else map (\(c,s) -> ["Total",T.pack $ show s,c]) $
+           else map (\(c,s) -> ["", "Total",T.pack $ show s,c]) $
                     M.toList $ totalBalance infos
 
       csvlines ::  [[T.Text]]
-      csvlines =  ["Balance Sheet", "Start date", T.pack $ show $ lStartDate l,
+      csvlines =  ["Trial Balance", "Start date", T.pack $ show $ lStartDate l,
                    "End date", T.pack $ show $ lEndDate l] :
                   [] :
-                  ("Account" : amountTitle ++ ["Commodity","Account Number"]) :
+                  ("Account Qualified Name" : "Account Name" : amountTitle ++ ["Commodity","Account Number"]) :
                   map serialize rawlines ++
                   ([] : total)
   in
