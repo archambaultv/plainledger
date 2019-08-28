@@ -10,6 +10,7 @@ import qualified Data.Text as T
 import Data.Decimal
 import Data.Time
 import Data.List
+import Data.Tree
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Text.Megaparsec (SourcePos)
@@ -90,9 +91,49 @@ data AccountInfo = AccountInfo {
   }
   deriving (Show)
 
+data Account = VirtualAccount {
+  vName :: AccountName,
+  vType :: AccountType,
+  vBalanceWithSubAccounts :: Balance,
+  vNumber :: Maybe Integer -- The smallest account number of real account children
+  } |
+  RealAccount {
+  rAccountInfo :: AccountInfo,
+  rBalanceWithSubAccounts :: Balance
+  }
+  deriving (Show)
 
+accType :: Account -> AccountType
+accType VirtualAccount{vType=n} = n
+accType RealAccount{rAccountInfo=i} = aType i
+
+accName :: Account -> AccountName
+accName VirtualAccount{vName=n} = n
+accName RealAccount{rAccountInfo=i} = last (aName i)
+
+accNumber :: Account -> Maybe Integer
+accNumber a =
+  case a of
+    (VirtualAccount _ _ _ n) -> n
+    (RealAccount i _) -> aNumber i
+
+accBalance :: Account -> Balance
+accBalance a =
+  case a of
+    (VirtualAccount _ _ _ _) -> M.empty
+    (RealAccount i _) -> aBalance i
+
+accBalanceWithSubAccounts :: Account -> Balance
+accBalanceWithSubAccounts a =
+  case a of
+    (VirtualAccount _ _ b _) -> b
+    (RealAccount _ b) -> b
+    
 totalBalance :: [AccountInfo] -> Balance
-totalBalance = foldl' (\b x -> M.unionWith (+) b (aBalance x)) M.empty
+totalBalance = totalBalance' . map aBalance
+
+totalBalance' :: [Balance] -> Balance
+totalBalance' = foldl' (\b x -> M.unionWith (+) b x) M.empty
 
 totalBalanceDebitCredit :: [AccountInfo] -> BalanceDebitCredit
 totalBalanceDebitCredit =                
@@ -124,16 +165,67 @@ isDebit _ a = a `elem` [Asset, Expense]
 isDebit' :: Quantity -> Bool
 isDebit' q = q >= 0
                      
-isCreditAccount :: AccountInfo -> Bool
-isCreditAccount a = aType a `elem` [Liability, Equity, Revenue]
+isCreditAccount :: AccountType -> Bool
+isCreditAccount a = a `elem` [Liability, Equity, Revenue]
 
-isDebitAccount :: AccountInfo -> Bool
-isDebitAccount a = aType a `elem` [Asset, Expense]
+isDebitAccount :: AccountType -> Bool
+isDebitAccount a = a `elem` [Asset, Expense]
+
+depth :: Tree a -> Integer
+depth (Node _ []) = 1
+depth (Node _ xs) = 1 + maximum (map depth xs)
+
+filterEmptyAccounts :: Forest Account -> Forest Account
+filterEmptyAccounts [] = []
+filterEmptyAccounts (x : siblings) =
+  let fs = filterEmptyAccounts siblings
+  in case x of
+       Node VirtualAccount{} [] -> filterEmptyAccounts fs
+       n@(Node VirtualAccount{} children) ->
+         case filterEmptyAccounts children of
+           [] -> fs
+           cs -> n{subForest = cs} : fs
+       n@(Node (RealAccount i _) children) ->
+         case filterEmptyAccounts children of
+           [] -> if M.empty == aBalance i then fs else n : fs
+           cs -> n{subForest = cs} : fs
+
+-- Returns the accounts in a tree structure from the qualified name
+-- and a subtotal for each node
+toAccountTree :: [AccountInfo] -> Forest Account
+toAccountTree accounts =
+  let sortedAccounts = sortBy (\a1 a2 -> compare (aType a1, aName a1) (aType a2, aName a2)) accounts
+  in makeForest $ map (\a -> (aName a, a)) sortedAccounts
+
+  where
+    makeForest :: [(QualifiedName, AccountInfo)] -> Forest Account
+    makeForest [] = []
+    makeForest xs =
+      let groupAccounts = groupBy (\(k1, _) (k2, _) -> head k1 == head k2) xs
+      in  map makeTree groupAccounts      
+
+    makeTree ::[(QualifiedName, AccountInfo)] -> Tree Account
+    makeTree [] = error "list must not be empty"
+    makeTree xs@((k, x):_) =
+      let (parent,children) = partition (\(k1, _) -> tail k1 == []) xs
+          parentName = head k
+          childrenForest = makeForest $ map (\(k1, a) -> (tail k1, a)) children
+          b = totalBalance' $ map (accBalanceWithSubAccounts . rootLabel) childrenForest
+      in  case parent of
+            [] -> let ns = foldl' (\b1 n1 -> case n1 of Nothing -> b1; Just x1 -> x1 : b1) [] $  map (accNumber . rootLabel) childrenForest
+                      n = if null ns then Nothing else Just (minimum ns)
+                  in Node (VirtualAccount parentName (aType x) b n)
+                          childrenForest
+            [(_,p)] -> Node (RealAccount p (totalBalance' [(aBalance p), b]))
+                       childrenForest
+            _ -> error "More than one parent"
+          
 
 data Configuration = Configuration {
   cDefaultCommodity :: Commodity,
   cAccountTypeMapping :: M.Map AccountName AccountType,
   cOpeningBalanceAccount :: QualifiedName,
+  cEarningsAccount :: QualifiedName,
   cSourcePos :: SourcePos
   }
   deriving (Show)

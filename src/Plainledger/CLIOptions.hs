@@ -15,8 +15,7 @@ data Command = Command CommandName FilePath FilePath (Maybe Day) (Maybe Day) Boo
 data CommandName = BalanceSheet
                  | IncomeStatement
                  | TrialBalance
-                 | SpendingReport
-                 | RevenuReport
+                 | Transactions
                  deriving (Show)
 
 str2CommandName :: String -> Maybe CommandName
@@ -25,6 +24,5 @@ str2CommandName x =
       "balancesheet" -> Just BalanceSheet
       "incomestatement" -> Just IncomeStatement
       "trialbalance" -> Just TrialBalance
-      "spendingreport" -> Just SpendingReport
-      "revenureport" -> Just RevenuReport
+      "transactions" -> Just Transactions
       _ -> Nothing

@@ -59,14 +59,25 @@ sexp2day :: Sexp -> Either Error Day
 sexp2day (SDate _ d) = return d
 sexp2day x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a date (YYYY-MM-DD)"
 
+sexp2tagValue :: Sexp -> Either Error Text
+sexp2tagValue (SString _ v) = return v
+sexp2tagValue (SSymbol _ s) = return s
+sexp2tagValue (SDecimal _ n) = return $ T.pack $ show n
+sexp2tagValue (SDate _ d) = return $ T.pack $ show d
+sexp2tagValue x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tag value"
+
 sexp2tag :: Sexp -> Either Error Tag
 sexp2tag (SString pos k) = return $ Tag k Nothing pos
 sexp2tag (SList pos [(SString _ k)]) = return $ Tag k Nothing pos
-sexp2tag (SList pos [(SString _ k),(SString _ v)]) = return $ Tag k (Just v) pos
-sexp2tag (SList pos [(SString _ k),(SSymbol _ s)]) = return $ Tag k (Just s) pos
-sexp2tag (SList pos [(SString _ k),(SDecimal _ n)]) = return $ Tag k (Just $ T.pack $ show n) pos
-sexp2tag (SList pos [(SString _ k),(SDate _ d)]) = return $ Tag k (Just $ T.pack $ show d) pos
+sexp2tag (SList pos [(SString _ k), v]) = do
+  v' <- sexp2tagValue v
+  return $ Tag k (Just v') pos
 sexp2tag x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tag"
+
+sexp2description :: Sexp -> Either Error Tag
+sexp2description x = do
+  v <- sexp2tagValue x
+  return $ Tag "Description" (Just v) (sexpSourcePos x)
 
 sexp2tags :: Sexp -> Either Error [Tag]
 sexp2tags (SList _ xs) = mapM sexp2tag xs
@@ -146,7 +157,8 @@ sexp2RawJournal j (SList pos ((SSymbol _ "configuration") : xs)) = do
   mapping <- lookup' ":account-type" keyValue >>= sexp2list >>= sexp2keyvalue >>= mapM sexp2text
              >>= checkMapping
   openingbalance <- lookup' ":opening-balance-account" keyValue >>= sexp2qualifiedname
-  return $ j{rjConfiguration = Just (Configuration currency mapping openingbalance pos)}
+  earningsAccount <- lookup' ":earnings-account" keyValue >>= sexp2qualifiedname
+  return $ j{rjConfiguration = Just (Configuration currency mapping openingbalance earningsAccount pos)}
 
   where lookup' :: String -> M.Map Text Sexp -> Either Error Sexp
         lookup' s keyValue =
@@ -182,8 +194,9 @@ sexp2RawJournal j (SList pos ((SSymbol _ "transaction") : date : xs))  = do
   where keyValueParse day = do
           keyValue <- sexp2keyvalue xs
           tags <- maybe (return []) sexp2tags $ M.lookup ":tags" keyValue
+          desc <- maybe (return []) (\u -> sexp2description u >>= (\y -> return [y])) $ M.lookup ":description" keyValue
           postings <- maybe noPostingError sexp2postings $ M.lookup ":postings" keyValue
-          return $ j{rjTransactions = (RawTransaction day tags postings pos) : rjTransactions j}
+          return $ j{rjTransactions = (RawTransaction day (desc ++ tags) postings pos) : rjTransactions j}
 
         noPostingError = Left $ sourcePosPretty pos ++ " No postings in transaction"
 
