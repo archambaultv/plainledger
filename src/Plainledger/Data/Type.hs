@@ -137,7 +137,7 @@ totalBalance' = foldl' (\b x -> M.unionWith (+) b x) M.empty
 
 totalBalanceDebitCredit :: [AccountInfo] -> BalanceDebitCredit
 totalBalanceDebitCredit =                
- foldl' (\b x -> M.unionWith (\(d1, c1) (d2, c2) -> (d1 + d2, c1 + c2))
+ foldl' (\b x -> M.unionWith (\(d1, c1) (d2, c2) -> (d1 + d2, c1 - c2))
                              b
                              (fmap toDebitCredit' (aBalance x)))
         M.empty
