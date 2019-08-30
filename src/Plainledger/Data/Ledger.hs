@@ -48,24 +48,53 @@ rawJournal2Ledger rj =
 
     -- We insert the transactions
     l3 <- foldM addTransaction l2 transactions
+    let l3' = l3{lTransactions = sortBy (\x y -> compare (tDate x) (tDate y)) (lTransactions l3)}
 
-    -- Compute balance assertion
-    -- ToDo : Should check balance assertion
-    let l4 = computeBalance l3
+    -- Compute the accounts balance and check balance assertions
+    l4 <- computeCheckBalance l3' balances
 
-    return l4{lTransactions = sortBy (\x y -> compare (tDate x) (tDate y)) (lTransactions l4)}
+    return l4
 
--- checkBalance :: Ledger -> [RawBalanceAssertion] -> Either Error ()
--- checkBalance _ [] = return ()
--- checkBalance l ((RawBalanceAssertion _ name (RawQuantity c q) sourcePos) : bas) = do
---      fullName <- findFullQualifiedName sourcePos (M.keys $ lAccountInfos l) name
---      commodity <- maybe (return $ aDefaultCommodity $ lAccountInfos l M.! fullName) return c
---      let s = (aBalance $ lAccountInfos l M.! fullName) M.! commodity
---      if s /= q
---      then Left $ sourcePosPretty sourcePos ++
---                  " Balance assertion failed. The computed balance is " ++ show s ++ " while the assertion is " ++ show q
---      else checkBalance l bas
+computeCheckBalance :: Ledger -> [RawBalanceAssertion] -> Either Error Ledger
+computeCheckBalance l bas = do
+  let ts = lTransactions l
+  bas' <- mapM fromRaw bas 
+  checkBalance l ts bas'
 
+  where fromRaw :: RawBalanceAssertion -> Either Error BalanceAssertion
+        fromRaw (RawBalanceAssertion d name (RawQuantity c q) sourcePos) = do
+          fullName <- findFullQualifiedName sourcePos (M.keys $ lAccountInfos l) name
+          commodity <- maybe (return $ aDefaultCommodity $ lAccountInfos l M.! fullName) return c
+          return (BalanceAssertion d fullName (Amount commodity q) sourcePos)
+
+checkBalance :: Ledger -> [Transaction] -> [BalanceAssertion] -> Either Error Ledger
+checkBalance l tss bas =
+  case (tss, bas) of
+    ([],_) -> mapM (check l) bas >> return l
+    (ts, []) -> return $ foldl' update l ts
+    (t:ts,b:_) | tDate t <= baDate b -> checkBalance (update l t) ts bas
+    _ -> check l (head bas) >> checkBalance l tss (tail bas)
+
+  where check :: Ledger -> BalanceAssertion -> Either Error ()
+        check l2 (BalanceAssertion _ name (Amount c q) sourcePos) = do
+          let s = (aBalance $ lAccountInfos l2 M.! name) M.! c
+          if s /= q
+           then Left $ sourcePosPretty sourcePos ++
+                 " Balance assertion failed. The computed balance is " ++ show s ++ " while the assertion is " ++ show q
+           else return ()
+
+        update :: Ledger -> Transaction -> Ledger
+        update l2 t =
+          let postings = tPostings t
+          in foldl' updateBalance l2 postings
+
+        updateBalance :: Ledger -> Posting -> Ledger
+        updateBalance l2 (Posting name (Amount comm quantity) _ _) =
+          l2{lAccountInfos = M.adjust (\a -> a{aBalance = M.insertWith (+) comm quantity (aBalance a)})
+                            name
+                            (lAccountInfos l2)}
+
+   
 findAccountType :: Ledger -> OpenAccount -> Either Error AccountType
 findAccountType l oa = maybe err return (M.lookup name mapping)
   where
@@ -230,7 +259,7 @@ computeBalance l =
 
   where updateBalance :: Ledger -> Posting -> Ledger
         updateBalance l2 (Posting name (Amount comm quantity) _ _) =
-          l{lAccountInfos = M.adjust (\a -> a{aBalance = M.insertWith (+) comm quantity (aBalance a)})
+          l2{lAccountInfos = M.adjust (\a -> a{aBalance = M.insertWith (+) comm quantity (aBalance a)})
                             name
                             (lAccountInfos l2)}
 
