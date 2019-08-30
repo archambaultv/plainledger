@@ -263,16 +263,22 @@ computeBalance l =
                             name
                             (lAccountInfos l2)}
 
-computeOpeningBalance :: [Transaction] -> Day -> QualifiedName -> [Transaction]
-computeOpeningBalance ts day openingBalanceAccount =
-  let b = foldl updateBalance M.empty (concatMap tPostings ts)
+computeOpeningBalance :: M.Map QualifiedName AccountType -> [Transaction] -> Day -> QualifiedName -> [Transaction]
+computeOpeningBalance typeMap ts day openingBalanceAccount =
+  let b = foldl updateBalance M.empty (filter notRevenueExpense $ concatMap tPostings ts)
       balanceList = M.toList (fmap M.toList b)
   in map buildTransaction balanceList
 
   where updateBalance :: M.Map QualifiedName Balance -> Posting -> M.Map QualifiedName Balance
         updateBalance b (Posting name (Amount comm quantity) _ _) =
-          let newMap = M.fromList [(comm, quantity)]
-          in M.insertWith (\_ m -> M.insertWith (+) comm quantity m) name newMap b
+          let nameF Nothing = Just $ M.fromList [(comm, quantity)]
+              nameF (Just m) = Just $ M.alter commF comm m
+
+              commF Nothing = Just quantity
+              commF (Just q) = Just $ q + quantity
+          -- in
+          in M.alter nameF name b
+           -- M.insertWith (\_ m -> M.insertWith (+) comm quantity m) name M.empty b
           
         buildTransaction :: (QualifiedName, [(Commodity, Quantity)]) -> Transaction
         buildTransaction (name, quantities) =
@@ -281,6 +287,9 @@ computeOpeningBalance ts day openingBalanceAccount =
               postingBalance = map (\(c, q) -> Posting openingBalanceAccount (Amount c (-q)) t nullPos) quantities
               t = Transaction day [Tag "Virtual transaction" Nothing nullPos] (postings ++ postingBalance) nullPos
           in t
+
+        notRevenueExpense :: Posting -> Bool
+        notRevenueExpense Posting{pAccount = n} = (typeMap M.! n) `elem` [Asset, Liability, Equity]
 
 adjustDate :: Ledger -> Maybe Day -> Maybe Day -> Ledger
 adjustDate l Nothing endDate = adjustDate l (Just (lStartDate l)) endDate
@@ -308,6 +317,7 @@ adjustDate' l newStartDate newEndDate =
       transactions = (lTransactions l)
       transactionsBeforeStart = filter (\t -> tDate t < newStartDate) transactions
       initialTransactions = computeOpeningBalance
+                            (fmap (\info -> aType info) (lAccountInfos l))
                             transactionsBeforeStart
                             newStartDate
                             (cOpeningBalanceAccount $ lConfiguration l)
