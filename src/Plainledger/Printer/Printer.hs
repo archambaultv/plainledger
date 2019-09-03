@@ -81,7 +81,11 @@ printTransactions l useDebitCredit =
             q = aQuantity $ pAmount p
             c = aCommodity $ pAmount p
             t = pTransaction p
-            acc = lAccountInfos l M.! n
+            acc = maybe (error ("Internal error : \"" ++
+                                qualifiedName2String n ++
+                                "\" is not in the AccountInfos map"))
+                        id
+                        (M.lookup n (lAccountInfos l))
             accountType = aType acc
             number = aNumber acc
             (desc, tags) = partition (\tag -> tagKey tag == "Description") (tTags t)
