@@ -53,7 +53,27 @@ rawJournal2Ledger rj =
     -- Compute the accounts balance and check balance assertions
     l4 <- computeCheckBalance l3' balances
 
+    -- Check that closed accounts have a zero balance
+    _ <- checkClosedAccounts l4
+
     return l4
+
+checkClosedAccounts :: Ledger -> Either Error ()
+checkClosedAccounts l =
+  let acc = M.toList $ lAccountInfos l
+      wrong = filter (\(_, info) -> maybe False (const True) (aCloseDate info) &&
+                                    (not $ zeroBalance (aBalance info)))
+                     acc
+  in case wrong of
+    [] -> return ()
+    ((n,info) : _) -> let name = qualifiedName2String n
+                          day :: Day
+                          day = fromJust (aCloseDate info)
+                          balance = aBalance info
+                      in  Left $ "Account \"" ++ name ++
+                          "\n was closed on " ++ show day ++
+                          " with a non zero balance. The balance map is " ++ show balance
+    
 
 computeCheckBalance :: Ledger -> [RawBalanceAssertion] -> Either Error Ledger
 computeCheckBalance l bas = do
@@ -302,7 +322,8 @@ adjustDate' l newStartDate newEndDate =
   -- Delete all the accounts closed before the new startDate
   -- Delete all the accounts opened after the new endDate
   -- Updates other relevant fields accordingly
-  let accountsInfo = M.toList (lAccountInfos l)
+  let
+      accountsInfo = M.toList (lAccountInfos l)
       keepAccount (_, info) =
         let o = aOpenDate info
             c = aCloseDate info
@@ -321,12 +342,14 @@ adjustDate' l newStartDate newEndDate =
                             transactionsBeforeStart
                             newStartDate
                             (cOpeningBalanceAccount $ lConfiguration l)
+      -- Remove opening transaction with amount 0
+      initialTransactions2 = filter (not . emptyTransaction) initialTransactions
                             
   -- Delete all transactions done before the new startDate and after the
   -- new endate
       keptTransactions = filter (\t -> tDate t >= newStartDate && tDate t <= newEndDate) transactions
 
-      l2 = Ledger newStartDate newEndDate (lConfiguration l) (initialTransactions ++ keptTransactions) keptAccountsInfo
+      l2 = Ledger newStartDate newEndDate (lConfiguration l) (initialTransactions2 ++ keptTransactions) keptAccountsInfo
 
   in computeBalance l2
 

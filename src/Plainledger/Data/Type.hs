@@ -67,6 +67,9 @@ data Posting = Posting {
   }
   deriving (Show)
 
+zeroPosting :: Posting -> Bool
+zeroPosting Posting{pAmount = a} = aQuantity a == 0
+
 data Transaction = Transaction {
   tDate :: Day,
   tTags :: [Tag],
@@ -75,8 +78,14 @@ data Transaction = Transaction {
   }
   deriving (Show)
 
+emptyTransaction :: Transaction -> Bool
+emptyTransaction Transaction{tPostings = ps}  = and $ map zeroPosting ps
+
 type Balance = M.Map Commodity Quantity
 type BalanceDebitCredit = M.Map Commodity (Quantity, Quantity)
+
+zeroBalance :: Balance -> Bool
+zeroBalance b = M.foldr' (&&) True (fmap (== 0) b)
 
 data AccountInfo = AccountInfo {
   aOpenDate :: Day,
