@@ -57,7 +57,7 @@ sexp2qualifiedname s = sexp2nonemptytext s >>= (\t -> return $ T.splitOn ":" t)
 
 sexp2day :: Sexp -> Either Error Day
 sexp2day (SDate _ d) = return d
-sexp2day x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a date (YYYY-MM-DD)"
+sexp2day x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a valid date (YYYY-MM-DD)"
 
 sexp2tagValue :: Sexp -> Either Error Text
 sexp2tagValue (SString _ v) = return v
