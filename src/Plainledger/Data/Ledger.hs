@@ -100,7 +100,9 @@ checkBalance l tss bas =
           let s = (aBalance $ lAccountInfos l2 M.! name) M.! c
           if s /= q
            then Left $ sourcePosPretty sourcePos ++
-                 " Balance assertion failed. The computed balance is " ++ show s ++ " while the assertion is " ++ show q
+                 " Balance assertion failed for account \"" ++
+                 qualifiedName2String name ++
+                 "\"\n The computed balance is " ++ show s ++ " while the assertion is " ++ show q
            else return ()
 
         update :: Ledger -> Transaction -> Ledger
