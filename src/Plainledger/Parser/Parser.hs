@@ -79,6 +79,16 @@ sexp2description x = do
   v <- sexp2tagValue x
   return $ Tag "Description" (Just v) (sexpSourcePos x)
 
+sexp2payer :: Sexp -> Either Error Tag
+sexp2payer x = do
+  v <- sexp2tagValue x
+  return $ Tag "Payer" (Just v) (sexpSourcePos x)
+
+sexp2payee :: Sexp -> Either Error Tag
+sexp2payee x = do
+  v <- sexp2tagValue x
+  return $ Tag "Payee" (Just v) (sexpSourcePos x)
+  
 sexp2tags :: Sexp -> Either Error [Tag]
 sexp2tags (SList _ xs) = mapM sexp2tag xs
 sexp2tags x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tags"
@@ -195,8 +205,10 @@ sexp2RawJournal j (SList pos ((SSymbol _ "transaction") : date : xs))  = do
           keyValue <- sexp2keyvalue xs
           tags <- maybe (return []) sexp2tags $ M.lookup ":tags" keyValue
           desc <- maybe (return []) (\u -> sexp2description u >>= (\y -> return [y])) $ M.lookup ":description" keyValue
+          payer <- maybe (return []) (\u -> sexp2payer u >>= (\y -> return [y])) $ M.lookup ":payer" keyValue
+          payee <- maybe (return []) (\u -> sexp2payee u >>= (\y -> return [y])) $ M.lookup ":payee" keyValue
           postings <- maybe noPostingError sexp2postings $ M.lookup ":postings" keyValue
-          return $ j{rjTransactions = (RawTransaction day (desc ++ tags) postings pos) : rjTransactions j}
+          return $ j{rjTransactions = (RawTransaction day (desc ++ payer ++ payee ++ tags) postings pos) : rjTransactions j}
 
         noPostingError = Left $ sourcePosPretty pos ++ " No postings in transaction"
 
