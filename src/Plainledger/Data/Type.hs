@@ -96,6 +96,13 @@ identifiedTransactions l =
               ns = zip [1..] tss
           in s ++ map (\(n, t) -> let d = tDate t in (T.pack (show d ++ "-" ++ show n),t)) ns
 
+-- Returns a sorted list (without duplicates) of all the tags
+tagsKeys :: [Transaction] -> [T.Text]
+tagsKeys ts =
+  let tags = concatMap tTags ts
+      keys = map tagKey tags
+  in sort $ S.toList $ S.fromList keys
+
 type Balance = M.Map Commodity Quantity
 type BalanceDebitCredit = M.Map Commodity (Quantity, Quantity)
 

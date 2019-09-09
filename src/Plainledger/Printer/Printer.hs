@@ -68,6 +68,14 @@ printTransactions l useDebitCredit =
   let transactions :: [(T.Text, Transaction)]
       transactions = identifiedTransactions l
 
+      tagKeys :: [T.Text]
+      tagKeys = tagsKeys (map snd transactions)
+
+      serializeTags :: [Tag] -> [T.Text]
+      serializeTags ts =
+        let m = M.fromList $ map (\t -> (tagKey t, maybe "TRUE" id $ tagValue t)) ts
+        in map (\t -> M.findWithDefault "" t m) tagKeys
+
       postings :: [(T.Text, Posting)]
       postings = concatMap (\(n, t) -> let ps = tPostings t in map (\p -> (n, p)) ps) transactions
 
@@ -91,9 +99,7 @@ printTransactions l useDebitCredit =
                         (M.lookup n (lAccountInfos l))
             accountType = aType acc
             number = aNumber acc
-            (desc, tags) = partition (\tag -> tagKey tag == "Description") (tTags t)
-            descText :: T.Text
-            descText = if null desc then "" else maybe "" id $ tagValue $ head desc
+            tags = tTags t
         in
           qualifiedName2Text n :
           last n :
@@ -102,20 +108,26 @@ printTransactions l useDebitCredit =
           [c,
            ident,
            maybe "" (T.pack . show) number,
-           T.pack $ show accountType,
-           descText]
+           T.pack $ show accountType
+           ] ++
+          serializeTags tags
 
       amountTitle :: [T.Text]
       amountTitle = if useDebitCredit
                     then ["Debit", "Credit"]
                     else ["Amount"]
 
+      title :: [[T.Text]]
+      title = ["Transactions", "Start date", T.pack $ show $ lStartDate l,
+                "End date", T.pack $ show $ lEndDate l] :
+              [] :
+              (["Account Qualified Name", "Account Name", "Date"] ++
+               amountTitle ++
+               ["Commodity","Transaction Id", "Account Number","Account Type"] ++
+               tagKeys) : []
+
       csvlines ::  [[T.Text]]
-      csvlines =  ["Transactions", "Start date", T.pack $ show $ lStartDate l,
-                   "End date", T.pack $ show $ lEndDate l] :
-                  [] :
-                  ("Account Qualified Name" : "Account Name" : "Date" : amountTitle ++
-                   ["Commodity","Transaction Id", "Account Number","Account Type", "Description"]) :
+      csvlines =  title ++
                   map serialize postings
   in
     encodeWith csvOptions csvlines
