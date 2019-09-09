@@ -65,8 +65,11 @@ printTrialBalance l useDebitCredit =
 
 printTransactions :: Ledger -> Bool -> B.ByteString
 printTransactions l useDebitCredit =
-  let postings :: [Posting]
-      postings = concatMap tPostings (lTransactions l)
+  let transactions :: [(T.Text, Transaction)]
+      transactions = identifiedTransactions l
+
+      postings :: [(T.Text, Posting)]
+      postings = concatMap (\(n, t) -> let ps = tPostings t in map (\p -> (n, p)) ps) transactions
 
       serializeAmount :: AccountInfo -> Quantity -> [T.Text]
       serializeAmount info q | useDebitCredit =
@@ -75,8 +78,8 @@ printTransactions l useDebitCredit =
          else ["", T.pack $ show $ negate q]
       serializeAmount _ q = [T.pack $ show q]
                             
-      serialize :: Posting -> [T.Text]
-      serialize p =
+      serialize :: (T.Text, Posting) -> [T.Text]
+      serialize (ident, p) =
         let n = pAccount p
             q = aQuantity $ pAmount p
             c = aCommodity $ pAmount p
@@ -97,6 +100,7 @@ printTransactions l useDebitCredit =
           (T.pack $ show $ tDate t) :
           (serializeAmount acc q) ++
           [c,
+           ident,
            maybe "" (T.pack . show) number,
            T.pack $ show accountType,
            descText]
@@ -110,7 +114,8 @@ printTransactions l useDebitCredit =
       csvlines =  ["Transactions", "Start date", T.pack $ show $ lStartDate l,
                    "End date", T.pack $ show $ lEndDate l] :
                   [] :
-                  ("Account Qualified Name" : "Account Name" : "Date" : amountTitle ++ ["Commodity","Account Number","Account Type", "Description"]) :
+                  ("Account Qualified Name" : "Account Name" : "Date" : amountTitle ++
+                   ["Commodity","Transaction Id", "Account Number","Account Type", "Description"]) :
                   map serialize postings
   in
     encodeWith csvOptions csvlines

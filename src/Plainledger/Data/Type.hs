@@ -81,6 +81,21 @@ data Transaction = Transaction {
 emptyTransaction :: Transaction -> Bool
 emptyTransaction Transaction{tPostings = ps}  = and $ map zeroPosting ps
 
+-- Add an id to the transactions
+-- The id YYYY-MM-DD-N is the date plus an extra number if necessary
+-- Sorting by this id sorts the transactions by date
+-- It also gives an approximate global ID (up to the same date)
+identifiedTransactions :: Ledger -> [(T.Text, Transaction)]
+identifiedTransactions l =
+  let ts = groupBy (\t1 t2 -> tDate t1 == tDate t2) (lTransactions l)
+  in foldl' makeId [] ts
+
+  where makeId :: [(T.Text, Transaction)] -> [Transaction] -> [(T.Text, Transaction)]
+        makeId s tss =
+          let ns :: [(Integer, Transaction)]
+              ns = zip [1..] tss
+          in s ++ map (\(n, t) -> let d = tDate t in (T.pack (show d ++ "-" ++ show n),t)) ns
+
 type Balance = M.Map Commodity Quantity
 type BalanceDebitCredit = M.Map Commodity (Quantity, Quantity)
 
