@@ -107,8 +107,9 @@ printTransactions l useDebitCredit =
           (serializeAmount acc q) ++
           [c,
            ident,
+           T.pack $ show accountType,
            maybe "" (T.pack . show) number,
-           T.pack $ show accountType
+           maybe "" id (tGuid t)
            ] ++
           serializeTags tags
 
@@ -123,7 +124,7 @@ printTransactions l useDebitCredit =
               [] :
               (["Account Qualified Name", "Account Name", "Date"] ++
                amountTitle ++
-               ["Commodity","Transaction Id", "Account Number","Account Type"] ++
+               ["Commodity","Transaction Id", "Account Type", "Account Number", "Transaction GUID"] ++
                tagKeys) : []
 
       csvlines ::  [[T.Text]]
@@ -170,7 +171,7 @@ printBalanceSheet l =
 
             totalAmounts :: [[T.Text]]
             totalAmounts = map (\(c, q) -> [serializeAmount (accType a) q, c]) (M.toList b)
-            num = maybe "" (T.pack . show) (accNumber a)
+            -- num = maybe "" (T.pack . show) (accNumber a)
 
             beforeName :: [T.Text]
             beforeName = makeBuffer level
@@ -244,7 +245,7 @@ printIncomeStatement l =
 
             totalAmounts :: [[T.Text]]
             totalAmounts = map (\(c, q) -> [serializeAmount (accType a) q, c]) (M.toList b)
-            num = maybe "" (T.pack . show) (accNumber a)
+            -- num = maybe "" (T.pack . show) (accNumber a)
 
             beforeName :: [T.Text]
             beforeName = makeBuffer level

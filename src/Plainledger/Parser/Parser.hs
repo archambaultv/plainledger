@@ -93,6 +93,11 @@ sexp2tags :: Sexp -> Either Error [Tag]
 sexp2tags (SList _ xs) = mapM sexp2tag xs
 sexp2tags x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tags"
 
+sexp2guid :: Sexp -> Either Error Text
+sexp2guid (SSymbol _ s) = return s
+sexp2guid (SString _ s) | not (T.null s) = return s
+sexp2guid x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a symbol or a non empty string"
+
 sexp2keyvalue :: [Sexp] -> Either Error (M.Map Text Sexp)
 sexp2keyvalue xs = do
   xsByPair <- makePair xs
@@ -207,8 +212,9 @@ sexp2RawJournal j (SList pos ((SSymbol _ "transaction") : date : xs))  = do
           desc <- maybe (return []) (\u -> sexp2description u >>= (\y -> return [y])) $ M.lookup ":description" keyValue
           payer <- maybe (return []) (\u -> sexp2payer u >>= (\y -> return [y])) $ M.lookup ":payer" keyValue
           payee <- maybe (return []) (\u -> sexp2payee u >>= (\y -> return [y])) $ M.lookup ":payee" keyValue
+          guid <- maybe (return Nothing) (\u -> sexp2guid u >>= (\y -> return (Just y))) $ M.lookup ":guid" keyValue
           postings <- maybe noPostingError sexp2postings $ M.lookup ":postings" keyValue
-          return $ j{rjTransactions = (RawTransaction day (desc ++ payer ++ payee ++ tags) postings pos) : rjTransactions j}
+          return $ j{rjTransactions = (RawTransaction day (desc ++ payer ++ payee ++ tags) postings pos guid) : rjTransactions j}
 
         noPostingError = Left $ sourcePosPretty pos ++ " No postings in transaction"
 

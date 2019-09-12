@@ -74,7 +74,8 @@ data Transaction = Transaction {
   tDate :: Day,
   tTags :: [Tag],
   tPostings :: [Posting],
-  tSourcePos :: SourcePos
+  tSourcePos :: SourcePos,
+  tGuid :: Maybe T.Text
   }
   deriving (Show)
 
@@ -320,7 +321,8 @@ data RawTransaction = RawTransaction {
   rtDate :: Day,
   rtTags :: [Tag],
   rtPostings :: [RawPosting],
-  rtSourcepos :: SourcePos
+  rtSourcepos :: SourcePos,
+  rtGuid :: Maybe T.Text
   }
 
 data RawBalanceAssertion = RawBalanceAssertion {

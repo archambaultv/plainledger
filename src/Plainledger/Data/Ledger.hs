@@ -50,6 +50,9 @@ rawJournal2Ledger rj =
     l3 <- foldM addTransaction l2 transactions
     let l3' = l3{lTransactions = sortBy (\x y -> compare (tDate x) (tDate y)) (lTransactions l3)}
 
+    -- Check that no transactions have the same GUID
+    _ <- checkUniqueGUID l3'
+    
     -- Compute the accounts balance and check balance assertions
     l4 <- computeCheckBalance l3' balances
 
@@ -57,6 +60,25 @@ rawJournal2Ledger rj =
     _ <- checkClosedAccounts l4
 
     return l4
+
+checkUniqueGUID :: Ledger -> Either Error ()
+checkUniqueGUID l =
+  let ts = lTransactions l
+      guids :: [(SourcePos, T.Text)]
+      guids = foldl' (\gs t -> case tGuid t of Nothing -> gs; Just g -> (tSourcePos t, g) : gs) []  ts
+      groupGuids = groupBy (\g1 g2 -> snd g1 == snd g2) $ sortBy (\g1 g2 -> compare (snd g1) (snd g2)) $ guids
+      moreThanOne = not . null . tail
+      ko = filter moreThanOne groupGuids
+  in if null ko
+     then return ()
+     else let firstBad = head ko
+              guid = T.unpack $ snd $ head firstBad
+              p1 = sourcePosPretty $ fst $ head firstBad
+              second = head . tail
+              p2 = sourcePosPretty $ fst $ second firstBad
+          in Left $ "Duplicate transcation GUID : " ++ guid ++
+                    ". Found at\n  " ++ p1 ++
+                    " and\n  " ++ p2 
 
 checkClosedAccounts :: Ledger -> Either Error ()
 checkClosedAccounts l =
@@ -187,14 +209,14 @@ updateCloseDate l (CloseAccount day name sourcePos) =
              lEndDate = max (lEndDate l) day}
 
 addTransaction :: Ledger -> RawTransaction -> Either Error Ledger
-addTransaction l (RawTransaction day tags rawPostings sourcePos) = do
+addTransaction l (RawTransaction day tags rawPostings sourcePos guid) = do
   rawPostings1 <- mapM updateAccountName rawPostings
   _ <- checkBetweenOpenCloseDate rawPostings1
   let rawPostings2 = map fillMonoCommodity rawPostings1
   rawPostings3 <- fillCommodity rawPostings2
   rawPostings4 <- balancePostings rawPostings3
   t <- return (let p = map (\(Posting' name amount pos) -> Posting name amount t pos) rawPostings4
-                   t = Transaction day tags p sourcePos
+                   t = Transaction day tags p sourcePos guid
                in t)
   return $ newTransaction l t
   
@@ -307,7 +329,7 @@ computeOpeningBalance typeMap ts day openingBalanceAccount =
           let nullPos = SourcePos "" (mkPos 1) (mkPos 1)
               postings = map (\(c, q) -> Posting name (Amount c q) t nullPos) quantities
               postingBalance = map (\(c, q) -> Posting openingBalanceAccount (Amount c (-q)) t nullPos) quantities
-              t = Transaction day [Tag "Virtual transaction" Nothing nullPos] (postings ++ postingBalance) nullPos
+              t = Transaction day [Tag "Virtual transaction" Nothing nullPos] (postings ++ postingBalance) nullPos Nothing
           in t
 
         notRevenueExpense :: Posting -> Bool
