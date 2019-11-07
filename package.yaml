@@ -1,7 +1,7 @@
 name:                plainledger
 version:             0.1.0.0
 github:              "archambaultv/plainledger"
-license:             0BSD
+license:             OtherLicense # OBSD
 author:              "Vincent Archambault-Bouffard"
 maintainer:          "archambault.v@gmail.com"
 copyright:           "2019 Vincent Archambault-Bouffard"
@@ -11,8 +11,8 @@ extra-source-files:
 - ChangeLog.md
 
 # Metadata used when publishing your package
-# synopsis:            Simple plain text accounting program
-# category:            Finance
+synopsis:            Simple plain text accounting program
+category:            Finance
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
