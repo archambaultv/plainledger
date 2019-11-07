@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-13.25
+resolver: lts-14.13
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -39,6 +39,7 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
   - KMP-0.2.0.0@sha256:6dfbac03ef00ebd9347234732cb86a40f62ab5a80c0cc6bedb8eb51766f7df28
+  - sexpresso-1.0.0.2@sha256:5215b30e9e5750eb2ff92238c9d06741e88b69075a665eda62f401e3f3dace5b
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
