@@ -1,4 +1,4 @@
-# Small Ledger
+# Plain Ledger
 
 A KISS plain text double entry accounting program. No fancy query language or portfolio tracking system. This program helps you catch mistakes in your accounting text files and spits out the data in a format easy for you to analyse in Calc or Excel.
 
