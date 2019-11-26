@@ -1,235 +1,235 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Plainledger.Parser.Parser
 (
-  sexps2RawJournal,
-  RawJournal,
-  module Plainledger.Parser.Sexp
+  journal
 ) where
 
+
+import Data.Void
 import Data.Decimal
-import Data.Text as T hiding (filter, map)
+import qualified Data.Text as T
 import Data.Time
-import Data.List as L
+import Data.List
+import Text.Read
+import qualified Data.Set as S
 import qualified Data.Map.Strict as M
-import Control.Monad
-import Plainledger.Parser.Sexp
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as L
+import Control.Applicative.Permutations
+import Data.SExpresso.Parse
 import Plainledger.Data.Type
-import Plainledger.Error
+ 
+type Parser = Parsec Void String
+
+-- The parser does not catch logical errors, only parsing errors
+
+journal :: Parser Journal
+journal = between pSpace eof $ many (located journalEntry)
+
+journalEntry :: Parser JournalEntry
+journalEntry = balance <|> open <|> close <|> transaction <|> configuration
+
+--- Whitespace
+lineComment :: Parser ()
+lineComment = L.skipLineComment ";"
+
+blockComment :: Parser ()
+blockComment = L.skipBlockComment "#|" "|#"
+
+pSpace :: Parser ()
+pSpace = L.space space1 lineComment blockComment
+
+symbol :: String -> Parser String
+symbol = L.symbol pSpace
+
+lexeme :: Parser a -> Parser a
+lexeme = L.lexeme pSpace
+
+paren :: Parser a -> Parser a
+paren = between (symbol "(") (symbol ")")
+
+decimal :: Parser Decimal
+decimal = label "number" $ lexeme $ realToFrac <$> L.signed (pure ()) L.scientific
+
+date :: Parser Day
+date = label "date (YYYY-MM-DD)" $ lexeme $ do
+  year <- count 4 digitChar
+  _ <- char '-'
+  month <- count 2 digitChar
+  _ <- char '-'
+  day <- count 2 digitChar
+  case validDate year month day of
+    Nothing -> fail "Invalid date"
+    Just d -> return  d
+
+  where validDate y m d = do
+          y' <- readMaybe y
+          m' <- readMaybe m
+          d' <- readMaybe d
+          fromGregorianValid y' m' d'
+
+-- Check for duplicated keys
+duplicateKeys :: Ord k => [(k,v)] -> [k]
+duplicateKeys l =
+  let mTest = M.fromListWith (const . const True) (map (fmap (const False)) l)
+  in map fst $ M.toList $ M.filter (== True) mTest
 
 
--- (<?>) :: Either Error a -> Error -> Either Error a
--- Left _ <?> msg = Left msg
--- x <?> _ = x
+identifier :: Parser T.Text
+identifier = do
+  i <- letterChar <|> oneOf initialList
+  is <- many (letterChar <|> digitChar <|> oneOf subsequentList)
+  return $ T.pack (i : is)
 
-sexp2list :: Sexp -> Either Error [Sexp]
-sexp2list (SList _ s) = return s
-sexp2list x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a sexp"
+initialList :: String
+initialList = "!$%&*/<=>?^_~@.#"
 
-sexp2symbol :: Sexp -> Either Error Text
-sexp2symbol (SSymbol _ s) = return s
-sexp2symbol x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a symbol"
+subsequentList :: String
+subsequentList = initialList ++ "+-"
 
-sexp2decimal :: Sexp -> Either Error Decimal
-sexp2decimal (SDecimal _ d) = return d
-sexp2decimal x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a decimal"
+pString :: Parser T.Text
+pString = lexeme $ do
+  _ <- char '"'
+  as <- many (escapedChar <|> noneOf ['\n','\\'])
+  _ <- char '"'
+  return $ T.pack as
 
-sexp2integer :: Sexp -> Either Error Integer
-sexp2integer s = do
-  d <- sexp2decimal s
-  if isInteger d
-  then return (fst $ properFraction $ toRational d)
-  else Left $ sourcePosPretty (sexpSourcePos s) ++ " expecting an integer"
-
-  where isInteger d = roundTo 0 d == d
-
-sexp2text :: Sexp -> Either Error Text
-sexp2text (SString _ s) = return s
-sexp2text x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a string"
-
-sexp2nonemptytext :: Sexp -> Either Error Text
-sexp2nonemptytext x = sexp2text x >>= guardEmptyText
- where guardEmptyText "" = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a non empty string"
-       guardEmptyText t = Right t
-
-sexp2qualifiedname :: Sexp -> Either Error [Text]
-sexp2qualifiedname s = sexp2nonemptytext s >>= (\t -> return $ T.splitOn ":" t)
-
-sexp2day :: Sexp -> Either Error Day
-sexp2day (SDate _ d) = return d
-sexp2day x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a valid date (YYYY-MM-DD)"
-
-sexp2tagValue :: Sexp -> Either Error Text
-sexp2tagValue (SString _ v) = return v
-sexp2tagValue (SSymbol _ s) = return s
-sexp2tagValue (SDecimal _ n) = return $ T.pack $ show n
-sexp2tagValue (SDate _ d) = return $ T.pack $ show d
-sexp2tagValue x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tag value"
-
-sexp2tag :: Sexp -> Either Error Tag
-sexp2tag (SString pos k) = return $ Tag k Nothing pos
-sexp2tag (SList pos [(SString _ k)]) = return $ Tag k Nothing pos
-sexp2tag (SList pos [(SString _ k), v]) = do
-  v' <- sexp2tagValue v
-  return $ Tag k (Just v') pos
-sexp2tag x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tag"
-
-sexp2description :: Sexp -> Either Error Tag
-sexp2description x = do
-  v <- sexp2tagValue x
-  return $ Tag "Description" (Just v) (sexpSourcePos x)
-
-sexp2payer :: Sexp -> Either Error Tag
-sexp2payer x = do
-  v <- sexp2tagValue x
-  return $ Tag "Payer" (Just v) (sexpSourcePos x)
-
-sexp2payee :: Sexp -> Either Error Tag
-sexp2payee x = do
-  v <- sexp2tagValue x
-  return $ Tag "Payee" (Just v) (sexpSourcePos x)
+escapedChar :: Parser Char
+escapedChar = (string "\\n" *> pure '\n') <|>
+              (string "\\\\" *> pure '\\')
   
-sexp2tags :: Sexp -> Either Error [Tag]
-sexp2tags (SList _ xs) = mapM sexp2tag xs
-sexp2tags x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed tags"
+text :: Parser T.Text
+text = label "text" $ lexeme $ (identifier <|> pString)
 
-sexp2guid :: Sexp -> Either Error Text
-sexp2guid (SSymbol _ s) = return s
-sexp2guid (SString _ s) | not (T.null s) = return s
-sexp2guid x = Left $ sourcePosPretty (sexpSourcePos x) ++ " expecting a symbol or a non empty string"
+qualifiedName :: Parser QualifiedName
+qualifiedName = label "qualified name" $ lexeme $ sepBy identifier (char ':')
 
-sexp2keyvalue :: [Sexp] -> Either Error (M.Map Text Sexp)
-sexp2keyvalue xs = do
-  xsByPair <- makePair xs
-  foldM foo M.empty xsByPair
+commodity :: Parser T.Text
+commodity = identifier
 
-  where foo :: M.Map Text Sexp -> (Sexp, Sexp) -> Either Error (M.Map Text Sexp)
-        foo m (k, v) = do
-          k' <- sexp2symbol k
-          case M.lookup k' m of
-            Nothing -> return $ M.insert k' v m
-            Just _ -> Left $ sourcePosPretty (sexpSourcePos k) ++ " Duplicate key " ++ T.unpack k'
+balance :: Parser JournalEntry
+balance = paren $ do
+  _ <- symbol "balance"
+  d <- date
+  n <- qualifiedName
+  q <- decimal
+  c  <- optional commodity
+  return $ JEBalance $ BalanceEntry d n q c
 
-        makePair :: [Sexp] -> Either Error [(Sexp, Sexp)]
-        makePair [] = return []
-        makePair (a : b : ys) = makePair ys >>= \r -> return ((a, b) : r) 
-        makePair (x : _)  = Left $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed key value pair. Odd number of sexpressions"
+open :: Parser JournalEntry
+open = paren $ do
+  _ <- symbol "open"
+  d <- date
+  os <- many (located $ rawOpen)
+  return $ JEOpenAccount $ OpenEntry d os
+    
+rawOpen :: Parser OpenAccountEntry
+rawOpen = paren $ do
+  n <- qualifiedName
+  (num, aCurr, d, aAny) <- runPermutation $
+    (,,,) <$> toPermutationWithDefault Nothing number
+          <*> toPermutationWithDefault Nothing allowedC
+          <*> toPermutationWithDefault Nothing defaultC
+          <*> toPermutationWithDefault False allowAnyC
 
-
-sexp2account :: Day -> Sexp -> Either Error OpenAccount
-sexp2account day (SList pos (name' : xs)) = do
-  name <- sexp2qualifiedname name'
-  keyValue <- sexp2keyvalue xs
-  tags <- maybe (return []) sexp2tags $ M.lookup ":tags" keyValue 
-  number <- maybe (return Nothing) (fmap Just . sexp2integer) $ M.lookup ":number" keyValue
-  commodity <- maybe (return []) (fmap return . sexp2nonemptytext) $ M.lookup ":commodity" keyValue
-  return $ OpenAccount day
-                       name
-                       tags
-                       number
-                       commodity
-                       pos  
-sexp2account _ s = Left $ sourcePosPretty (sexpSourcePos s) ++ " Ill formed account in open statement"
-
-sexp2posting :: Sexp -> Either Error RawPosting
-sexp2posting (SList pos [account]) = do
-  a <- sexp2qualifiedname account
-  return $ RawPosting a (RawAmount Nothing Nothing) pos
-
-sexp2posting (SList pos [account, (SDecimal _ d)]) = do
-  a <- sexp2qualifiedname account
-  return $ RawPosting a (RawAmount Nothing (Just d)) pos
-
-sexp2posting (SList pos [account, c@(SString _ _)]) = do
-  a <- sexp2qualifiedname account
-  c' <- sexp2nonemptytext c 
-  return $ RawPosting a (RawAmount (Just c') Nothing) pos
-
-sexp2posting (SList pos [account, decimal, commodity]) = do
-  a <- sexp2qualifiedname account
-  d <- sexp2decimal decimal
-  c <- sexp2nonemptytext commodity
-  return $ RawPosting a (RawAmount (Just c) (Just d)) pos
-
-sexp2posting s = Left $ sourcePosPretty (sexpSourcePos s) ++ " Ill formed posting"
+  return $ OpenAccountEntry n num aCurr aAny d
   
-sexp2postings :: Sexp -> Either Error [RawPosting]
-sexp2postings (SList pos []) = Left $ sourcePosPretty pos ++ " Empty postings in transaction"
-sexp2postings (SList _ xs) = mapM sexp2posting xs
-sexp2postings x = Left  $ sourcePosPretty (sexpSourcePos x) ++ " Ill formed postings"
+  where number = symbol ":number" *> (lexeme $ Just <$> L.decimal)
+        allowedC = symbol ":allowed-commodities" *> (Just <$> some text)
+        defaultC = symbol ":default-commodity" *> (Just <$> text)
+        allowAnyC = symbol ":allow-any-commodities" *> pure True 
 
-sexps2RawJournal :: [Sexp] -> Either Error RawJournal
-sexps2RawJournal xs = foldM sexp2RawJournal (RawJournal Nothing [] [] [] []) xs
-      
-sexp2RawJournal :: RawJournal -> Sexp -> Either Error RawJournal
+close :: Parser JournalEntry
+close = paren $ do
+  _ <- symbol "close"
+  d <- date
+  n <- some (located qualifiedName)
+  return $ JECloseAccount $ CloseAccountEntry d n
 
-sexp2RawJournal (RawJournal (Just _) _ _ _ _) (SList pos ((SSymbol _ "configuration") : _)) =
-  Left $ sourcePosPretty pos ++ " Duplicate configuration."
-
-sexp2RawJournal j (SList pos ((SSymbol _ "configuration") : xs)) = do
-  keyValue <- sexp2keyvalue xs
-  currency <- lookup' ":main-currency" keyValue >>= sexp2text
-  mapping <- lookup' ":account-type" keyValue >>= sexp2list >>= sexp2keyvalue >>= mapM sexp2text
-             >>= checkMapping
-  openingbalance <- lookup' ":opening-balance-account" keyValue >>= sexp2qualifiedname
-  earningsAccount <- lookup' ":earnings-account" keyValue >>= sexp2qualifiedname
-  return $ j{rjConfiguration = Just (Configuration currency mapping openingbalance earningsAccount pos)}
-
-  where lookup' :: String -> M.Map Text Sexp -> Either Error Sexp
-        lookup' s keyValue =
-          maybe (Left $ sourcePosPretty pos ++ " Missing " ++ s ++ " in configuration")
-                return
-                (M.lookup (T.pack s) keyValue)
-
-        checkMapping :: M.Map Text Text -> Either Error (M.Map Text AccountType)
-        checkMapping m =
-          if M.size m /= 5
-          then Left $ sourcePosPretty pos ++ " Expecting only 5 keys (:asset, :liability, :equity, :revenue, :expense) for the account-type mapping"
-          else fmap M.fromList $ sequence [findKeyword ":asset" Asset,
-                                           findKeyword ":liability"  Liability,
-                                           findKeyword ":equity"  Equity,
-                                           findKeyword ":revenue" Revenue,
-                                           findKeyword ":expense" Expense]
-          where
-            findKeyword :: Text -> AccountType ->  Either Error (Text, AccountType)
-            findKeyword t at =
-              case M.lookup t m of
-                Nothing -> Left $ sourcePosPretty pos ++ " Missing " ++ T.unpack t ++ " in account-type mapping"
-                Just v -> return (v, at)
-          
-sexp2RawJournal j (SList _ ((SSymbol _ "open") : date : xs)) = do
-  day <- sexp2day date
-  accounts <- mapM (sexp2account day) xs
-  return $ j{rjOpenAccounts = accounts ++ rjOpenAccounts j}
-
-sexp2RawJournal j (SList pos ((SSymbol _ "transaction") : date : xs))  = do
-  day <- sexp2day date
-  keyValueParse day
-
-  where keyValueParse day = do
-          keyValue <- sexp2keyvalue xs
-          tags <- maybe (return []) sexp2tags $ M.lookup ":tags" keyValue
-          desc <- maybe (return []) (\u -> sexp2description u >>= (\y -> return [y])) $ M.lookup ":description" keyValue
-          payer <- maybe (return []) (\u -> sexp2payer u >>= (\y -> return [y])) $ M.lookup ":payer" keyValue
-          payee <- maybe (return []) (\u -> sexp2payee u >>= (\y -> return [y])) $ M.lookup ":payee" keyValue
-          guid <- maybe (return Nothing) (\u -> sexp2guid u >>= (\y -> return (Just y))) $ M.lookup ":guid" keyValue
-          postings <- maybe noPostingError sexp2postings $ M.lookup ":postings" keyValue
-          return $ j{rjTransactions = (RawTransaction day (desc ++ payer ++ payee ++ tags) postings pos guid) : rjTransactions j}
-
-        noPostingError = Left $ sourcePosPretty pos ++ " No postings in transaction"
-
-sexp2RawJournal j (SList pos ((SSymbol _ "balance") : date : name : quantity : comm)) = do
-  day <- sexp2day date
-  account <- sexp2qualifiedname name
-  d <- sexp2decimal quantity
-  c <- if L.null comm then (return Nothing) else sexp2nonemptytext (L.head comm) >>= (return . Just)
-  return $ j{rjBalanceAssertions = (RawBalanceAssertion day account (RawQuantity c d) pos) : rjBalanceAssertions j}
-
-sexp2RawJournal j (SList pos ((SSymbol _ "close") : date : xs)) = do
-  day <- sexp2day date
-  accounts <- mapM sexp2qualifiedname xs
-  let cs = map (\t -> CloseAccount day t pos) accounts
-  return $ j{rjCloseAccounts = cs ++ rjCloseAccounts j}
+tag :: Parser Tag
+tag = do
+  key <- char ':' *> identifier
+  value <- optional (text <|> (T.pack . show <$> decimal) <|> (T.pack . show <$> date))
+  return $ Tag key value
   
-sexp2RawJournal _ x = Left $ sourcePosPretty (sexpSourcePos x) ++ " Unknown entry. Expecting configuration, open, transaction, balance or close statement."
+transaction :: Parser JournalEntry
+transaction = paren $ do
+  _ <- symbol "transaction"
+  d <- date
+  (postings, tags1) <- runPermutation $
+    (,) <$> toPermutation posting
+        <*> toPermutationWithDefault [] tags
+  tags2 <- option [] tags
+  let tagss = tags1 ++ tags2
+  return $ JETransaction $ Transaction d tagss postings
   
+  where posting = symbol ":postings" *> (some (located rawPosting) <?> "posting")
+        tags = many (located tag)
+
+rawPosting :: Parser PostingEntry
+rawPosting = paren $ do
+  n <- qualifiedName
+  q <- optional decimal
+  c <- optional commodity
+  return $ Posting n q c
+
+configuration :: Parser JournalEntry
+configuration = paren $ do
+  _ <- symbol "configuration"
+  c <- runPermutation $
+    Configuration <$> toPermutation defaultCommodity
+        <*> toPermutation accountTypeC
+        <*> toPermutation openingAccount
+        <*> toPermutation earningsAccount
+        <*> toPermutationWithDefault M.empty tagDescriptionP
+        <*> toPermutationWithDefault "True" tagDefaultValue
+        <*> toPermutationWithDefault "False" tagValueIfMissing
+  return $ JEConfiguration c
+  
+  where defaultCommodity = symbol ":main-currency" *> text
+        accountTypeC = symbol ":account-type" *> accountType
+        openingAccount = symbol ":opening-balance-account" *> qualifiedName
+        earningsAccount = symbol ":earnings-account" *> qualifiedName
+        tagDescriptionP = symbol ":tags-description" *> tagDescription
+        tagDefaultValue = symbol ":tags-default-value" *> text
+        tagValueIfMissing = symbol ":tags-value-if-not-tagged" *> text
+
+accountType :: Parser (M.Map AccountName AccountType)
+accountType = paren $ do
+  s <- getParserState
+  (a,l,e,r,ex) <- runPermutation $
+    (,,,,) <$> toPermutation (category "asset" Asset)
+           <*> toPermutation (category "liability" Liability)
+           <*> toPermutation (category "equity" Equity)
+           <*> toPermutation (category "revenue" Revenue)
+           <*> toPermutation (category "expense" Expense)
+  let xs = (a ++ l ++ e ++ r ++ ex)
+  let d = duplicateKeys xs
+  if null d
+   then return $ M.fromList xs
+   else let dStr = intercalate " " $ map T.unpack d
+        in setParserState s >> fail ("The following names appear more than once in :account-type " ++ dStr)
+  
+  where category s t = (map (,t) . S.toList . S.fromList) <$> (symbol (':' : s) *> some text)
+
+tagDescription :: Parser (M.Map T.Text TagDescription)
+tagDescription = toMap <$> (many $ paren $ do
+  t <- identifier
+  td <- runPermutation $
+    TagDescription t <$> toPermutationWithDefault t name
+           <*> toPermutationWithDefault False unique
+           <*> toPermutationWithDefault Nothing foreignKey
+           <*> toPermutationWithDefault "True" defaultValue
+           <*> toPermutationWithDefault "False" valueIfMissing
+  return td)
+  
+  where name = symbol ":header" *> text
+        unique = symbol ":unique" *> pure True
+        foreignKey = symbol ":foreign-key" *> (Just <$> text)
+        defaultValue = symbol ":default-value" *> text
+        valueIfMissing = symbol ":value-if-not-tagged" *> text
+
+        toMap = M.fromList . fmap (\td -> (tdTagKeyword td, td))

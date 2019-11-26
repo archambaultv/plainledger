@@ -28,9 +28,12 @@ dependencies:
 - Decimal
 - optparse-applicative
 - mtl
-- KMP
 - cassava
 - bytestring
+- sexpresso
+- parser-combinators
+- recursion-schemes
+- bifunctors
 
 ghc-options:
   - -Wall
