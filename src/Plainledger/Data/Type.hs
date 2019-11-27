@@ -7,6 +7,10 @@
 -- For simplicity, all the datatypes are defined here.
 -- See the corresponding modules for the related functions.
 module Plainledger.Data.Type (
+  Algebra,
+  CoAlgebra,
+  RCoAlgebra,
+
   AccountingType(..),
 
   Tag(..),
@@ -60,6 +64,10 @@ import Data.Functor.Classes
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Data.SExpresso.Parse.Location
+
+type Algebra f a = f a -> a
+type CoAlgebra f a = a -> f a
+type RCoAlgebra f t a = a -> f (Either t a)
 
 data AccountingType = PlusMinus | DebitCredit
                     deriving (Eq, Ord, Show)
@@ -139,7 +147,7 @@ type Balance = M.Map Commodity (Quantity, Quantity)
 
 data AccountInfo
   = VirtualAccount {
---   aQName :: QualifiedName
+   aQName :: QualifiedName
    }
   | RealAccount {
    aOpenDate :: Day,

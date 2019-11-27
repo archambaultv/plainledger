@@ -3,7 +3,8 @@
 
 module Plainledger.Parser.Parser
 (
-  journal
+  journal,
+  date
 ) where
 
 

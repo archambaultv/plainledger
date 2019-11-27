@@ -3,15 +3,15 @@
 
 module Plainledger.Data.Ledger (
   journalToLedger,
---  adjustDate,
---  lAccountSortedByType
+  adjustDate,
+  accountsSortedByType
   ) where
 
 import Prelude hiding (span)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Tree
+--import Data.Tree
 import Data.Time
 import Data.Bifunctor
 import Data.List
@@ -19,14 +19,15 @@ import Data.Maybe
 import Data.Functor.Foldable
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.State
-import Text.Megaparsec (SourcePos(..), sourcePosPretty, mkPos)  
+--import Control.Monad.State
+--import Text.Megaparsec (SourcePos(..), sourcePosPretty, mkPos)  
 import Data.SExpresso.Parse.Location
 import Plainledger.Data.Type
 import Plainledger.Data.QualifiedName
 import Plainledger.Data.Journal
 import Plainledger.Data.Account
 import Plainledger.Data.Balance
+import Plainledger.Data.Transaction
 import Plainledger.Error
 
 -- Returns the ledger that corresponds to the journal file.
@@ -125,9 +126,6 @@ addAccounts (OpenEntry date ys) l = do
             (Just _, _) -> throwError $ "Account " ++ qualifiedNameToString (aQName acc) ++ " is already open"
 
 
--- tDate :: Day,
--- tTags :: [t],
--- tPostings :: [p]
 addTransaction :: (MonadError Error m) =>
                   TransactionEntry ->
                   Ledger ->
@@ -139,7 +137,8 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
   rawPostings3 <- fillCommodity rawPostings2
   rawPostings4 <- balancePostings rawPostings3
   let t' = t{tPostings = rawPostings4, tTags = map snd tags}
-  return $ l{lTransactions = t'  : lTransactions l}
+  let acc' = updateBalance t' (lAccounts l)
+  return $ l{lTransactions = t'  : lTransactions l, lAccounts = acc'}
   
   where
    checkBetweenOpenCloseDate :: (MonadError Error m) => [PostingEntry] -> m ()
@@ -210,7 +209,6 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
        in concat <$> traverse f grp
 
    -- -- Group posting by commodity
-   -- -- If commodity is Nothing it is matched with the "" currency
    groupPostings :: [PostingF q Commodity] -> [(Commodity, [PostingF q Commodity])]
    groupPostings rps =
      let x = map (\r -> (pCommodity r, [r])) rps
@@ -223,9 +221,9 @@ verifyBalance :: (MonadError Error m) =>
 verifyBalance be l = do
   fullName <- findFullQualifiedName (M.keys (lAccounts l)) (bName be)
   let acc = (lAccounts l) M.! fullName
-  let comm = maybe (aDefaultCommodity acc) id (bCommodity be)
-  let (d,c) = maybe (0,0) id $ M.lookup comm $ aBalance $ acc
+  let comm = fromMaybe (aDefaultCommodity acc) (bCommodity be)
   _ <- guardAllowedCommodity comm acc
+  let (d,c) = fromMaybe (0,0) $ M.lookup comm $ aBalance $ acc
   if (d - c) == (bQuantity be)
     then return l
     else throwError $ "Balance assertion failed for account \"" ++
@@ -233,7 +231,6 @@ verifyBalance be l = do
          "\"\n The computed balance is " ++ show (d - c) ++
          " while the assertion is " ++ show (bQuantity be)
   
-
 
 closeAccounts :: (MonadError Error m) =>
                  CloseAccountEntry ->
@@ -272,9 +269,6 @@ closeAccounts (CloseAccountEntry date names) l = do
           then return ()
           else throwError $ "Unable to close account " ++ qualifiedNameToString (aQName acc) ++
                " because its balance is not at zero"
-                    
---     -- Check that no transactions have the same GUID
---     _ <- checkUniqueGUID l3'
     
 -- checkUniqueGUID :: Ledger -> Either Error ()
 -- checkUniqueGUID l =
@@ -295,162 +289,44 @@ closeAccounts (CloseAccountEntry date names) l = do
 --                     ". Found at\n  " ++ p1 ++
 --                     " and\n  " ++ p2 
 
+adjustDate :: Ledger -> Maybe Day -> Maybe Day -> Ledger
+adjustDate l maybeStart maybeEnd =
+  let (beforeT, keepT, afterT) = splitTransactions maybeStart maybeEnd (lTransactions l)
 
+      cleanAccount :: AccountMap
+      cleanAccount = fmap (\info -> info{aBalance = M.empty}) (lAccounts l)
 
--- addTransaction :: Ledger -> RawTransaction -> Either Error Ledger
--- addTransaction l (RawTransaction day tags rawPostings sourcePos guid) = do
---   rawPostings1 <- mapM findFullQualifiedNameInPosting rawPostings
---   _ <- checkBetweenOpenCloseDate rawPostings1
---   let rawPostings2 = map fillMonoCommodity rawPostings1
---   rawPostings3 <- fillCommodity rawPostings2
---   rawPostings4 <- balancePostings rawPostings3
---   t <- return (let p = map (\(Posting' name amount pos) -> Posting name amount t pos) rawPostings4
---                    t = Transaction day tags p sourcePos guid
---                in t)
---   return $ newTransaction l t
+  in case (beforeT, afterT) of
+       -- The ledger is the same as the one we received
+       ([],[]) -> l
+       -- We discard the afterT transactions and build an initial balance
+       -- with the beforeT transactions
+       _ -> let openedAccount = foldr updateBalance cleanAccount beforeT
+                keepAccount = foldr updateBalance openedAccount keepT
+            in l{lTransactions = keepT, lAccounts = keepAccount}
   
+updateBalance :: Transaction -> AccountMap -> AccountMap
+updateBalance t amap =
+  let ps = tPostings t
+      adjustBalance :: Commodity -> Quantity -> AccountInfo -> AccountInfo
+      adjustBalance c q = \info ->
+        let x = if q < 0 then (0, negate q) else (q, 0)
+            b = M.insertWith
+                (\(dr, cr) (dr', cr') -> (dr + dr', cr + cr'))
+                c
+                x
+                (aBalance info)
+        in info{aBalance = b}
+      update :: Posting -> AccountMap -> AccountMap
+      update p m = M.adjust
+                   (adjustBalance (pCommodity p) (pQuantity p))
+                   (pAccount p)
+                   m
+  in foldr update amap ps
 
---   where
---    checkBetweenOpenCloseDate :: [PostingEntry] -> Either Error ()
---    checkBetweenOpenCloseDate rps =
---      let accountInfos = lAccounts l
---          accounts = map (\r -> accountInfos M.! (rpAccount r)) rps
---          openDate = filter (\(_,a) -> aOpenDate a > day) $ zip rps accounts
---          closeDate = filter (\(_,a) -> maybe False (\d -> d < day) (aCloseDate a)) $ zip rps accounts
---      in case (openDate, closeDate) of
---          ([],[]) -> return ()
---          (((rp,a):_),_) -> Left $ sourcePosPretty (rpSourcePos rp) ++
---                             " Posting to the account "++ (qualifiedName2String $ rpAccount rp) ++
---                             " before the account was opened (opened on :" ++ (show $ aOpenDate a) ++ ")"
---          (_, ((rp,a):_)) -> Left $ sourcePosPretty (rpSourcePos rp) ++
---                             " Posting to the account " ++ (qualifiedName2String $ rpAccount rp) ++
---                             " after the account was closed (closed on :" ++ (show $ aCloseDate a) ++ ")"
-    
---    newTransaction :: Ledger -> Transaction -> Ledger
---    newTransaction ledger t = ledger{lTransactions = t : lTransactions ledger, lEndDate = max (lEndDate ledger) (tDate t)}
-
-
---    fillMonoCommodity :: PostingEntry -> PostingEntry
---    fillMonoCommodity r@(PostingEntry name (RawAmount Nothing q) s) =
---      let accountInfo = lAccounts l M.! name
---          commodities = aAllowedCommodities accountInfo
---      in if S.size commodities == 1
---         then PostingEntry name (RawAmount (Just $ aDefaultCommodity accountInfo) q) s
---         else r
---    fillMonoCommodity r = r
-
---    -- -- Group posting by commodity
---    -- -- If commodity is Nothing it is matched with the "" currency
---    groupPostings :: [PostingEntry] -> [[PostingEntry]]
---    groupPostings rps =
---      let comm = map (\r -> maybe "" id $ raCommodity $ rpAmount r) rps
---          commPosting = zip comm $ map (\x -> [x]) rps
---      in map snd $ M.toList $ M.fromListWith (++) commPosting
-
---    fillCommodity :: [PostingEntry] -> Either Error [PostingEntry]
---    fillCommodity rp =
---      let knownCommodities = S.fromList $ filter (not . T.null) $ map (maybe "" id . raCommodity . rpAmount) rp
---          foo (PostingEntry name (RawAmount Nothing q) s) =
---             let accountInfo = lAccounts l M.! name
---                 postingCommodities = aAllowedCommodities accountInfo
---                 candidates = S.intersection knownCommodities postingCommodities
---             in if S.size candidates == 1
---                then return $ PostingEntry name (RawAmount (Just (S.elemAt 0 candidates)) q) s
---                else Left $ sourcePosPretty s ++
---                          " Unable to infer commodity for this posting. Possible candidates are :" ++ intercalate ", " (map T.unpack $ S.toList candidates)
---          foo r = return r
---      in mapM foo rp
-                               
---    balancePostings :: [PostingEntry] -> Either Error [Posting']
---    balancePostings rp =
---        let f xs = let (noQuantity, withQuantity) = partition (maybe True (const False) . raQuantity . rpAmount) xs
---                       s = sum (map (\r -> maybe 0 id (raQuantity $ rpAmount r)) withQuantity)
---                       curr = if null withQuantity then "" else fromJust $ raCommodity $ rpAmount $ head withQuantity
---                   in case noQuantity of
---                         [] -> if s == 0
---                               then return xs
---                               else Left $ sourcePosPretty sourcePos ++
---                              " Transaction does not balance for commodity " ++ T.unpack curr
---                         [x] -> let negS = negate s
---                                in return $ x{rpAmount = (rpAmount x){raQuantity = Just negS}} : withQuantity
---                         _ -> Left $ sourcePosPretty sourcePos ++
---                              "More than one postings with no specified quantity for the commodity " ++ T.unpack curr
---            grp = groupPostings rp
---            convert (PostingEntry name (RawAmount (Just c) (Just q)) s) = Posting' name (Amount c q) s
---            convert _ = error "RawAmount of PostingEntry has some unfilled fields"
---        in (map convert . concat) <$> mapM f grp
-
-
--- computeOpeningBalance :: M.Map QualifiedName AccountType -> [Transaction] -> Day -> QualifiedName -> [Transaction]
--- computeOpeningBalance typeMap ts day openingBalanceAccount =
---   let b = foldl updateBalance M.empty (filter notRevenueExpense $ concatMap tPostings ts)
---       balanceList = M.toList (fmap M.toList b)
---   in map buildTransaction balanceList
-
---   where updateBalance :: M.Map QualifiedName Balance -> Posting -> M.Map QualifiedName Balance
---         updateBalance b (Posting name (Amount comm quantity) _ _) =
---           let nameF Nothing = Just $ M.fromList [(comm, quantity)]
---               nameF (Just m) = Just $ M.alter commF comm m
-
---               commF Nothing = Just quantity
---               commF (Just q) = Just $ q + quantity
---           -- in
---           in M.alter nameF name b
---            -- M.insertWith (\_ m -> M.insertWith (+) comm quantity m) name M.empty b
-          
---         buildTransaction :: (QualifiedName, [(Commodity, Quantity)]) -> Transaction
---         buildTransaction (name, quantities) =
---           let nullPos = SourcePos "" (mkPos 1) (mkPos 1)
---               postings = map (\(c, q) -> Posting name (Amount c q) t nullPos) quantities
---               postingBalance = map (\(c, q) -> Posting openingBalanceAccount (Amount c (-q)) t nullPos) quantities
---               t = Transaction day [Tag "Virtual transaction" Nothing nullPos] (postings ++ postingBalance) nullPos Nothing
---           in t
-
---         notRevenueExpense :: Posting -> Bool
---         notRevenueExpense Posting{pAccount = n} = (typeMap M.! n) `elem` [Asset, Liability, Equity]
-
--- adjustDate :: Ledger -> Maybe Day -> Maybe Day -> Ledger
--- adjustDate l Nothing endDate = adjustDate l (Just (lStartDate l)) endDate
--- adjustDate l startDate Nothing = adjustDate l startDate (Just (lEndDate l))
--- adjustDate l (Just s) (Just e) = adjustDate' l s e 
-
--- adjustDate' :: Ledger -> Day -> Day -> Ledger
--- adjustDate' l newStartDate newEndDate | lStartDate l >= newStartDate && lEndDate l <= newEndDate = l
--- adjustDate' l newStartDate newEndDate =
---   -- Delete all the accounts closed before the new startDate
---   -- Delete all the accounts opened after the new endDate
---   -- Updates other relevant fields accordingly
---   let
---       accountsInfo = M.toList (lAccounts l)
---       keepAccount (_, info) =
---         let o = aOpenDate info
---             c = aCloseDate info
---         in o <= newEndDate  &&
---            maybe True (\c' -> c' >= newStartDate) c
---       keptAccounts = map (\(n, i) -> (n, i{aBalance = M.empty})) $ filter keepAccount accountsInfo
---       keptAccountsInfo = M.fromList keptAccounts
-
---   -- Compute the accounts balance to the day before the new date
---   -- and add a transaction at the startdate posting to the opening
---   -- balance for each accounts
---       transactions = (lTransactions l)
---       transactionsBeforeStart = filter (\t -> tDate t < newStartDate) transactions
---       initialTransactions = computeOpeningBalance
---                             (fmap (\info -> aType info) (lAccounts l))
---                             transactionsBeforeStart
---                             newStartDate
---                             (cOpeningBalanceAccount $ lConfiguration l)
---       -- Remove opening transaction with amount 0
---       initialTransactions2 = filter (not . emptyTransaction) initialTransactions
-                            
---   -- Delete all transactions done before the new startDate and after the
---   -- new endate
---       keptTransactions = filter (\t -> tDate t >= newStartDate && tDate t <= newEndDate) transactions
-
---       l2 = Ledger newStartDate newEndDate (lConfiguration l) (initialTransactions2 ++ keptTransactions) keptAccountsInfo
-
---   in computeBalance l2
-
--- -- Sorted by AccountType
--- lAccountSortedByType :: Ledger -> [(QualifiedName, AccountInfo)]
--- lAccountSortedByType l = sortBy (\(n1, a1) (n2, a2) -> compare (aType a1, n1) (aType a2, n2)) (M.toList $ lAccounts l)
+-- Sorted by AccountType and then by name
+accountsSortedByType :: Ledger -> [(QualifiedName, AccountInfo)]
+accountsSortedByType l = sortBy sortByType (M.toList $ lAccounts l)
+  where sortByType (n1, _) (n2, _) =
+          let accMap = cAccountTypeMapping $ lConfiguration l
+          in compare (accMap M.! head n1, n1) (accMap M.! head n2, n2)

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 
 module Plainledger.Data.Account (
   mapToTree,
@@ -10,15 +11,19 @@ module Plainledger.Data.Account (
   isDebitAccount,
   isAllowedCommodity,
   guardAllowedCommodity,
-
-  --depth,
-  pruneEmptyAccounts,
+--  pruneEmptyAccounts,
+--  flattenBalance,
+  minAndMaxDates,
+  flattenBalance,
+  totalBalance,
+  updateAccount
 )
 where
 
 import Data.Tree
 import Data.Maybe
 import Data.List
+import Data.Time
 import Data.Bifunctor
 import Control.Monad.Except
 import qualified Data.Set as S
@@ -27,6 +32,7 @@ import qualified Data.Map.Strict as M
 import Plainledger.Data.Type
 import Plainledger.Error
 import Plainledger.Data.QualifiedName
+import Plainledger.Data.Balance
 import Data.Functor.Foldable
 
 isAllowedCommodity :: Commodity -> AccountInfo -> Bool
@@ -46,38 +52,28 @@ aName :: AccountInfo -> T.Text
 aName = last . aQName
 
 mapToTree :: AccountMap -> Account
-mapToTree = ana coAlgebra . (,) (VirtualAccount) . M.toList
-  where coAlgebra :: (AccountInfo, [(QualifiedName, AccountInfo)]) ->
-                     TreeF AccountInfo (AccountInfo, [(QualifiedName, AccountInfo)])
-        coAlgebra (acc, xs) =
+mapToTree = ana coAlgebra . (,) (VirtualAccount{aQName = []}) . M.toList
+  where coAlgebra :: CoAlgebra (TreeF AccountInfo) (AccountInfo, [(QualifiedName, AccountInfo)]) 
+        coAlgebra (acc, children) =
           let xsGroup :: [[(QualifiedName, AccountInfo)]]
-              xsGroup = groupBy (\x1 x2 -> (head $ fst x1) == (head $ fst x2)) xs
-          in NodeF acc (map makeAccount xsGroup)
+              xsGroup = groupBy (\x1 x2 -> (head $ fst x1) == (head $ fst x2)) children
+          in NodeF acc (map (makeAccount acc) xsGroup)
 
-        makeAccount :: [(QualifiedName, AccountInfo)] -> (AccountInfo, [(QualifiedName, AccountInfo)])
-        makeAccount (([_] , info) : xs) = (info, map (first tail) xs)
-        makeAccount ((_:vs, info) : xs) = (VirtualAccount , (vs, info) : map (first tail) xs)
-        makeAccount _ = error "Invalid makeAccount call"
+        makeAccount :: AccountInfo -> [(QualifiedName, AccountInfo)] -> (AccountInfo, [(QualifiedName, AccountInfo)])
+        makeAccount _ (([_] , info) : xs) = (info, map (first tail) xs)
+        makeAccount acc ((v:vs, info) : xs) = (VirtualAccount{aQName = aQName acc ++ [v]} , (vs, info) : map (first tail) xs)
+        makeAccount _ _ = error "Invalid makeAccount call"
 
--- mapToTree :: AccountMap -> [Account]
--- mapToTree = makeForest . M.toList
-
--- -- The list must be sorted by QualifiedName !
--- makeForest :: [(QualifiedName, AccountInfo)] -> [Account]
--- makeForest xs =
---   let xsGroup :: [[(QualifiedName, AccountInfo)]]
---       xsGroup = groupBy (\x1 x2 -> (head $ fst x1) == (head $ fst x2)) xs
---   in map makeTree xsGroup
-
--- -- The list have qualified names starting with the same account name
--- makeTree :: [(QualifiedName, AccountInfo)] -> Account
--- makeTree (([_] , info) : xs) =
---   let children = makeForest $ map (first tail) xs
---   in Node info children
--- makeTree ((v : vs, info) : xs) =
---   let child = makeTree $ (vs, info) : map (first tail) xs
---   in Node (VirtualAccount (v:vs)) [child]
--- makeTree _ = error "Invalid use of makeTree"
+updateAccount :: (AccountInfo -> AccountInfo) -> QualifiedName -> Account -> Account
+updateAccount f n a = apo coAlgebra (n, a)
+ where coAlgebra :: RCoAlgebra (TreeF AccountInfo) Account (QualifiedName, Account)
+       coAlgebra ([], _) = error "QualifiedName must be a non empty list"
+       coAlgebra ([x], Node acc children)
+         | last (aQName acc) == x =  NodeF (f acc) (map Left children)
+         | otherwise = NodeF acc (map Left children)
+       coAlgebra ((x:xs), Node acc children)
+         | last (aQName acc) == x =  NodeF acc (map (Right . (xs,)) children)
+         | otherwise = NodeF acc (map Left children)
 
 isRealAccount :: AccountInfo -> Bool
 isRealAccount VirtualAccount{} = False
@@ -97,13 +93,42 @@ isDebitAccount a = a `elem` [Asset, Expense]
 --  where algebra :: TreeF a Integer -> Integer
 --        algebra (NodeF _ xs) = 1 + sum xs
 
-pruneEmptyAccounts :: Account -> Maybe Account
-pruneEmptyAccounts = cata algebra
- where algebra :: TreeF AccountInfo (Maybe Account) -> Maybe Account
-       algebra (NodeF info xs) =
-         let nonEmpty = catMaybes $ xs
-         in if null nonEmpty &&
-               (isVirtualAccount info ||
-                isRealAccount info && M.empty == aBalance info)
-            then Nothing
-            else Just $ Node info nonEmpty
+-- pruneEmptyAccounts :: Account -> Maybe Account
+-- pruneEmptyAccounts = filterAccounts (not . M.null . aBalance)
+
+-- filterAccounts :: (AccountInfo -> Bool) -> Account -> Maybe Account
+-- filterAccounts f s = cata algebra
+--  where algebra :: TreeF AccountInfo (Maybe Account) -> Maybe Account
+--        algebra (NodeF info xs) =
+--          let nonEmpty = catMaybes $ xs
+--              test = f info
+--          in if null nonEmpty &&
+--                (isVirtualAccount info ||  not test)
+--             then Nothing
+--             else if test
+--                  then Just $ Node info nonEmpty
+--                  else Just $ Node VirtualAccount nonEmpty
+           
+minAndMaxDates :: Account -> (Day, Day)
+minAndMaxDates = cata algebra
+  where algebra (NodeF VirtualAccount{} dts) =
+          (minimum $ map fst dts, maximum $ map snd dts)
+        algebra (NodeF RealAccount{aOpenDate = s, aCloseDate = c} dts) =
+          let e = fromMaybe s $ c
+          in (minimum $ s : map fst dts, maximum $ e : map snd dts)
+
+flattenBalance :: Tree AccountInfo -> [(AccountInfo, Commodity, (Quantity, Quantity))]
+flattenBalance = cata algebra
+  where
+      algebra (NodeF VirtualAccount{} ls) = concat ls
+      algebra (NodeF a ls) =
+        let lines1 :: [(AccountInfo, Commodity, (Quantity, Quantity))]
+            lines1 = map (\(c, amount) -> (a, c, amount)) $ M.toList (aBalance a)
+        in concat (lines1 : ls)
+
+totalBalance :: Tree AccountInfo -> Balance
+totalBalance = cata algebra
+  where
+      algebra (NodeF VirtualAccount{} bs) = sumBalance bs
+      algebra (NodeF a bs) = sumBalance (aBalance a : bs)
+        

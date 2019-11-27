@@ -8,8 +8,9 @@ where
 
 import Data.Time
 import Data.Char
+import Plainledger.Data.Type
 
-data Command = Command CommandName FilePath FilePath (Maybe Day) (Maybe Day) Bool
+data Command = Command CommandName FilePath FilePath (Maybe Day) (Maybe Day) AccountingType
              deriving (Show)
 
 data CommandName = BalanceSheet
