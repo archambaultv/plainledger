@@ -7,7 +7,7 @@ import Options.Applicative
 import qualified Text.Megaparsec as M
 
 import Plainledger.Data.Type (AccountingType(..))
-import Plainledger.Parser.Parser (date)
+import Plainledger.Parser.Lexer (date)
 import Plainledger.CLIOptions
 import Plainledger.Run
 

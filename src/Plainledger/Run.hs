@@ -12,7 +12,7 @@ import qualified Data.Text.Lazy as L
 import Data.Bifunctor ( first )
 import Control.Monad.Except
 import Text.Megaparsec
-import Plainledger.Parser.Parser
+import Plainledger.Parser.Journal
 import Plainledger.CLIOptions
 import Plainledger.Error
 import Plainledger.Data.Ledger

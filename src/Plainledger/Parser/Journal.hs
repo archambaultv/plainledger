@@ -1,19 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
-module Plainledger.Parser.Parser
+module Plainledger.Parser.Journal
 (
-  journal,
-  date
+  journal
 ) where
 
 
-import Data.Void
-import Data.Decimal
 import qualified Data.Text as T
-import Data.Time
 import Data.List
-import Text.Read
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Text.Megaparsec
@@ -22,55 +17,16 @@ import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Applicative.Permutations
 import Data.SExpresso.Parse
 import Plainledger.Data.Type
+import Plainledger.Parser.Lexer
  
-type Parser = Parsec Void String
-
 -- The parser does not catch logical errors, only parsing errors
 
 journal :: Parser Journal
 journal = between pSpace eof $ many (located journalEntry)
 
 journalEntry :: Parser JournalEntry
-journalEntry = balance <|> open <|> close <|> transaction <|> configuration
-
---- Whitespace
-lineComment :: Parser ()
-lineComment = L.skipLineComment ";"
-
-blockComment :: Parser ()
-blockComment = L.skipBlockComment "#|" "|#"
-
-pSpace :: Parser ()
-pSpace = L.space space1 lineComment blockComment
-
-symbol :: String -> Parser String
-symbol = L.symbol pSpace
-
-lexeme :: Parser a -> Parser a
-lexeme = L.lexeme pSpace
-
-paren :: Parser a -> Parser a
-paren = between (symbol "(") (symbol ")")
-
-decimal :: Parser Decimal
-decimal = label "number" $ lexeme $ realToFrac <$> L.signed (pure ()) L.scientific
-
-date :: Parser Day
-date = label "date (YYYY-MM-DD)" $ lexeme $ do
-  year <- count 4 digitChar
-  _ <- char '-'
-  month <- count 2 digitChar
-  _ <- char '-'
-  day <- count 2 digitChar
-  case validDate year month day of
-    Nothing -> fail "Invalid date"
-    Just d -> return  d
-
-  where validDate y m d = do
-          y' <- readMaybe y
-          m' <- readMaybe m
-          d' <- readMaybe d
-          fromGregorianValid y' m' d'
+journalEntry = paren $
+               balance <|> open <|> close <|> transaction <|> configuration
 
 -- Check for duplicated keys
 duplicateKeys :: Ord k => [(k,v)] -> [k]
@@ -78,41 +34,11 @@ duplicateKeys l =
   let mTest = M.fromListWith (const . const True) (map (fmap (const False)) l)
   in map fst $ M.toList $ M.filter (== True) mTest
 
-
-identifier :: Parser T.Text
-identifier = do
-  i <- letterChar <|> oneOf initialList
-  is <- many (letterChar <|> digitChar <|> oneOf subsequentList)
-  return $ T.pack (i : is)
-
-initialList :: String
-initialList = "!$%&*/<=>?^_~@.#"
-
-subsequentList :: String
-subsequentList = initialList ++ "+-"
-
-pString :: Parser T.Text
-pString = lexeme $ do
-  _ <- char '"'
-  as <- many (escapedChar <|> noneOf ['\n','\\'])
-  _ <- char '"'
-  return $ T.pack as
-
-escapedChar :: Parser Char
-escapedChar = (string "\\n" *> pure '\n') <|>
-              (string "\\\\" *> pure '\\')
-  
-text :: Parser T.Text
-text = label "text" $ lexeme $ (identifier <|> pString)
-
-qualifiedName :: Parser QualifiedName
-qualifiedName = label "qualified name" $ lexeme $ sepBy identifier (char ':')
-
 commodity :: Parser T.Text
-commodity = identifier
+commodity = text
 
 balance :: Parser JournalEntry
-balance = paren $ do
+balance =  do
   _ <- symbol "balance"
   d <- date
   n <- qualifiedName
@@ -121,7 +47,7 @@ balance = paren $ do
   return $ JEBalance $ BalanceEntry d n q c
 
 open :: Parser JournalEntry
-open = paren $ do
+open =  do
   _ <- symbol "open"
   d <- date
   os <- many (located $ rawOpen)
@@ -144,7 +70,7 @@ rawOpen = paren $ do
         allowAnyC = symbol ":allow-any-commodities" *> pure True 
 
 close :: Parser JournalEntry
-close = paren $ do
+close =  do
   _ <- symbol "close"
   d <- date
   n <- some (located qualifiedName)
@@ -157,7 +83,7 @@ tag = do
   return $ Tag key value
   
 transaction :: Parser JournalEntry
-transaction = paren $ do
+transaction = do
   _ <- symbol "transaction"
   d <- date
   (postings, tags1) <- runPermutation $
@@ -178,7 +104,7 @@ rawPosting = paren $ do
   return $ Posting n q c
 
 configuration :: Parser JournalEntry
-configuration = paren $ do
+configuration = do
   _ <- symbol "configuration"
   c <- runPermutation $
     Configuration <$> toPermutation defaultCommodity
