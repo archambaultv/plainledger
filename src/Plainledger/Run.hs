@@ -5,15 +5,16 @@ module Plainledger.Run
   run
   ) where
 
-
+import Data.Time
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy.Encoding as E
 import qualified Data.Text.Lazy as L
 import Data.Bifunctor ( first )
 import Control.Monad.Except
 import Text.Megaparsec
+import Plainledger.Data.Type
 import Plainledger.Parser.Journal
-import Plainledger.CLIOptions
+import Plainledger.Commands
 import Plainledger.Error
 import Plainledger.Data.Ledger
 import Plainledger.Printer.Printer
@@ -22,22 +23,50 @@ run :: Command -> IO ()
 run c = runExceptT (runT c) >>= either putStrLn return
 
 runT :: Command -> ExceptT Error IO () 
-runT (Command command input output startDate endDate accountingType) = do
+runT command = 
+  case command of
+    CImport c -> runImport c
+    CModify c -> runModify c
+    CBalanceSheet c -> runBalanceSheet c
+    CIncome c -> runIncome c
+    CTrialBalance c -> runTrialBalance c --return $ printTrialBalance startDate endDate adjustedLedger accountingType
+    CTransactions c -> runTransactions c
 
-  lift $ putStrLn "Parsing input file"
+getLedger :: String -> Maybe Day -> Maybe Day -> ExceptT Error IO Ledger
+getLedger input startDate endDate = do
   stream <- lift $ readFile input
   j <- liftEither $ first errorBundlePretty $ parse journal input stream
-
-  lift $ putStrLn "Building the ledger"
   ledger <- liftEither $ journalToLedger j
-  let adjustedLedger = adjustDate ledger startDate endDate
+  return $ adjustDate ledger startDate endDate
 
-  lift $ putStrLn "Executing the command"  
-  res <- case command of
-           BalanceSheet -> return $ printBalanceSheet startDate endDate adjustedLedger
-           IncomeStatement -> return $ printIncomeStatement startDate endDate adjustedLedger
-           TrialBalance -> return $ printTrialBalance startDate endDate adjustedLedger accountingType
-           Transactions -> return $ printTransactions startDate endDate adjustedLedger accountingType
-  case null output of
-    True -> lift $ putStrLn $ L.unpack $ E.decodeUtf8 res
-    False -> lift $ B.writeFile output res
+printStream :: Maybe String -> B.ByteString -> ExceptT Error IO ()
+printStream f s =
+  case f of
+    Nothing -> lift $ putStrLn $ L.unpack $ E.decodeUtf8 s
+    Just output -> lift $ B.writeFile output s
+  
+runImport :: ImportCommand -> ExceptT Error IO ()
+runImport _ = return ()
+
+runModify :: ModifyCommand -> ExceptT Error IO ()
+runModify _ = return ()
+
+runBalanceSheet :: BalanceSheetCommand -> ExceptT Error IO ()
+runBalanceSheet c =  do
+  l <- getLedger (bcInputFile c) (bcStart c) (bcEnd c)
+  printStream (bcOutputFile c) $ printBalanceSheet (bcStart c) (bcEnd c) l
+
+runIncome :: IncomeCommand -> ExceptT Error IO ()
+runIncome c = do
+  l <- getLedger (incInputFile c) (incStart c) (incEnd c)
+  printStream (incOutputFile c) $ printIncomeStatement (incStart c) (incEnd c) l
+
+runTransactions :: TransactionsCommand -> ExceptT Error IO ()
+runTransactions c = do
+  l <- getLedger (tcInputFile c) (tcStart c) (tcEnd c)
+  printStream (tcOutputFile c) $ printTransactions (tcStart c) (tcEnd c) l (tcAccType c)
+
+runTrialBalance :: TrialBalanceCommand -> ExceptT Error IO ()
+runTrialBalance c = do
+  l <- getLedger (tbcInputFile c) (tbcStart c) (tbcEnd c)
+  printStream (tbcOutputFile c) $ printTrialBalance (tbcStart c) (tbcEnd c) l (tbcAccType c)

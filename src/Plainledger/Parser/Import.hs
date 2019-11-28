@@ -15,6 +15,8 @@ import Plainledger.Parser.Lexer
 
 data ImportConfiguration = ImportConfiguration {
   columnDelimiter :: Char,
+  skip :: Int,
+  defaultCommodity :: Commodity,
   dateColumn :: Int,
   debitColumn :: Int,
   creditColumn :: Int,
@@ -33,6 +35,8 @@ importConf = lexeme $ paren $ do
   c <- runPermutation $
     ImportConfiguration <$>
     toPermutationWithDefault ',' pdelimiter <*>
+    toPermutationWithDefault 1 pskip <*>
+    toPermutation pcommodity <*>
     toPermutation pdateColumn <*>
     toPermutation pdebitColumn <*>
     toPermutation pcreditColumn <*>
@@ -47,13 +51,15 @@ importConf = lexeme $ paren $ do
 
   where integer = lexeme L.decimal
         pdelimiter = symbol ":column-delimiter" *> (lexeme anySingle)
+        pcommodity = symbol ":commodity" *> text
+        pskip = symbol ":rows-to-skip" *> integer
         pdateColumn = symbol ":date-column" *> integer
         pdebitColumn = symbol ":debit-column" *> integer
         pcreditColumn = symbol ":credit-column" *> integer 
         pbalanceColumn = symbol ":balance-column" *> integer
-        ptagColumns  = symbol ":date-column" *> some (paren $ (,) <$> integer <*> text)
+        ptagColumns  = symbol ":tag-columns" *> some (paren $ (,) <$> integer <*> text)
 
-        paccount = symbol ":account" *> qualifiedName
-        paccountCredit = symbol ":second-entry-account-when-account-is-credited" *> qualifiedName
-        paccountDebit = symbol ":second-entry-account-when-account-is-debited" *> qualifiedName
+        paccount = symbol ":main-account" *> qualifiedName
+        paccountCredit = symbol ":second-account-credit" *> qualifiedName
+        paccountDebit = symbol ":second-account-debit" *> qualifiedName
         prules = symbol ":import-rules-file" *> some text
