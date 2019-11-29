@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Plainledger.Parser.Lexer
 (
@@ -14,12 +16,17 @@ module Plainledger.Parser.Lexer
   decimal,
   date,
   text,
-  qualifiedName  
+  qualifiedName,
+  escapedChar,
+  graphicChar,
+  isGraphicChar,
+  commodity
 ) where
 
 import qualified Data.Char as C
 import Data.Void
 import Data.Decimal
+import Data.Proxy
 import qualified Data.Text as T
 import Data.Time
 import Text.Read
@@ -30,30 +37,37 @@ import Plainledger.Data.Type
  
 type Parser = Parsec Void String
 
+-- proxy :: Proxy Char
+-- proxy = Proxy
 
 --- Whitespace
-lineComment :: Parser ()
-lineComment = L.skipLineComment ";"
+lineComment :: forall e s m. (MonadParsec e s m, Token s ~ Char) => m ()
+lineComment = L.skipLineComment (tokensToChunk (Proxy :: Proxy s) ";")
 
-blockComment :: Parser ()
-blockComment = L.skipBlockComment "#|" "|#"
+blockComment :: forall e s m. (MonadParsec e s m, Token s ~ Char) => m ()
+blockComment = L.skipBlockComment
+               (tokensToChunk (Proxy :: Proxy s) "#|")
+               (tokensToChunk (Proxy :: Proxy s) "|#")
 
-pSpace :: Parser ()
+pSpace :: (MonadParsec e s m, Token s ~ Char) => m ()
 pSpace = L.space space1 lineComment blockComment
 
-symbol :: String -> Parser String
-symbol = L.symbol pSpace
+symbol :: forall e s m. (MonadParsec e s m, Token s ~ Char) => String -> m (Tokens s)
+symbol s = L.symbol pSpace (tokensToChunk (Proxy :: Proxy s) s)
 
-lexeme :: Parser a -> Parser a
+lexeme :: (MonadParsec e s m, Token s ~ Char) => m a -> m a
 lexeme = L.lexeme pSpace
 
-paren :: Parser a -> Parser a
+paren :: (MonadParsec e s m, Token s ~ Char) => m a -> m a
 paren = between (symbol "(") (symbol ")")
 
-decimal :: Parser Decimal
+decimal :: (MonadParsec e s m, Token s ~ Char) => m Decimal
 decimal = label "number" $ lexeme $ realToFrac <$> L.signed (pure ()) L.scientific
 
-date :: Parser Day
+commodity :: Parser T.Text
+commodity = text
+
+date :: (MonadParsec e s m, Token s ~ Char) => m Day
 date = label "date (YYYY-MM-DD)" $ lexeme $ do
   year <- count 4 digitChar
   _ <- char '-'
@@ -70,31 +84,36 @@ date = label "date (YYYY-MM-DD)" $ lexeme $ do
           d' <- readMaybe d
           fromGregorianValid y' m' d'
 
+-- The following characters are reserved characters " ` ' ? : and cannot
+-- be used in identifier (use a string instead) . They are needed for the regex in the
+-- import command and for strings
 identifier :: Parser T.Text
 identifier = do
   i <- letterChar <|> oneOf initialList
-  is <- many (letterChar <|> digitChar <|> oneOf subsequentList)
+  is <- many (alphaNumChar <|> oneOf subsequentList)
   return $ T.pack (i : is)
 
 initialList :: String
-initialList = "!$%&*/<=>?^_~@.#"
+initialList = "!$%&*/<=>^~@.#_"
 
 subsequentList :: String
 subsequentList = initialList ++ "+-"
 
-graphic :: Parser Char
-graphic = satisfy graphic'
- where graphic' '"' = False
-       graphic' '\\' = False
-       graphic' ' ' = True
-       graphic' x = C.isAlphaNum x ||
-                    C.isPunctuation x ||
-                    C.isSymbol x
+graphicChar :: Parser Char
+graphicChar = satisfy isGraphicChar
+
+isGraphicChar :: Char -> Bool
+isGraphicChar '"' = False
+isGraphicChar '\\' = False
+isGraphicChar ' ' = True
+isGraphicChar x = C.isAlphaNum x ||
+                  C.isPunctuation x ||
+                  C.isSymbol x
 
 pString :: Parser T.Text
 pString = lexeme $
           between (char '"') (char '"')
-          (T.pack <$> many (escapedChar <|> graphic))
+          (T.pack <$> many (escapedChar <|> graphicChar))
 
 escapedChar :: Parser Char
 escapedChar = (string "\\n" *> pure '\n') <|>
@@ -106,14 +125,19 @@ escapedChar = (string "\\n" *> pure '\n') <|>
               (string "\\f" *> pure '\f') <|>
               (string "\\\\" *> pure '\\') <|>
               (string "\\\"" *> pure '"') <|>
-              (between (string "\\U(")) (char ')') (L.decimal >>= validChar) <|>
-              (between (string "\\Uo(")) (char ')') (L.octal >>= validChar) <|>
-              (between (string "\\Ux(")) (char ')') (L.hexadecimal >>= validChar)
+              (between uniDecimal (char '}') (L.decimal >>= validChar)) <|>
+              (between uniOctal (char '}') (L.octal >>= validChar)) <|>
+              (between uniHexa (char '}') (L.hexadecimal >>= validChar))
 
   where validChar i =
           if i <= 0x10FFFF
           then return $ C.chr i
           else fail $ show i ++ " is greater than the maximum unicode valid code point (x10FFFF)"
+
+        uniStart = char '\\' >> oneOf ("uU" :: String)
+        uniDecimal = uniStart >> char '{'
+        uniOctal = uniStart >> string "o{"
+        uniHexa = uniStart >> string "x{"
 
 text :: Parser T.Text
 text = label "text" $ lexeme $ (identifier <|> pString)

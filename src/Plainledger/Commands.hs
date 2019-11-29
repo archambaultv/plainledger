@@ -55,9 +55,10 @@ data BalanceSheetCommand = BalanceSheetCommand {
   
 data ImportCommand = ImportCommand {
   icCsvFile :: String,
-  icJournalFile :: Maybe String,
+  icConfig :: String,
   icDryRun :: Bool,
-  icConfig :: String
+  icJournalFile :: Maybe String,
+  icRules :: [String]
   }
 
 data ModifyCommand = ModifyCommand {

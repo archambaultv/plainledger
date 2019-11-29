@@ -1,3 +1,4 @@
+
 module Main where
 
 import Data.Semigroup ( (<>) )
@@ -7,13 +8,13 @@ import Options.Applicative
 import qualified Text.Megaparsec as M
 
 import Plainledger.Data.Type (AccountingType(..))
-import Plainledger.Parser.Lexer (date)
+import qualified Plainledger.Parser.Lexer as L
 import Plainledger.Commands
 import Plainledger.Run
 
 dateparser :: Char -> String -> String -> String -> Parser (Maybe Day)
 dateparser shortOption optionStr helpStr meta = option
-  (eitherReader $ fmap Just . first M.errorBundlePretty . M.parse date "")
+  (eitherReader $ fmap Just . first M.errorBundlePretty . M.parse (L.date :: L.Parser Day) "")
   (value Nothing <>
    short shortOption <>
    long optionStr <>
@@ -103,13 +104,22 @@ trialBalanceInfo = info (trialBalanceCommand <**> helper)
 importCommand :: Parser Command
 importCommand = CImport <$> (ImportCommand
     <$> argument str (metavar "CSV-FILE" <> help "The CSV file containing the new transactions")
+    <*> strOption (short 'c' <>
+                   long "config" <>
+                   metavar "CONFIG-FILE" <>
+                   help "The configuration file that specifies how to parse the CSV-FILE")
+    <*> switch ( long "dry-run" <>
+                 short 'd' <>
+                 help "Just show the transactions to be imported. Does not append the new transactions to JOURNAL-FILE")
     <*> optional (strOption (short 'j' <>
                              long "journal" <>
                              metavar "JOURNAL-FILE" <>
                              help ("The journal to which the new transactions will be appended. " ++
                                    "A new file will be created if it doesn't exists. Defaults to STDOUT.")))
-    <*> switch ( long "dry-run" <> short 'd' <> help "Just show the transactions to be imported. Does not append the new transactions to JOURNAL-FILE")
-    <*> strOption (short 'c' <> long "config" <> metavar "CONFIG-FILE" <> help "The configuration file that specifies how to parse the CSV-FILE"))
+    <*> many (strOption (short 'r' <>
+                         long "rules" <>
+                         metavar "RULE-FILES" <>
+                         help "The rule file that specifies how to modify the new transactions read from the CSV-FILE")))
 
 importInfo :: ParserInfo Command
 importInfo = info (importCommand <**> helper)
@@ -134,5 +144,3 @@ opts = info (parseCommand <**> helper)
 
 main :: IO ()
 main = execParser opts >>= run
-   
-      

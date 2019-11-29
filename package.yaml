@@ -29,11 +29,14 @@ dependencies:
 - optparse-applicative
 - mtl
 - cassava
+- cassava-megaparsec
 - bytestring
 - sexpresso
 - parser-combinators
 - recursion-schemes
 - bifunctors
+- regex-tdfa
+- vector
 
 ghc-options:
   - -Wall

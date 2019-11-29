@@ -13,7 +13,8 @@ module Plainledger.Data.Type (
 
   AccountingType(..),
 
-  Tag(..),
+  TagF(..),
+  Tag,
   TagDescription(..),
   
   Quantity,
@@ -48,6 +49,7 @@ module Plainledger.Data.Type (
   BalanceEntry(..),
   PostingEntry,
 
+  ImportConfiguration(..),
 )
 where
 
@@ -72,10 +74,12 @@ type RCoAlgebra f t a = a -> f (Either t a)
 data AccountingType = PlusMinus | DebitCredit
                     deriving (Eq, Ord, Show)
 
-data Tag = Tag {
+data TagF a = Tag {
   tagKeyword :: T.Text,
-  tagValue :: Maybe (T.Text)
-  } deriving (Show)
+  tagValue :: a
+  } deriving (Show, Functor, Foldable, Traversable)
+
+type Tag = TagF (Maybe (T.Text))
 
 -- Tags are compared and sorted based on their keys
 instance Eq Tag where
@@ -114,8 +118,8 @@ type Quantity = Decimal
 
 type Commodity = T.Text
 
-data PostingF q c = Posting {
-  pAccount :: QualifiedName,
+data PostingF n q c = Posting {
+  pAccount :: n,
   pQuantity :: q, --Quantity,
   pCommodity :: c -- Commodity
   }
@@ -125,11 +129,11 @@ $(deriveBifunctor ''PostingF)
 $(deriveBifoldable ''PostingF)
 $(deriveBitraversable ''PostingF)
 
-type Posting = PostingF Quantity Commodity
-type PostingEntry = PostingF (Maybe Quantity) (Maybe Commodity)
+type Posting = PostingF QualifiedName Quantity Commodity
+type PostingEntry = PostingF QualifiedName (Maybe Quantity) (Maybe Commodity)
 
-data TransactionF t p = Transaction {
-  tDate :: Day,
+data TransactionF d t p = Transaction {
+  tDate :: d,
   tTags :: [t],
   tPostings :: [p]
   }
@@ -139,8 +143,8 @@ $(deriveBifunctor ''TransactionF)
 $(deriveBifoldable ''TransactionF)
 $(deriveBitraversable ''TransactionF)
 
-type Transaction = TransactionF Tag Posting
-type TransactionEntry = TransactionF (Located Tag) (Located PostingEntry)
+type Transaction = TransactionF Day Tag Posting
+type TransactionEntry = TransactionF Day (Located Tag) (Located PostingEntry)
 
 -- Both debit and credit are positif integer
 type Balance = M.Map Commodity (Quantity, Quantity)
@@ -226,3 +230,19 @@ data OpenAccountEntry = OpenAccountEntry {
   oaDefaultCommodity :: Maybe Commodity
   }
   deriving (Show)
+
+------
+
+data ImportConfiguration = ImportConfiguration {
+  columnDelimiter :: Char,
+  skip :: Int,
+  defaultCommodity :: Commodity,
+  dateColumn :: Int,
+  debitColumn :: Int,
+  creditColumn :: Int,
+  balanceColumn :: Maybe Int,
+  tagColumns :: [(Int, T.Text)],
+  iAccount :: QualifiedName,
+  iAccountNegative :: QualifiedName,
+  iAccountPositive :: QualifiedName
+  }

@@ -5,18 +5,25 @@ module Plainledger.Run
   run
   ) where
 
+import Data.Char
+import Data.Csv
+import qualified Data.List as DL
+import qualified Data.Csv.Parser.Megaparsec as M
 import Data.Time
 import qualified Data.ByteString.Lazy as B
-import qualified Data.Text.Lazy.Encoding as E
+import qualified Data.Text.Lazy.Encoding as EL
 import qualified Data.Text.Lazy as L
 import Data.Bifunctor ( first )
 import Control.Monad.Except
 import Text.Megaparsec
 import Plainledger.Data.Type
 import Plainledger.Parser.Journal
+import Plainledger.Parser.Import
+import Plainledger.Parser.Rule
 import Plainledger.Commands
 import Plainledger.Error
 import Plainledger.Data.Ledger
+import Plainledger.Data.Transaction
 import Plainledger.Printer.Printer
 
 run :: Command -> IO ()
@@ -42,11 +49,43 @@ getLedger input startDate endDate = do
 printStream :: Maybe String -> B.ByteString -> ExceptT Error IO ()
 printStream f s =
   case f of
-    Nothing -> lift $ putStrLn $ L.unpack $ E.decodeUtf8 s
+    Nothing -> lift $ putStrLn $ L.unpack $ EL.decodeUtf8 s
     Just output -> lift $ B.writeFile output s
-  
+
+printString :: Maybe String -> String -> ExceptT Error IO ()
+printString f s =
+  case f of
+    Nothing -> lift $ putStrLn $ s
+    Just output -> lift $ writeFile output s
+    
 runImport :: ImportCommand -> ExceptT Error IO ()
-runImport _ = return ()
+runImport c = do
+  -- Read configuration
+  stream <- lift $ readFile (icConfig c)
+  config <- liftEither $ first errorBundlePretty $ parse importConf (icConfig c) stream
+
+  -- Read the rules files (if any)
+  rules <- concat <$> traverse parseRuleFile (icRules c)
+
+  -- Read the csv file
+  csvStream <- lift $ B.readFile (icCsvFile c)
+  let csvOpts = defaultDecodeOptions {
+        decDelimiter = fromIntegral (ord (columnDelimiter config))
+        }
+  csvData <- liftEither $ first errorBundlePretty $ M.decodeWith csvOpts NoHeader (icCsvFile c) csvStream
+
+  -- Build transactions
+  ts <- liftEither $ importTransactions config csvData
+
+  -- Apply modification rules
+
+  -- Print transactions
+  printString (icJournalFile c) (DL.intercalate "\n\n" $ map printTransaction ts)
+
+  where parseRuleFile :: String -> ExceptT Error IO [TransactionRule]
+        parseRuleFile input = do
+          stream <- lift $ readFile input
+          liftEither $ first errorBundlePretty $ parse parseRules input stream
 
 runModify :: ModifyCommand -> ExceptT Error IO ()
 runModify _ = return ()

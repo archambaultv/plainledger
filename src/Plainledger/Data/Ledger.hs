@@ -171,7 +171,7 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
         else r
    fillMonoCommodity r = r
 
-   fillCommodity :: (MonadError Error m) => [PostingEntry] -> m [PostingF (Maybe Quantity) Commodity]
+   fillCommodity :: (MonadError Error m) => [PostingEntry] -> m [PostingF QualifiedName (Maybe Quantity) Commodity]
    fillCommodity rp =
      let knownCommodities = S.fromList $  mapMaybe pCommodity rp
          fill x@Posting{pAccount = name, pCommodity = Nothing} =
@@ -187,12 +187,12 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
          fill r = return r{pCommodity = fromJust (pCommodity r)}
      in mapM fill rp
                                
-   balancePostings :: (MonadError Error m) => [PostingF (Maybe Quantity) Commodity] -> m [Posting]
+   balancePostings :: (MonadError Error m) => [PostingF QualifiedName (Maybe Quantity) Commodity] -> m [Posting]
    balancePostings rp =
-       let grp :: [(Commodity, [PostingF (Maybe Quantity) Commodity])]
+       let grp :: [(Commodity, [PostingF QualifiedName (Maybe Quantity) Commodity])]
            grp = groupPostings rp
 
-           f :: (MonadError Error m) => (Commodity, [PostingF (Maybe Quantity) Commodity]) -> m [Posting]
+           f :: (MonadError Error m) => (Commodity, [PostingF QualifiedName (Maybe Quantity) Commodity]) -> m [Posting]
            f (curr, xs) =
               let (noQuantity, withQuantity) = fmap (map (first fromJust)) $ partition (isNothing . pQuantity) xs
                   s = sum $ map pQuantity withQuantity
@@ -209,7 +209,7 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
        in concat <$> traverse f grp
 
    -- -- Group posting by commodity
-   groupPostings :: [PostingF q Commodity] -> [(Commodity, [PostingF q Commodity])]
+   groupPostings :: [PostingF QualifiedName q Commodity] -> [(Commodity, [PostingF QualifiedName q Commodity])]
    groupPostings rps =
      let x = map (\r -> (pCommodity r, [r])) rps
      in M.toList $ M.fromListWith (++) x

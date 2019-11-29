@@ -50,7 +50,7 @@ amountTitle :: AccountingType -> [T.Text]
 amountTitle x = case x of
                   DebitCredit -> ["Debit", "Credit"]
                   PlusMinus -> ["Amount"]
-
+        
 printTrialBalance :: Maybe Day -> Maybe Day -> Ledger -> AccountingType -> B.ByteString
 printTrialBalance start end l accountingType =
   let root = mapToTree $ lAccounts l

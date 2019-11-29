@@ -34,9 +34,6 @@ duplicateKeys l =
   let mTest = M.fromListWith (const . const True) (map (fmap (const False)) l)
   in map fst $ M.toList $ M.filter (== True) mTest
 
-commodity :: Parser T.Text
-commodity = text
-
 balance :: Parser JournalEntry
 balance =  do
   _ <- symbol "balance"
@@ -78,7 +75,7 @@ close =  do
 
 tag :: Parser Tag
 tag = do
-  key <- char ':' *> identifier
+  key <- char ':' *> lexeme identifier
   value <- optional (text <|> (T.pack . show <$> decimal) <|> (T.pack . show <$> date))
   return $ Tag key value
   
@@ -107,7 +104,7 @@ configuration :: Parser JournalEntry
 configuration = do
   _ <- symbol "configuration"
   c <- runPermutation $
-    Configuration <$> toPermutation defaultCommodity
+    Configuration <$> toPermutation defaultCommodityP
         <*> toPermutation accountTypeC
         <*> toPermutation openingAccount
         <*> toPermutation earningsAccount
@@ -116,7 +113,7 @@ configuration = do
         <*> toPermutationWithDefault "False" tagValueIfMissing
   return $ JEConfiguration c
   
-  where defaultCommodity = symbol ":main-currency" *> text
+  where defaultCommodityP = symbol ":main-currency" *> text
         accountTypeC = symbol ":account-type" *> accountType
         openingAccount = symbol ":opening-balance-account" *> qualifiedName
         earningsAccount = symbol ":earnings-account" *> qualifiedName
