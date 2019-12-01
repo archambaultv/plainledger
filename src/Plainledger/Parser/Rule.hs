@@ -73,9 +73,17 @@ variable = char '?' >> (T.unpack <$> identifier)
 withRegex :: Parser a -> Parser (ERegex a)
 withRegex p = regex <|> (Right <$> p)
 
+regexUse :: Parser String
+regexUse = string "\\?{" *> (T.unpack <$> identifier) <* char '}'
+
+replaceString :: Parser [Either String String]
+replaceString = between (char '\"') (char '\"') $ many $ 
+                (Right <$> many (escapedChar <|> graphicChar)) <|>
+                (Left <$> regexUse)
+                 
 withReplace :: Parser a -> Parser (Replace a)
-withReplace p = (Variable 0 <$> variable) <|>
-                (Replace <$> regexP) <|>
+withReplace p = (Variable 0 <$> lexeme variable) <|>
+                (Replace <$> replaceString ) <|>
                 (RawInput <$> p)
      
 withReplaceDecimal :: Parser a -> Parser (Replace a)

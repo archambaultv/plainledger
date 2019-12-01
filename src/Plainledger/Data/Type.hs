@@ -265,7 +265,7 @@ type TagMatch = TagF (Maybe (ERegex T.Text))
 
 data Replace a
   = Variable Decimal String
-  | Replace String
+  | Replace [Either String String]
   | RawInput a
 type TransactionReplace = TransactionF (Maybe (Replace Day)) TagReplace PostingReplace
 type PostingReplace = PostingF (Replace QualifiedName) (Replace Quantity) (Replace Commodity)
