@@ -50,6 +50,15 @@ module Plainledger.Data.Type (
   PostingEntry,
 
   ImportConfiguration(..),
+  ERegex,
+  TransactionRule,
+  TransactionMatch,
+  PostingMatch,
+  TagMatch,
+  Replace(..),
+  TransactionReplace,
+  PostingReplace,
+  TagReplace,
 )
 where
 
@@ -246,3 +255,19 @@ data ImportConfiguration = ImportConfiguration {
   iAccountNegative :: QualifiedName,
   iAccountPositive :: QualifiedName
   }
+
+type TransactionRule = (TransactionMatch, Maybe TransactionReplace)
+
+type ERegex a = Either ([String], String) a
+type TransactionMatch = TransactionF (Maybe (ERegex Day)) (Bool, TagMatch) (Bool, PostingMatch)
+type PostingMatch = PostingF (ERegex QualifiedName) (ERegex Quantity) (ERegex Commodity)
+type TagMatch = TagF (Maybe (ERegex T.Text))
+
+data Replace a
+  = Variable Decimal String
+  | Replace String
+  | RawInput a
+type TransactionReplace = TransactionF (Maybe (Replace Day)) TagReplace PostingReplace
+type PostingReplace = PostingF (Replace QualifiedName) (Replace Quantity) (Replace Commodity)
+type TagReplace = TagF (Maybe (Replace T.Text))
+

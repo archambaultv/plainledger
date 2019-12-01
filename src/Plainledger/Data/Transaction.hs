@@ -7,7 +7,9 @@ module Plainledger.Data.Transaction (
   splitTransactions,
   minMaxDates,
   importTransactions,
-  printTransaction
+  printTransaction,
+  applyRules,
+  applyRule
 )
 where
 
@@ -19,6 +21,7 @@ import Data.Void
 import qualified Data.Vector as V
 import qualified Data.Text as T
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import qualified Data.Text.Encoding as E
 import Text.Megaparsec
 import Plainledger.Data.QualifiedName
@@ -26,7 +29,9 @@ import Plainledger.Parser.Lexer
 import Plainledger.Data.Posting
 import Plainledger.Data.Type
 import Plainledger.Error
+import Plainledger.Utils
 import Data.Functor.Foldable
+import Text.Regex.TDFA
 
 minMaxDates :: [Transaction] -> Maybe (Day, Day)
 minMaxDates = cata algebra
@@ -143,3 +148,87 @@ importTransactions config csv =
         toTag :: (T.Text, (Int, T.Text)) -> Tag
         toTag (v, (_, k)) | T.null v = Tag k Nothing
         toTag (v, (_, k)) = Tag k (Just v)
+
+-- Apply the rules from left to right. Stops if an error
+-- happens. Stops when the transaction is deleted.
+applyRules :: [TransactionRule] -> Transaction -> Either Error (Maybe Transaction)
+applyRules rules t = cata algebra rules t
+  where algebra :: Algebra (ListF TransactionRule) (Transaction -> Either Error (Maybe Transaction))
+        algebra Nil t1 = pure $ Just t1
+        algebra (Cons rule acc) t1 =
+          case applyRule t1 rule of
+            Right (Just t2) -> acc t2
+            x -> x
+            
+applyRule :: Transaction -> TransactionRule -> Either Error (Maybe Transaction)
+applyRule t rule =
+  case applyMatch (fst rule) t of
+    Left Nothing -> pure $ Just t
+    Left (Just err) -> Left err
+    Right vars -> case (snd rule) of
+      -- The Nothing case means we need to delete the transaction
+      Nothing -> pure Nothing
+      -- We modify the transaction according to the template
+      Just template -> pure $ Just t -- fromTemplate vars template t
+
+  where applyMatch :: TransactionMatch -> Transaction -> Either (Maybe Error) (M.Map String String)
+        applyMatch m t1 =  do
+           v1 <- matchDate (tDate m) (tDate t1)
+           v2 <- matchPostings (map snd $ tPostings m) (tPostings t1)
+           v3 <- matchTags (map snd $ tTags m) (tTags t1)
+           let vars = v1 ++ v2 ++ v3
+           let dups = duplicateKeys vars
+           case dups of
+             [] -> pure $ M.fromList vars
+             _ -> Left $ Just $ "Conflicting definitions for " ++ intercalate ", " dups
+
+        regexMatch :: (Eq a) => (a -> String) -> ERegex a -> a -> Either (Maybe Error) [(String, String)]
+        regexMatch _ (Right x1) x2 = if x1 == x2
+                                     then pure []
+                                     else Left Nothing
+        regexMatch f (Left (vars, re)) x2 =
+          let m :: (String, String, String, [String])
+              m = (f x2) =~ re
+          in case m of
+               (_,(_:_),_,vs) -> zipEither vars vs
+               _ -> Left Nothing
+
+        matchDate :: Maybe (ERegex Day) -> Day -> Either (Maybe Error) [(String, String)]
+        matchDate Nothing _ = pure []
+        matchDate (Just d1) d2 = regexMatch show d1 d2
+
+        
+        matchRegexList :: (r -> Algebra (ListF a) (Either (Maybe Error) [(String, String)])) ->
+                          [r] ->
+                          [a] ->
+                          Either (Maybe Error) [(String, String)]
+        matchRegexList algebra rs xs = concat <$> traverse (matchRegexList1 xs) rs
+          where matchRegexList1 as r = cata (algebra r) as
+
+        matchPostings :: [PostingMatch] -> [Posting] -> Either (Maybe Error) [(String, String)]
+        matchPostings = matchRegexList alg
+          where alg _ Nil = Left Nothing
+                alg pM (Cons p acc) = either (maybe acc (Left . Just)) pure $ do
+                  p1 <- regexMatch qualifiedNameToString (pAccount pM) (pAccount p)
+                  p2 <- regexMatch show (pQuantity pM) (pQuantity p)
+                  p3 <- regexMatch T.unpack (pCommodity pM) (pCommodity p)
+                  return $ p1 ++ p2 ++ p3
+
+
+        matchTags :: [TagMatch] -> [Tag] -> Either (Maybe Error) [(String, String)]
+        matchTags = matchRegexList alg
+          where alg _ Nil = Left Nothing
+                alg tM (Cons t1 acc) =
+                  case (t1, tM) of
+                    (Tag k1 _, Tag k2 _) | k1 /= k2 -> acc
+                    (Tag _ Nothing, Tag _ Nothing) -> pure []
+                    (Tag _ (Just v), Tag _ (Just re)) -> regexMatch T.unpack re v 
+                    _ -> Left Nothing
+        
+        zipEither :: [String] -> [String] -> Either (Maybe Error) [(String, String)]
+        zipEither [] _ = pure []
+        zipEither _ [] = Left $ Just "Not enough sub matches for the number of variables"
+        zipEither ("_":xs) (_:ys) = zipEither xs ys
+        zipEither (x:xs) (y:ys) = do
+          l <- zipEither xs ys
+          pure $ (x, y) : l

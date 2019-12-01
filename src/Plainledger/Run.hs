@@ -5,6 +5,7 @@ module Plainledger.Run
   run
   ) where
 
+import Data.Maybe
 import Data.Char
 import Data.Csv
 import qualified Data.List as DL
@@ -78,9 +79,10 @@ runImport c = do
   ts <- liftEither $ importTransactions config csvData
 
   -- Apply modification rules
+  tsR <- liftEither $ catMaybes <$> traverse (applyRules rules) ts
 
   -- Print transactions
-  printString (icJournalFile c) (DL.intercalate "\n\n" $ map printTransaction ts)
+  printString (icJournalFile c) (DL.intercalate "\n\n" $ map printTransaction tsR)
 
   where parseRuleFile :: String -> ExceptT Error IO [TransactionRule]
         parseRuleFile input = do

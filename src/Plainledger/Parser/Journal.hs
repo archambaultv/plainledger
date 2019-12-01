@@ -17,6 +17,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Applicative.Permutations
 import Data.SExpresso.Parse
 import Plainledger.Data.Type
+import Plainledger.Utils
 import Plainledger.Parser.Lexer
  
 -- The parser does not catch logical errors, only parsing errors
@@ -27,12 +28,6 @@ journal = between pSpace eof $ many (located journalEntry)
 journalEntry :: Parser JournalEntry
 journalEntry = paren $
                balance <|> open <|> close <|> transaction <|> configuration
-
--- Check for duplicated keys
-duplicateKeys :: Ord k => [(k,v)] -> [k]
-duplicateKeys l =
-  let mTest = M.fromListWith (const . const True) (map (fmap (const False)) l)
-  in map fst $ M.toList $ M.filter (== True) mTest
 
 balance :: Parser JournalEntry
 balance =  do
