@@ -84,9 +84,6 @@ date = label "date (YYYY-MM-DD)" $ lexeme $ do
           d' <- readMaybe d
           fromGregorianValid y' m' d'
 
--- The following characters are reserved characters " ` ' ? : and cannot
--- be used in identifier (use a string instead) . They are needed for the regex in the
--- import command and for strings
 identifier :: Parser T.Text
 identifier = do
   i <- letterChar <|> oneOf initialList
@@ -97,7 +94,7 @@ initialList :: String
 initialList = "!$%&*/<=>^~@.#_"
 
 subsequentList :: String
-subsequentList = initialList ++ "+-"
+subsequentList = initialList ++ "+-?"
 
 graphicChar :: Parser Char
 graphicChar = satisfy isGraphicChar
