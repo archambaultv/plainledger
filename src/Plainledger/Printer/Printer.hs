@@ -41,7 +41,7 @@ serializeAmount t (dr, cr) =
                    in if total > 0
                       then [T.pack $ show total, ""]
                       else if total < 0
-                           then ["", T.pack $ show total]
+                           then ["", T.pack $ show $ negate total]
                            else ["",""]
     PlusMinus -> [T.pack $ show (dr - cr)]
 
