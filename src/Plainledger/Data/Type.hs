@@ -86,6 +86,7 @@ type RCoAlgebra f t a = a -> f (Either t a)
 
 type Located a = (SourceOffset, a)
 
+-- Rename to AccountingFormat ???
 data AccountingType = PlusMinus | DebitCredit
                     deriving (Eq, Ord, Show)
 

@@ -309,6 +309,8 @@ updateBalance t amap =
   let ps = tPostings t
       adjustBalance :: Commodity -> Quantity -> AccountInfo -> AccountInfo
       adjustBalance c q = \info ->
+        -- In a Balance, both debit and credit are positive
+        -- In a posting, debit is positive and credit is negative
         let x = if q < 0 then (0, negate q) else (q, 0)
             b = M.insertWith
                 (\(dr, cr) (dr', cr') -> (dr + dr', cr + cr'))

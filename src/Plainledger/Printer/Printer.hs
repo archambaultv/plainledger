@@ -37,7 +37,12 @@ printDate s e l =
 serializeAmount :: AccountingType -> (Quantity, Quantity) -> [T.Text]
 serializeAmount t (dr, cr) =
   case t of
-    DebitCredit -> [T.pack $ show dr, T.pack $ show dr]
+    DebitCredit -> let total = dr - cr
+                   in if total > 0
+                      then [T.pack $ show total, ""]
+                      else if total < 0
+                           then ["", T.pack $ show total]
+                           else ["",""]
     PlusMinus -> [T.pack $ show (dr - cr)]
 
 serializePlusMinus :: AccountingType -> Quantity -> [T.Text]
@@ -78,8 +83,8 @@ printTrialBalance start end l accountingType =
                             
       -- Total lines
       total :: [[T.Text]]
-      total = map (\(c, x) -> ["", "Total"] ++ serializeAmount accountingType x ++ [c]) $
-              M.toList $ totalBalance root
+      total = map (\(c, (dr, cr)) -> ["", "Total"] ++ [T.pack $ show dr, T.pack $ show cr] ++ [c]) $
+              M.toList $ totalNetBalance root
 
       csvlines ::  [[T.Text]]
       csvlines =  title ++

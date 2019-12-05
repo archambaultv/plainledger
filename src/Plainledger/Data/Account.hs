@@ -16,6 +16,7 @@ module Plainledger.Data.Account (
   minAndMaxDates,
   flattenBalance,
   totalBalance,
+  totalNetBalance,
   updateAccount
 )
 where
@@ -126,9 +127,20 @@ flattenBalance = cata algebra
             lines1 = map (\(c, amount) -> (a, c, amount)) $ M.toList (aBalance a)
         in concat (lines1 : ls)
 
+-- A new balance where :
+-- Credit = sum of all the credits
+-- Debit = sum of all the debits          
 totalBalance :: Tree AccountInfo -> Balance
 totalBalance = cata algebra
   where
       algebra (NodeF VirtualAccount{} bs) = sumBalance bs
       algebra (NodeF a bs) = sumBalance (aBalance a : bs)
-        
+
+-- A new balance where :
+-- Credit = sum of all the accounts with negative total
+-- Debit = sum of all the accounts with positive toal
+totalNetBalance :: Tree AccountInfo -> Balance
+totalNetBalance = cata algebra
+  where
+      algebra (NodeF VirtualAccount{} bs) = sumBalance bs
+      algebra (NodeF a bs) = sumBalance (netBalance (aBalance a) : bs)
