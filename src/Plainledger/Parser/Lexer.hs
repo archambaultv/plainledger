@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Plainledger.Parser.Lexer
 (
@@ -24,15 +25,16 @@ module Plainledger.Parser.Lexer
   tokInteger,
   tokNumber,
   tokString,
+  tokNonEmptyString,
   tokIdentifier,
   tokText,
+  tokNonEmptyText,
   tokProperty,
   tokQName,
   tokCommodity
 ) where
 
 import Data.Void
-import qualified Data.List.Split as LS
 import qualified Data.Char as C
 import Data.Decimal
 import Data.Proxy
@@ -65,9 +67,16 @@ data Tok
   | TDecimal Decimal
   | TString T.Text
   | TIdentifier T.Text
-  | TProperty T.Text
-  | TQName [T.Text]
-  deriving (Eq, Ord, Show)
+  | TColon
+  deriving (Eq, Ord)
+
+instance Show Tok where
+  show (TDate x) = show x
+  show (TInteger x) = show x
+  show (TDecimal x) = show x
+  show (TString x) = show x
+  show (TIdentifier x) = show x
+  show TColon = ":"
 
 sepRule :: Tok -> Tok -> SL.SeparatorRule
 sepRule (TString _) _ = SL.SOptional
@@ -77,15 +86,20 @@ sepRule _ _ = SL.SMandatory
 -- How to parse token
 tok :: (MonadParsec e s m, Token s ~ Char) => m Tok
 tok = (TDate <$> try date) <|>
-      (TDecimal <$> try decimal) <|>
-      (TInteger <$> integer) <|>
-      (TQName <$> qualifiedName) <|>
+      number <|>
       (TString . T.pack <$> pString) <|>
       (TIdentifier . T.pack <$> identifier) <|>
-      (TProperty . T.pack <$> (char ':' *> identifier))
+      (pure TColon <* char ':')
 
-integer :: (MonadParsec e s m, Token s ~ Char) => m Integer
-integer = L.signed (pure ()) L.decimal
+      where number = do
+              d <- decimal
+              let (i,a) = properFraction d
+              if a == 0
+                then return $ TInteger i
+                else return $ TDecimal d
+
+-- integer :: (MonadParsec e s m, Token s ~ Char) => m Integer
+-- integer = L.signed (pure ()) L.decimal
   
 decimal :: (MonadParsec e s m, Token s ~ Char) => m Decimal
 decimal = realToFrac <$> L.signed (pure ()) L.scientific
@@ -120,7 +134,7 @@ subsequentList :: String
 subsequentList = initialList ++ "+-"
 
 graphicChar :: (MonadParsec e s m, Token s ~ Char) => m Char
-graphicChar = satisfy isGraphicChar
+graphicChar = satisfy isGraphicChar <?> "printable character"
 
 isGraphicChar :: Char -> Bool
 isGraphicChar '"' = False
@@ -128,6 +142,7 @@ isGraphicChar '\\' = False
 isGraphicChar ' ' = True
 isGraphicChar x = C.isAlphaNum x ||
                   C.isPunctuation x ||
+                  C.isMark x ||
                   C.isSymbol x
 
 pString :: (MonadParsec e s m, Token s ~ Char) => m String
@@ -144,6 +159,7 @@ escapedChar = (escape >> char 'n' >> pure '\n') <|>
               (escape >> char 'f' *> pure '\f') <|>
               (escape >> char '\\' *> pure '\\') <|>
               (escape >> char '\"' *> pure '"') <|>
+              (escape >> char ':' *> pure ':') <|>
               (between escape (char ';') (L.decimal >>= validChar)) <|>
               (between uniOctal (char ';') (L.octal >>= validChar)) <|>
               (between uniHexa (char ';') (L.hexadecimal >>= validChar))
@@ -153,24 +169,23 @@ escapedChar = (escape >> char 'n' >> pure '\n') <|>
           then return $ C.chr i
           else fail $ show i ++ " is greater than the maximum unicode valid code point (x10FFFF)"
           
-        escape = char '\\'
 
         uniOctal = escape >> char 'o'
         uniHexa = escape >> char 'x'
 
-qualifiedName :: (MonadParsec e s m, Token s ~ Char) => m QualifiedName
-qualifiedName = fmap (map T.pack)  $
-  (stringQName <|>
-   (sepBy1 identifier (char ':')))
+escape :: (MonadParsec e s m, Token s ~ Char) => m Char
+escape = char '\\'
 
-  where stringQName = do
-          s <- pString
-          let ss = LS.splitOn ":" s
-          let r = all (not . null) ss
-          if r
-            then return ss
-            else fail "Qualified name written with a string cannot start or end with : or contain empty names (':' followed by another ':')"
+-- qualifiedName :: (MonadParsec e s m, Token s ~ Char) => m QualifiedName
+-- qualifiedName = fmap (map T.pack)  $
+--   (stringQName <|>
+--    (sepBy1 identifier (char ':')))
 
+--   where stringQName = between (char '"') (char '"') $ do
+--           sepBy1 (some qualifiedChar) (char ':')
+
+--         qualifiedChar = (escapedChar <|>
+--                         satisfy (\c -> c /= ':' && isGraphicChar c)) <?> "printable character except :"
 
 --- Whitespace
 lineComment :: forall e s m. (MonadParsec e s m, Token s ~ Char) => m ()
@@ -193,7 +208,7 @@ symbol :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => T.Text -> m T.
 symbol s = SL.atom (TIdentifier s) *> pure s
 
 property :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => T.Text -> m T.Text
-property s = SL.atom (TProperty s) *> pure s
+property s = tokColon *> SL.atom (TIdentifier s) *> pure s
 
 tokDate :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m Day
 tokDate = SL.atomToken (\t -> case t of {TDate x -> Just x; _ -> Nothing}) Nothing <?> "date"
@@ -210,17 +225,29 @@ tokNumber = (fmap fromIntegral tokInteger <|> tokDecimal) <?> "number"
 tokString :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
 tokString = SL.atomToken (\t -> case t of {TString x -> Just x; _ -> Nothing}) Nothing <?> "string"
 
+tokNonEmptyString :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
+tokNonEmptyString = SL.atomToken (\t -> case t of
+                                          TString x@(T.null -> False) -> Just x
+                                          _ -> Nothing)
+                    Nothing <?> "non empty string"
+
 tokIdentifier :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
 tokIdentifier = SL.atomToken (\t -> case t of {TIdentifier x -> Just x; _ -> Nothing}) Nothing <?> "identifier"
 
 tokText :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
-tokText = tokString <|> tokIdentifier 
+tokText = tokString <|> tokIdentifier
+
+tokNonEmptyText :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
+tokNonEmptyText = tokNonEmptyString <|> tokIdentifier
+
+tokColon :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m ()
+tokColon = SL.atomToken (\t -> case t of {TColon -> Just (); _ -> Nothing}) Nothing <?> ":"
 
 tokProperty :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
-tokProperty = SL.atomToken (\t -> case t of {TProperty x -> Just x; _ -> Nothing}) Nothing <?> "property"
+tokProperty = tokColon *> tokIdentifier
 
 tokQName :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m [T.Text]
-tokQName = SL.atomToken (\t -> case t of {TQName x -> Just x; _ -> Nothing}) Nothing <?> "qualified name"
+tokQName = sepBy1 (tokNonEmptyText) tokColon <?> "qualified name"
 
 tokCommodity :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
-tokCommodity = tokText
+tokCommodity = tokNonEmptyText
