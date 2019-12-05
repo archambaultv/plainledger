@@ -62,9 +62,8 @@ located p = do
   p2 <- SL.getInputOffset
   return ((p1, (p2 - p1)), x)
 
--- QualifiedName only string
--- identifier => alias or variable
--- commodity =>  string
+-- FixMe :: Add the comments, so we get better error message (expecting ... or comment)
+-- FixMe ::  -- passe le lexer. - ok c'est un id. -12 c'est un nombre. Mais -- ne doit pas passer.
 data Tok
   = TDate Day
   | TInteger Integer
@@ -81,7 +80,7 @@ instance Show Tok where
   show (TDecimal x) = show x
   show (TString x) = show x
   show (TIdentifier x) = show x
-  show (TProperty x) = show x
+  show (TProperty x) = '"' : ':' : drop 1 (show x)
   show (TQName x) = qualifiedNameToString x
 
 sepRule :: Tok -> Tok -> SL.SeparatorRule
@@ -162,18 +161,19 @@ pString = label "string" $ between (char '"') (char '"') $
           many (escapedChar <|> graphicChar)
 
 escapedChar :: (MonadParsec e s m, Token s ~ Char) => m Char
-escapedChar = (escape >> char 'n' >> pure '\n') <|>
-              (escape >> char 't' >> pure '\t') <|>
-              (escape >> char 'r' *> pure '\r') <|>
-              (escape >> char 'v' *> pure '\v') <|>
-              (escape >> char 'a' *> pure '\a') <|>
-              (escape >> char 'b' *> pure '\b') <|>
-              (escape >> char 'f' *> pure '\f') <|>
-              (escape >> char '\\' *> pure '\\') <|>
-              (escape >> char '\"' *> pure '"') <|>
-              (between escape (char ';') (L.decimal >>= validChar)) <|>
-              (between uniOctal (char ';') (L.octal >>= validChar)) <|>
-              (between uniHexa (char ';') (L.hexadecimal >>= validChar))
+escapedChar = escape >>
+              ((char 'n' >> pure '\n') <|>
+               (char 't' >> pure '\t') <|>
+               (char 'r' *> pure '\r') <|>
+               (char 'v' *> pure '\v') <|>
+               (char 'a' *> pure '\a') <|>
+               (char 'b' *> pure '\b') <|>
+               (char 'f' *> pure '\f') <|>
+               (char '\\' *> pure '\\') <|>
+               (char '\"' *> pure '"') <|>
+               ((L.decimal >>= validChar) <* char ';') <|>
+               (between uniOctal (char ';') (L.octal >>= validChar)) <|>
+               (between uniHexa (char ';') (L.hexadecimal >>= validChar)))
 
   where validChar i =
           if i <= 0x10FFFF
@@ -181,8 +181,8 @@ escapedChar = (escape >> char 'n' >> pure '\n') <|>
           else fail $ show i ++ " is greater than the maximum unicode valid code point (x10FFFF)"
           
 
-        uniOctal = escape >> char 'o'
-        uniHexa = escape >> char 'x'
+        uniOctal = char 'o'
+        uniHexa = char 'x'
 
 escape :: (MonadParsec e s m, Token s ~ Char) => m Char
 escape = char '\\'
@@ -193,19 +193,21 @@ qualifiedName = label "qualified name" $ fmap (map T.pack) stringQName
   where stringQName = between (char '\'') (char '\'')
                       (sepBy1 (some qualifiedChar) (char ':'))
 
-        qualifiedChar = (escape >> char ':' *> pure ':') <|>
-                        (escape >> char '\'' *> pure '\'') <|>
+        newEscape = escape >> ((char ':' *> pure ':') <|>
+                               (char '\'' *> pure '\''))
+
+        qualifiedChar = try newEscape <|>
                         escapedChar <|>
                         (satisfy (\c -> c /= ':' &&
                                         c /= '\'' &&
                                         isGraphicChar c))
-                         <?> "printable character except \":\""
+                         <?> "printable character"
 --- Whitespace
 lineComment :: forall e s m. (MonadParsec e s m, Token s ~ Char) => m ()
 lineComment = L.skipLineComment (tokensToChunk (Proxy :: Proxy s) ";")
 
 blockComment :: forall e s m. (MonadParsec e s m, Token s ~ Char) => m ()
-blockComment = L.skipBlockComment
+blockComment = L.skipBlockCommentNested
                (tokensToChunk (Proxy :: Proxy s) "#|")
                (tokensToChunk (Proxy :: Proxy s) "|#")
 
