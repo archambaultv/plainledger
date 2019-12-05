@@ -69,7 +69,8 @@ simpleExpr =
            (withOffset EVarF tokIdentifier) <|>
            (withOffset EDateF tokDate) <|>
            (withOffset ENumberF tokNumber) <|>
-           (withOffset EStringF tokString)
+           (withOffset EStringF tokString) <|>
+           (withOffset EQNameF tokQName)
 
 withOffset :: (Stream s) =>
               (a -> f (Fix (Compose ((,) SourceOffset) f))) ->
@@ -84,7 +85,7 @@ withOffset f p = do
 primitive :: (Stream s) => Parser s CsvPrim
 primitive = choice (map
                     (\(x, y) -> symbol x *> pure y)
-                    primList)
+                    primList) <?> "keyword"
 
 primList :: [(T.Text, CsvPrim)]
 primList = [("-", OpMinus),
@@ -103,7 +104,12 @@ primList = [("-", OpMinus),
             ("year", OpYear),
             ("month", OpMonth),
             ("day", OpDay),
-            ("make-date", OpDate)]
+            ("make-date", OpDate),
+            ("make-transaction", OpTransaction),
+            ("make-posting", OpPosting),
+            ("make-tag", OpTag),
+            ("pass", OpPass),
+            ("skip-line", OpSkipline)]
 
 define :: (Stream s) => Parser s (CsvStatementAnn SourceOffset)
 define = do
@@ -124,12 +130,12 @@ evalRules = do
 functionCall :: (Stream s) => Parser s (CsvExprAnn SourceOffset)
 functionCall = do
   p1 <- getInputOffset
-  e <- paren $ ECallF <$> csvExpr <*> some csvExpr
+  e <- ECallF <$> csvExpr <*> some csvExpr
   p2 <- getInputOffset
   return $ Fix $ Compose ((p1, (p2 - p1)), e)
 
 csvExpr :: (Stream s) => Parser s (CsvExprAnn SourceOffset)
-csvExpr = simpleExpr <|> functionCall
+csvExpr = simpleExpr <|> paren functionCall
 
 csvKeywords :: [T.Text]
 csvKeywords = "define" : "evaluate-rules" : "true" : "false" : map fst primList

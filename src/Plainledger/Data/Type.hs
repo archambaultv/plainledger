@@ -277,6 +277,11 @@ data CsvPrim
   | OpMonth
   | OpDay
   | OpDate
+  | OpPass
+  | OpSkipline
+  | OpTransaction
+  | OpPosting
+  | OpTag
   deriving (Eq, Show)
 
 data CsvExpr
@@ -285,6 +290,7 @@ data CsvExpr
   | EPrim CsvPrim
   | EDate Day
   | EString T.Text
+  | EQName QualifiedName
   | ENumber Decimal
   | ECall CsvExpr [CsvExpr]
   deriving (Eq, Show)
@@ -298,15 +304,19 @@ type CsvExprAnn info = Fix (Compose ((,) info) CsvExprF)
 -- pattern CVar info x = Fix (Compose (info, EVarF x))
 
 data CsvValue
+  -- Values available in the journal file
   = VDate Day
-  | VText String
+  | VString T.Text
   | VNumber Decimal
-  | VBool Bool
-  | VProperty String
+  | VQualifiedName QualifiedName
+  | VIdentifier T.Text
+  -- Extra values for this little language  
+  | VBool Bool  
   | VTransaction
   | VSkipLine
   | VPass
   deriving (Eq, Show)
+
 
 -- Csv configuration
 data FieldType

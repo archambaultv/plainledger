@@ -45,6 +45,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import Plainledger.Data.Type
+import Plainledger.Data.QualifiedName
 import qualified Data.SExpresso.Parse as SL
  
 type Parser s = Parsec Void (SL.SExprStream s Char Char Tok)
@@ -61,13 +62,17 @@ located p = do
   p2 <- SL.getInputOffset
   return ((p1, (p2 - p1)), x)
 
+-- QualifiedName only string
+-- identifier => alias or variable
+-- commodity =>  string
 data Tok
   = TDate Day
   | TInteger Integer
   | TDecimal Decimal
   | TString T.Text
   | TIdentifier T.Text
-  | TColon
+  | TProperty T.Text
+  | TQName QualifiedName
   deriving (Eq, Ord)
 
 instance Show Tok where
@@ -76,7 +81,8 @@ instance Show Tok where
   show (TDecimal x) = show x
   show (TString x) = show x
   show (TIdentifier x) = show x
-  show TColon = ":"
+  show (TProperty x) = show x
+  show (TQName x) = qualifiedNameToString x
 
 sepRule :: Tok -> Tok -> SL.SeparatorRule
 sepRule (TString _) _ = SL.SOptional
@@ -86,12 +92,13 @@ sepRule _ _ = SL.SMandatory
 -- How to parse token
 tok :: (MonadParsec e s m, Token s ~ Char) => m Tok
 tok = (TDate <$> try date) <|>
-      number <|>
+      try number <|>
       (TString . T.pack <$> pString) <|>
       (TIdentifier . T.pack <$> identifier) <|>
-      (pure TColon <* char ':')
+      (TProperty . T.pack <$> label "property" (char ':' *> identifier)) <|>
+      (TQName  <$> qualifiedName)
 
-      where number = do
+      where number = label "number" $ do
               d <- decimal
               let (i,a) = properFraction d
               if a == 0
@@ -105,7 +112,7 @@ decimal :: (MonadParsec e s m, Token s ~ Char) => m Decimal
 decimal = realToFrac <$> L.signed (pure ()) L.scientific
 
 date :: (MonadParsec e s m, Token s ~ Char) => m Day
-date = do
+date = label "date" $ do
   year <- count 4 digitChar
   _ <- char '-'
   month <- count 2 digitChar
@@ -122,13 +129,18 @@ date = do
           fromGregorianValid y' m' d'
 
 identifier :: (MonadParsec e s m, Token s ~ Char) => m String
-identifier = do
-  i <- letterChar <|> oneOf initialList
-  is <- many (alphaNumChar <|> oneOf subsequentList)
-  return $ i : is
+identifier = standardIdentifier <|> peculiarIdentifier <?> "identifier"
+
+  where standardIdentifier = do
+          i <- letterChar <|> oneOf initialList
+          is <- many (alphaNumChar <|> oneOf subsequentList)
+          return $ i : is
+
+        peculiarIdentifier = (single '+' >> return "+") <|>
+                             (single '-' >> return "-")
 
 initialList :: String
-initialList = "!$%&*/<=>^~@.#_?"
+initialList = "!$%&*/<=>?^_~@."
 
 subsequentList :: String
 subsequentList = initialList ++ "+-"
@@ -146,7 +158,7 @@ isGraphicChar x = C.isAlphaNum x ||
                   C.isSymbol x
 
 pString :: (MonadParsec e s m, Token s ~ Char) => m String
-pString = between (char '"') (char '"') $
+pString = label "string" $ between (char '"') (char '"') $
           many (escapedChar <|> graphicChar)
 
 escapedChar :: (MonadParsec e s m, Token s ~ Char) => m Char
@@ -159,7 +171,6 @@ escapedChar = (escape >> char 'n' >> pure '\n') <|>
               (escape >> char 'f' *> pure '\f') <|>
               (escape >> char '\\' *> pure '\\') <|>
               (escape >> char '\"' *> pure '"') <|>
-              (escape >> char ':' *> pure ':') <|>
               (between escape (char ';') (L.decimal >>= validChar)) <|>
               (between uniOctal (char ';') (L.octal >>= validChar)) <|>
               (between uniHexa (char ';') (L.hexadecimal >>= validChar))
@@ -176,17 +187,19 @@ escapedChar = (escape >> char 'n' >> pure '\n') <|>
 escape :: (MonadParsec e s m, Token s ~ Char) => m Char
 escape = char '\\'
 
--- qualifiedName :: (MonadParsec e s m, Token s ~ Char) => m QualifiedName
--- qualifiedName = fmap (map T.pack)  $
---   (stringQName <|>
---    (sepBy1 identifier (char ':')))
+qualifiedName :: (MonadParsec e s m, Token s ~ Char) => m QualifiedName
+qualifiedName = label "qualified name" $ fmap (map T.pack) stringQName
 
---   where stringQName = between (char '"') (char '"') $ do
---           sepBy1 (some qualifiedChar) (char ':')
+  where stringQName = between (char '\'') (char '\'')
+                      (sepBy1 (some qualifiedChar) (char ':'))
 
---         qualifiedChar = (escapedChar <|>
---                         satisfy (\c -> c /= ':' && isGraphicChar c)) <?> "printable character except :"
-
+        qualifiedChar = (escape >> char ':' *> pure ':') <|>
+                        (escape >> char '\'' *> pure '\'') <|>
+                        escapedChar <|>
+                        (satisfy (\c -> c /= ':' &&
+                                        c /= '\'' &&
+                                        isGraphicChar c))
+                         <?> "printable character except \":\""
 --- Whitespace
 lineComment :: forall e s m. (MonadParsec e s m, Token s ~ Char) => m ()
 lineComment = L.skipLineComment (tokensToChunk (Proxy :: Proxy s) ";")
@@ -208,7 +221,7 @@ symbol :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => T.Text -> m T.
 symbol s = SL.atom (TIdentifier s) *> pure s
 
 property :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => T.Text -> m T.Text
-property s = tokColon *> SL.atom (TIdentifier s) *> pure s
+property s = SL.atom (TProperty s) *> pure s
 
 tokDate :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m Day
 tokDate = SL.atomToken (\t -> case t of {TDate x -> Just x; _ -> Nothing}) Nothing <?> "date"
@@ -240,14 +253,11 @@ tokText = tokString <|> tokIdentifier
 tokNonEmptyText :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
 tokNonEmptyText = tokNonEmptyString <|> tokIdentifier
 
-tokColon :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m ()
-tokColon = SL.atomToken (\t -> case t of {TColon -> Just (); _ -> Nothing}) Nothing <?> ":"
-
 tokProperty :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
-tokProperty = tokColon *> tokIdentifier
+tokProperty = SL.atomToken (\t -> case t of {TProperty x -> Just x; _ -> Nothing}) Nothing <?> "property"
 
 tokQName :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m [T.Text]
-tokQName = sepBy1 (tokNonEmptyText) tokColon <?> "qualified name"
+tokQName = SL.atomToken (\t -> case t of {TQName x -> Just x; _ -> Nothing}) Nothing <?> "qualified name"
 
 tokCommodity :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
-tokCommodity = tokNonEmptyText
+tokCommodity = tokNonEmptyString <?> "commodity"

@@ -66,7 +66,6 @@ runImport c = do
   lift $ putStrLn "Reading File"
   stream <- lift $ readFile (icConfig c)
 
-  lift $ putStrLn stream
   _ <- lift $ putStrLn "Tokenize"
   tokens1 <- liftEither $ first errorBundlePretty $ parse (lexer :: Lexer String) (icConfig c) stream
 
