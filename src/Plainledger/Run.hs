@@ -5,7 +5,6 @@ module Plainledger.Run
   run
   ) where
 
-import Data.Maybe
 import Data.Char
 import Data.Csv
 import qualified Data.List as DL
@@ -17,10 +16,11 @@ import qualified Data.Text.Lazy as L
 import Data.Bifunctor ( first )
 import Control.Monad.Except
 import Text.Megaparsec
+import Plainledger.Parser.Lexer
 import Plainledger.Data.Type
 import Plainledger.Parser.Journal
-import Plainledger.Parser.Import
-import Plainledger.Parser.Rule
+import Plainledger.Parser.Csv
+import Plainledger.Data.Csv
 import Plainledger.Commands
 import Plainledger.Error
 import Plainledger.Data.Ledger
@@ -43,7 +43,8 @@ runT command =
 getLedger :: String -> Maybe Day -> Maybe Day -> ExceptT Error IO Ledger
 getLedger input startDate endDate = do
   stream <- lift $ readFile input
-  j <- liftEither $ first errorBundlePretty $ parse journal input stream
+  tokens1 <- liftEither $ first errorBundlePretty $ parse (lexer :: Lexer String) input stream
+  j <- liftEither $ first errorBundlePretty $ parse journal input tokens1
   ledger <- liftEither $ journalToLedger j
   return $ adjustDate ledger startDate endDate
 
@@ -62,13 +63,18 @@ printString f s =
 runImport :: ImportCommand -> ExceptT Error IO ()
 runImport c = do
   -- Read configuration
+  lift $ putStrLn "Reading File"
   stream <- lift $ readFile (icConfig c)
-  config <- liftEither $ first errorBundlePretty $ parse importConf (icConfig c) stream
 
-  -- Read the rules files (if any)
-  rules <- concat <$> traverse parseRuleFile (icRules c)
+  lift $ putStrLn stream
+  _ <- lift $ putStrLn "Tokenize"
+  tokens1 <- liftEither $ first errorBundlePretty $ parse (lexer :: Lexer String) (icConfig c) stream
+
+  _ <- lift $ putStrLn "Read Config"
+  (config, csvStatement) <- liftEither $ first errorBundlePretty $ parse parseCsv (icConfig c) tokens1
 
   -- Read the csv file
+  _ <- lift $ putStrLn "Read Csv"
   csvStream <- lift $ B.readFile (icCsvFile c)
   let csvOpts = defaultDecodeOptions {
         decDelimiter = fromIntegral (ord (columnDelimiter config))
@@ -76,18 +82,10 @@ runImport c = do
   csvData <- liftEither $ first errorBundlePretty $ M.decodeWith csvOpts NoHeader (icCsvFile c) csvStream
 
   -- Build transactions
-  ts <- liftEither $ importTransactions config csvData
-
-  -- Apply modification rules
-  tsR <- liftEither $ catMaybes <$> traverse (applyRules rules) ts
+  ts <- liftEither $ evalCsv config csvStatement csvData
 
   -- Print transactions
-  printString (icJournalFile c) (DL.intercalate "\n\n" $ map printTransaction tsR)
-
-  where parseRuleFile :: String -> ExceptT Error IO [TransactionRule]
-        parseRuleFile input = do
-          stream <- lift $ readFile input
-          liftEither $ first errorBundlePretty $ parse parseRules input stream
+  printString (icJournalFile c) (DL.intercalate "\n\n" $ map printTransaction ts)
 
 runModify :: ModifyCommand -> ExceptT Error IO ()
 runModify _ = return ()

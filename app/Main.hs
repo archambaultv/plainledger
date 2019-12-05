@@ -1,6 +1,7 @@
 
 module Main where
 
+import Data.Void
 import Data.Semigroup ( (<>) )
 import Data.Time
 import Data.Bifunctor ( first )
@@ -14,7 +15,7 @@ import Plainledger.Run
 
 dateparser :: Char -> String -> String -> String -> Parser (Maybe Day)
 dateparser shortOption optionStr helpStr meta = option
-  (eitherReader $ fmap Just . first M.errorBundlePretty . M.parse (L.date :: L.Parser Day) "")
+  (eitherReader $ fmap Just . first M.errorBundlePretty . M.parse (L.date :: M.Parsec Void String Day) "")
   (value Nothing <>
    short shortOption <>
    long optionStr <>
@@ -115,11 +116,7 @@ importCommand = CImport <$> (ImportCommand
                              long "journal" <>
                              metavar "JOURNAL-FILE" <>
                              help ("The journal to which the new transactions will be appended. " ++
-                                   "A new file will be created if it doesn't exists. Defaults to STDOUT.")))
-    <*> many (strOption (short 'r' <>
-                         long "rules" <>
-                         metavar "RULE-FILES" <>
-                         help "The rule file that specifies how to modify the new transactions read from the CSV-FILE")))
+                                   "A new file will be created if it doesn't exists. Defaults to STDOUT."))))
 
 importInfo :: ParserInfo Command
 importInfo = info (importCommand <**> helper)

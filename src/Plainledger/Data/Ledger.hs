@@ -21,7 +21,6 @@ import Control.Monad
 import Control.Monad.Except
 --import Control.Monad.State
 --import Text.Megaparsec (SourcePos(..), sourcePosPretty, mkPos)  
-import Data.SExpresso.Parse.Location
 import Plainledger.Data.Type
 import Plainledger.Data.QualifiedName
 import Plainledger.Data.Journal

@@ -57,8 +57,7 @@ data ImportCommand = ImportCommand {
   icCsvFile :: String,
   icConfig :: String,
   icDryRun :: Bool,
-  icJournalFile :: Maybe String,
-  icRules :: [String]
+  icJournalFile :: Maybe String
   }
 
 data ModifyCommand = ModifyCommand {

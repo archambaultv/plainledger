@@ -4,4 +4,4 @@ packages:
 - .
 extra-deps:
 - git: https://github.com/archambaultv/sexpresso.git
-  commit: e63b829f22cccca495c4acf747dd301c12973a60 
+  commit: d6989686c83863e41b69749828f02ea29fa7efc9 

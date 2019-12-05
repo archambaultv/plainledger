@@ -15,7 +15,6 @@ where
 import Prelude hiding (span)
 import Data.Time
 import Data.List (sortBy)
-import Data.SExpresso.Parse.Location
 import Plainledger.Error
 import Plainledger.Data.Type
 import Control.Monad.Except
@@ -59,8 +58,8 @@ configuration [] = throwError "No configuration in the journal"
 configuration ((span, (JEConfiguration _)) : (span2, (JEConfiguration _)) : _) =
   throwError $
   "More than one configuration found in the journal\n" ++
-  "One at " ++ startPosPretty span ++ "\n" ++
-  "The other at " ++ startPosPretty span2
+  "One at " ++ {- startPosPretty span ++ -} "\n" ++
+  "The other at " -- ++ startPosPretty span2
 configuration ((_, JEConfiguration x) : _) = pure x
 configuration _ = throwError "No configuration in the journal"
 

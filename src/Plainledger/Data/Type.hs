@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- For simplicity, all the datatypes are defined here.
 -- See the corresponding modules for the related functions.
@@ -10,6 +11,8 @@ module Plainledger.Data.Type (
   Algebra,
   CoAlgebra,
   RCoAlgebra,
+  Located,
+  SourceOffset,
 
   AccountingType(..),
 
@@ -29,9 +32,10 @@ module Plainledger.Data.Type (
   Balance,
 
   TreeF(..),
+  TreeAnn,
+  pattern CNode,
   AccountType(..),
   AccountInfo(..),
-  AnnAccount,
   Account,
   AccountMap,
   AccountName,
@@ -49,19 +53,19 @@ module Plainledger.Data.Type (
   BalanceEntry(..),
   PostingEntry,
 
-  ImportConfiguration(..),
-  ERegex,
-  TransactionRule,
-  TransactionMatch,
-  PostingMatch,
-  TagMatch,
-  Replace(..),
-  TransactionReplace,
-  PostingReplace,
-  TagReplace,
+  FieldType(..),
+  CsvConfiguration(..),
+  CsvStatementF(..),
+  CsvStatement,
+  CsvStatementAnn,
+  CsvPrim(..),
+  CsvExpr(..),
+  CsvExprF(..),
+  CsvExprAnn,
+--  pattern CVar,
+  CsvValue(..)
 )
 where
-
 
 import qualified Data.Text as T
 import Data.Tree
@@ -70,15 +74,17 @@ import Data.Time
 import Data.Bifunctor.TH
 import Data.Functor.Foldable
 import Data.Functor.Foldable.TH
---import Data.Functor.Compose
+import Data.Functor.Compose
 import Data.Functor.Classes
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
-import Data.SExpresso.Parse.Location
+import Data.SExpresso.Parse (SourceOffset)
 
 type Algebra f a = f a -> a
 type CoAlgebra f a = a -> f a
 type RCoAlgebra f t a = a -> f (Either t a)
+
+type Located a = (SourceOffset, a)
 
 data AccountingType = PlusMinus | DebitCredit
                     deriving (Eq, Ord, Show)
@@ -178,7 +184,11 @@ makeBaseFunctor ''Tree
 instance Show1 (TreeF (a, AccountInfo)) where
   liftShowsPrec _ _ _ (NodeF (_, n) _) = shows n
   
-type AnnAccount a = Fix (TreeF (a, AccountInfo))
+type TreeAnn info a = Fix (Compose ((,) info) (TreeF a))
+
+pattern CNode :: info -> a -> [TreeAnn info a] -> TreeAnn info a
+pattern CNode info a as = Fix (Compose (info, NodeF a as))
+
 type Account = Tree AccountInfo
 type AccountMap = M.Map QualifiedName AccountInfo
 
@@ -241,33 +251,73 @@ data OpenAccountEntry = OpenAccountEntry {
   deriving (Show)
 
 ------
+data CsvStatementF text expr
+  = CsvDefine text [text] expr
+  | CsvEvalRules text
+  | CsvExpr expr
+  deriving (Eq, Show)
 
-data ImportConfiguration = ImportConfiguration {
+type CsvStatement = CsvStatementF T.Text CsvExpr
+
+data CsvPrim
+  = OpMinus
+  | OpPlus
+  | OpMult
+  | OpDiv
+  | OpRound
+  | OpGT
+  | OpLT
+  | OpEQ
+  | OpNEQ
+  | OpAnd
+  | OpOr
+  | OpNot
+  | OpIf
+  | OpYear
+  | OpMonth
+  | OpDay
+  | OpDate
+  deriving (Eq, Show)
+
+data CsvExpr
+  = EVar T.Text
+  | EBool Bool
+  | EPrim CsvPrim
+  | EDate Day
+  | EString T.Text
+  | ENumber Decimal
+  | ECall CsvExpr [CsvExpr]
+  deriving (Eq, Show)
+
+makeBaseFunctor ''CsvExpr
+
+type CsvStatementAnn info = CsvStatementF (info, T.Text) (CsvExprAnn info)
+type CsvExprAnn info = Fix (Compose ((,) info) CsvExprF)
+
+-- pattern CVar :: info -> T.Text -> CsvExprAnn info
+-- pattern CVar info x = Fix (Compose (info, EVarF x))
+
+data CsvValue
+  = VDate Day
+  | VText String
+  | VNumber Decimal
+  | VBool Bool
+  | VProperty String
+  | VTransaction
+  | VSkipLine
+  | VPass
+  deriving (Eq, Show)
+
+-- Csv configuration
+data FieldType
+  = FText
+  | FNumber
+  | FDate
+  deriving (Show, Eq)
+
+data CsvConfiguration = CsvConfiguration {
   columnDelimiter :: Char,
-  skip :: Int,
-  defaultCommodity :: Commodity,
-  dateColumn :: Int,
-  debitColumn :: Int,
-  creditColumn :: Int,
-  balanceColumn :: Maybe Int,
-  tagColumns :: [(Int, T.Text)],
-  iAccount :: QualifiedName,
-  iAccountNegative :: QualifiedName,
-  iAccountPositive :: QualifiedName
+  skip :: Integer,
+  fields :: [(T.Text, Integer, FieldType)]
   }
-
-type TransactionRule = (TransactionMatch, Maybe TransactionReplace)
-
-type ERegex a = Either ([String], String) a
-type TransactionMatch = TransactionF (Maybe (ERegex Day)) (Bool, TagMatch) (Bool, PostingMatch)
-type PostingMatch = PostingF (ERegex QualifiedName) (ERegex Quantity) (ERegex Commodity)
-type TagMatch = TagF (Maybe (ERegex T.Text))
-
-data Replace a
-  = Variable Decimal String
-  | Replace [Either String String]
-  | RawInput a
-type TransactionReplace = TransactionF (Maybe (Replace Day)) TagReplace PostingReplace
-type PostingReplace = PostingF (Replace QualifiedName) (Replace Quantity) (Replace Commodity)
-type TagReplace = TagF (Maybe (Replace T.Text))
-
+  deriving (Show, Eq)

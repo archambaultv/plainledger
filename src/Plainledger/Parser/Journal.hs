@@ -12,42 +12,37 @@ import Data.List
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Applicative.Permutations
-import Data.SExpresso.Parse
 import Plainledger.Data.Type
 import Plainledger.Utils
 import Plainledger.Parser.Lexer
- 
--- The parser does not catch logical errors, only parsing errors
 
-journal :: Parser Journal
-journal = between pSpace eof $ many (located journalEntry)
+journal :: (Stream s) => Parser s Journal
+journal = many (located journalEntry) <* eof
 
-journalEntry :: Parser JournalEntry
+journalEntry :: (Stream s) => Parser s JournalEntry
 journalEntry = paren $
                balance <|> open <|> close <|> transaction <|> configuration
 
-balance :: Parser JournalEntry
+balance :: (Stream s) => Parser s JournalEntry
 balance =  do
   _ <- symbol "balance"
-  d <- date
-  n <- qualifiedName
-  q <- decimal
-  c  <- optional commodity
+  d <- tokDate
+  n <- tokQName
+  q <- tokNumber
+  c  <- optional tokCommodity
   return $ JEBalance $ BalanceEntry d n q c
 
-open :: Parser JournalEntry
+open :: (Stream s) => Parser s JournalEntry
 open =  do
   _ <- symbol "open"
-  d <- date
+  d <- tokDate
   os <- many (located $ rawOpen)
   return $ JEOpenAccount $ OpenEntry d os
     
-rawOpen :: Parser OpenAccountEntry
+rawOpen :: (Stream s) => Parser s OpenAccountEntry
 rawOpen = paren $ do
-  n <- qualifiedName
+  n <- tokQName
   (num, aCurr, d, aAny) <- runPermutation $
     (,,,) <$> toPermutationWithDefault Nothing number
           <*> toPermutationWithDefault Nothing allowedC
@@ -56,28 +51,28 @@ rawOpen = paren $ do
 
   return $ OpenAccountEntry n num aCurr aAny d
   
-  where number = symbol ":number" *> (lexeme $ Just <$> L.decimal)
-        allowedC = symbol ":allowed-commodities" *> (Just <$> some text)
-        defaultC = symbol ":default-commodity" *> (Just <$> text)
-        allowAnyC = symbol ":allow-any-commodities" *> pure True 
+  where number = property "number" *> (Just <$> tokInteger)
+        allowedC = property "allowed-commodities" *> (Just <$> some tokText)
+        defaultC = property "default-commodity" *> (Just <$> tokText)
+        allowAnyC = property "allow-any-commodities" *> pure True 
 
-close :: Parser JournalEntry
+close :: (Stream s) => Parser s JournalEntry
 close =  do
   _ <- symbol "close"
-  d <- date
-  n <- some (located qualifiedName)
+  d <- tokDate
+  n <- some (located tokQName)
   return $ JECloseAccount $ CloseAccountEntry d n
 
-tag :: Parser Tag
+tag :: (Stream s) => Parser s Tag
 tag = do
-  key <- char ':' *> lexeme identifier
-  value <- optional (text <|> (T.pack . show <$> decimal) <|> (T.pack . show <$> date))
+  key <- tokProperty
+  value <- optional (tokText <|> (T.pack . show <$> tokNumber) <|> (T.pack . show <$> tokDate))
   return $ Tag key value
   
-transaction :: Parser JournalEntry
+transaction :: (Stream s) => Parser s JournalEntry
 transaction = do
   _ <- symbol "transaction"
-  d <- date
+  d <- tokDate
   (postings, tags1) <- runPermutation $
     (,) <$> toPermutation posting
         <*> toPermutationWithDefault [] tags
@@ -85,17 +80,17 @@ transaction = do
   let tagss = tags1 ++ tags2
   return $ JETransaction $ Transaction d tagss postings
   
-  where posting = symbol ":postings" *> (some (located rawPosting) <?> "posting")
+  where posting = property "postings" *> (some (located rawPosting) <?> "posting")
         tags = many (located tag)
 
-rawPosting :: Parser PostingEntry
+rawPosting :: (Stream s) => Parser s PostingEntry
 rawPosting = paren $ do
-  n <- qualifiedName
-  q <- optional decimal
-  c <- optional commodity
+  n <- tokQName
+  q <- optional tokNumber
+  c <- optional tokCommodity
   return $ Posting n q c
 
-configuration :: Parser JournalEntry
+configuration :: (Stream s) => Parser s JournalEntry
 configuration = do
   _ <- symbol "configuration"
   c <- runPermutation $
@@ -108,15 +103,15 @@ configuration = do
         <*> toPermutationWithDefault "False" tagValueIfMissing
   return $ JEConfiguration c
   
-  where defaultCommodityP = symbol ":main-currency" *> text
-        accountTypeC = symbol ":account-type" *> accountType
-        openingAccount = symbol ":opening-balance-account" *> qualifiedName
-        earningsAccount = symbol ":earnings-account" *> qualifiedName
-        tagDescriptionP = symbol ":tags-description" *> tagDescription
-        tagDefaultValue = symbol ":tags-default-value" *> text
-        tagValueIfMissing = symbol ":tags-value-if-not-tagged" *> text
+  where defaultCommodityP = property "main-currency" *> tokText
+        accountTypeC = property "account-type" *> accountType
+        openingAccount = property "opening-balance-account" *> tokQName
+        earningsAccount = property "earnings-account" *> tokQName
+        tagDescriptionP = property "tags-description" *> tagDescription
+        tagDefaultValue = property "tags-default-value" *> tokText
+        tagValueIfMissing = property "tags-value-if-not-tagged" *> tokText
 
-accountType :: Parser (M.Map AccountName AccountType)
+accountType :: (Stream s) => Parser s (M.Map AccountName AccountType)
 accountType = paren $ do
   s <- getParserState
   (a,l,e,r,ex) <- runPermutation $
@@ -132,11 +127,13 @@ accountType = paren $ do
    else let dStr = intercalate " " $ map T.unpack d
         in setParserState s >> fail ("The following names appear more than once in :account-type " ++ dStr)
   
-  where category s t = (map (,t) . S.toList . S.fromList) <$> (symbol (':' : s) *> some text)
+  where
+    category :: (Stream s) => T.Text -> AccountType -> Parser s [(T.Text, AccountType)]
+    category s t = (map (,t) . S.toList . S.fromList) <$> (property s *> some tokText)
 
-tagDescription :: Parser (M.Map T.Text TagDescription)
+tagDescription :: (Stream s) => Parser s (M.Map T.Text TagDescription)
 tagDescription = toMap <$> (many $ paren $ do
-  t <- identifier
+  t <- tokIdentifier
   td <- runPermutation $
     TagDescription t <$> toPermutationWithDefault t name
            <*> toPermutationWithDefault False unique
@@ -145,10 +142,10 @@ tagDescription = toMap <$> (many $ paren $ do
            <*> toPermutationWithDefault "False" valueIfMissing
   return td)
   
-  where name = symbol ":header" *> text
-        unique = symbol ":unique" *> pure True
-        foreignKey = symbol ":foreign-key" *> (Just <$> text)
-        defaultValue = symbol ":default-value" *> text
-        valueIfMissing = symbol ":value-if-not-tagged" *> text
+  where name = property "header" *> tokText
+        unique = property "unique" *> pure True
+        foreignKey = property "foreign-key" *> (Just <$> tokText)
+        defaultValue = property "default-value" *> tokText
+        valueIfMissing = property "value-if-not-tagged" *> tokText
 
         toMap = M.fromList . fmap (\td -> (tdTagKeyword td, td))
