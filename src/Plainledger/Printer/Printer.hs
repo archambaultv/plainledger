@@ -107,7 +107,7 @@ printTransactions start end l accountingType =
               [] :
               (["Account Qualified Name", "Account Name", "Date"] ++
                amountTitle accountingType ++
-               ["Commodity","Transaction Id", "Account Type", "Account Number", "Transaction GUID"] ++
+               ["Commodity","Transaction Id", "Account Type", "Account Number"] ++
                tagKeys) : []
 
       -- Transactions
