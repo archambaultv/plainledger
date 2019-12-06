@@ -35,9 +35,7 @@ dependencies:
 - parser-combinators
 - recursion-schemes
 - bifunctors
-- regex-tdfa
 - vector
-- split
 
 ghc-options:
   - -Wall

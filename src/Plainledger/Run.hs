@@ -16,6 +16,7 @@ import qualified Data.Text.Lazy as L
 import Data.Bifunctor ( first )
 import Control.Monad.Except
 import Text.Megaparsec
+import System.IO
 import Plainledger.Parser.Lexer
 import Plainledger.Data.Type
 import Plainledger.Parser.Journal
@@ -28,7 +29,7 @@ import Plainledger.Data.Transaction
 import Plainledger.Printer.Printer
 
 run :: Command -> IO ()
-run c = runExceptT (runT c) >>= either putStrLn return
+run c = runExceptT (runT c) >>= either (hPutStr stderr) return
 
 runT :: Command -> ExceptT Error IO () 
 runT command = 

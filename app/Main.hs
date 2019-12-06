@@ -8,7 +8,7 @@ import Data.Bifunctor ( first )
 import Options.Applicative
 import qualified Text.Megaparsec as M
 
-import Plainledger.Data.Type (AccountingType(..))
+import Plainledger.Data.Type (AccountingFormat(..), SignConvention(..))
 import qualified Plainledger.Parser.Lexer as L
 import Plainledger.Commands
 import Plainledger.Run
@@ -36,8 +36,8 @@ endDate = dateparser
           "All transactions after this date are ignored"
           "END-DATE"
 
-debitCredit :: Parser AccountingType
-debitCredit = flag PlusMinus DebitCredit
+debitCredit :: Parser AccountingFormat
+debitCredit = flag (OneColumnSignedNumber SignDependsOnNetBalance) TwoColumnsDebitCredit
               (short 'd' <>
                long "debitcredit" <>
                help "Indicates whether to prints an amount using two columns (debit and credit) or with one column (+ for inflow, - for outflow)"

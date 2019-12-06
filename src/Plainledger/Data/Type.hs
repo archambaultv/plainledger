@@ -14,7 +14,8 @@ module Plainledger.Data.Type (
   Located,
   SourceOffset,
 
-  AccountingType(..),
+  AccountingFormat(..),
+  SignConvention(..),  
 
   TagF(..),
   Tag,
@@ -32,11 +33,12 @@ module Plainledger.Data.Type (
   Balance,
 
   TreeF(..),
-  TreeAnn,
-  pattern CNode,
+--  TreeAnn,
+--  pattern CNode,
   AccountType(..),
+--  VirtualAccount(..),
   AccountInfo(..),
-  Account,
+--  Account,
   AccountMap,
   AccountName,
   QualifiedName,
@@ -48,6 +50,7 @@ module Plainledger.Data.Type (
   JournalEntry(..),
   OpenAccountEntry(..),
   OpenEntry(..),
+--  NodeA,
   CloseAccountEntry(..),
   TransactionEntry,
   BalanceEntry(..),
@@ -68,6 +71,7 @@ module Plainledger.Data.Type (
 where
 
 import qualified Data.Text as T
+import qualified Data.List.NonEmpty as NE
 import Data.Tree
 import Data.Decimal
 import Data.Time
@@ -86,9 +90,15 @@ type RCoAlgebra f t a = a -> f (Either t a)
 
 type Located a = (SourceOffset, a)
 
--- Rename to AccountingFormat ???
-data AccountingType = PlusMinus | DebitCredit
-                    deriving (Eq, Ord, Show)
+data AccountingFormat
+  = OneColumnSignedNumber SignConvention
+  | TwoColumnsDebitCredit
+  deriving (Eq, Ord, Show)
+
+data SignConvention
+  = SignDependsOnNetBalance -- The number will have the same sign as (Debit - Credit)
+  | SignDependsOnAccountType -- Inverse of DependsOnNetBalance for Liabilities, Equity and Revenue
+  deriving (Eq, Ord, Show)
 
 data TagF a = Tag {
   tagKeyword :: T.Text,
@@ -121,7 +131,7 @@ type AccountName = T.Text
 -- The account's parents name and its name
 -- ex : Asset:Banking:Bank Foo:Chequing ->
 --        ["Asset","Banking","Bank Foo","Chequing"]
-type QualifiedName = [AccountName]
+type QualifiedName = NE.NonEmpty AccountName
 
 data AccountType = Asset
                  | Liability
@@ -166,10 +176,11 @@ type TransactionEntry = TransactionF Day (Located Tag) (Located PostingEntry)
 type Balance = M.Map Commodity (Quantity, Quantity)
 
 data AccountInfo
-  = VirtualAccount {
-   aQName :: QualifiedName
-   }
-  | RealAccount {
+  -- = VirtualAccount {
+  --  vQName :: Maybe QualifiedName
+  --  }
+  --  RealAccount {
+  = RealAccount {
    aOpenDate :: Day,
    aCloseDate :: Maybe Day,
    aQName :: QualifiedName,
@@ -178,6 +189,11 @@ data AccountInfo
    aAllowedCommodities :: Maybe (S.Set Commodity),
    aBalance :: Balance
    }
+  deriving (Show)
+
+data VirtualAccount
+  = VRoot
+  | VNode QualifiedName
   deriving (Show)
 
 makeBaseFunctor ''Tree
@@ -190,7 +206,8 @@ type TreeAnn info a = Fix (Compose ((,) info) (TreeF a))
 pattern CNode :: info -> a -> [TreeAnn info a] -> TreeAnn info a
 pattern CNode info a as = Fix (Compose (info, NodeF a as))
 
-type Account = Tree AccountInfo
+type NodeA = Either VirtualAccount AccountInfo
+type Account = Tree NodeA
 type AccountMap = M.Map QualifiedName AccountInfo
 
 data Configuration = Configuration {

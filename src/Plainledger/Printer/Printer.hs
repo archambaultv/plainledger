@@ -4,9 +4,9 @@
 module Plainledger.Printer.Printer
 where
 
+
 import Data.Csv
-import Data.Tree
-import Data.List
+import qualified Data.List.NonEmpty as NE
 import Data.Time
 import Data.Maybe
 import Data.Functor.Foldable
@@ -34,33 +34,40 @@ printDate s e l =
   in (T.pack start, T.pack end)
 
 
-serializeAmount :: AccountingType -> (Quantity, Quantity) -> [T.Text]
-serializeAmount t (dr, cr) =
+serializeAmount :: AccountingFormat -> AccountType -> (Quantity, Quantity) -> [T.Text]
+serializeAmount t accType (dr, cr) =
   case t of
-    DebitCredit -> let total = dr - cr
-                   in if total > 0
-                      then [T.pack $ show total, ""]
-                      else if total < 0
-                           then ["", T.pack $ show $ negate total]
-                           else ["",""]
-    PlusMinus -> [T.pack $ show (dr - cr)]
+    TwoColumnsDebitCredit ->
+      let total = dr - cr
+      in if total > 0
+         then [T.pack $ show total, ""]
+         else if total < 0
+              then ["", T.pack $ show $ negate total]
+              else ["",""]
+    OneColumnSignedNumber SignDependsOnNetBalance -> [T.pack $ show (dr - cr)]
+    OneColumnSignedNumber SignDependsOnAccountType ->
+      if isCreditAccountType accType
+      then [T.pack $ show $ negate (dr - cr)]
+      else [T.pack $ show (dr - cr)]
 
-serializePlusMinus :: AccountingType -> Quantity -> [T.Text]
-serializePlusMinus t a =
+serializeNumber :: AccountingFormat -> AccountType -> Quantity -> [T.Text]
+serializeNumber t accType a =
   if a < 0
-  then serializeAmount t (0, negate a)
-  else serializeAmount t (a, 0)
-    
-amountTitle :: AccountingType -> [T.Text]
-amountTitle x = case x of
-                  DebitCredit -> ["Debit", "Credit"]
-                  PlusMinus -> ["Amount"]
-        
-printTrialBalance :: Maybe Day -> Maybe Day -> Ledger -> AccountingType -> B.ByteString
-printTrialBalance start end l accountingType =
-  let root = mapToTree $ lAccounts l
-      (sDate, eDate) = printDate start end l
+  then serializeAmount t accType (0, negate a)
+  else serializeAmount t accType (a, 0)
 
+       
+amountTitle :: AccountingFormat -> [T.Text]
+amountTitle x = case x of
+  TwoColumnsDebitCredit -> ["Debit", "Credit"]
+  OneColumnSignedNumber _ -> ["Amount"]
+        
+printTrialBalance :: Maybe Day -> Maybe Day -> Ledger -> AccountingFormat -> B.ByteString
+printTrialBalance start end l accountingType =
+  let -- root = mapToTree $ lAccounts l
+      (sDate, eDate) = printDate start end l
+      accTypes = cAccountTypeMapping $ lConfiguration l
+      
       -- Header lines
       title :: [[T.Text]]
       title = ["Trial Balance", "Start date", sDate,
@@ -71,20 +78,23 @@ printTrialBalance start end l accountingType =
 
       -- Account data to print
       accData :: [(AccountInfo, Commodity, (Quantity, Quantity))]
-      accData = flattenBalance root
+      accData = flattenBalance $ lAccounts l
       
       -- How to print the data
       serialize :: (AccountInfo, Commodity, (Quantity, Quantity)) -> [T.Text]
-      serialize (info, c, x) = qualifiedNameToText (aQName info) :
-                               last (aQName info) :
-                               (serializeAmount accountingType x) ++
-                               [c, maybe "" (T.pack . show) (aNumber info)]
+      serialize (info, c, x) =
+        let name = NE.last (aQName info)
+            accType = accTypes M.! (NE.head $ aQName info)
+        in qualifiedNameToText (aQName info) :
+           name :
+           (serializeAmount accountingType accType x) ++
+           [c, maybe "" (T.pack . show) (aNumber info)]
 
                             
       -- Total lines
       total :: [[T.Text]]
       total = map (\(c, (dr, cr)) -> ["", "Total"] ++ [T.pack $ show dr, T.pack $ show cr] ++ [c]) $
-              M.toList $ totalNetBalance root
+              M.toList $ totalNetBalance $ lAccounts l
 
       csvlines ::  [[T.Text]]
       csvlines =  title ++
@@ -93,7 +103,7 @@ printTrialBalance start end l accountingType =
   in
     encodeWith csvOptions csvlines
 
-printTransactions :: Maybe Day -> Maybe Day -> Ledger -> AccountingType -> B.ByteString
+printTransactions :: Maybe Day -> Maybe Day -> Ledger -> AccountingFormat -> B.ByteString
 printTransactions start end l accountingType =
   let transactions :: [(T.Text, Transaction)]
       transactions = identifiedTransactions l
@@ -126,13 +136,13 @@ printTransactions start end l accountingType =
             q = pQuantity p
             c = pCommodity p
             acc = accInfos M.! n
-            accountType = accTypes M.! (head $ n)
+            accountType = accTypes M.! (NE.head n)
             number = aNumber acc
         in
           qualifiedNameToText n :
-          last n :
+          NE.last n :
           (T.pack $ show $ date) :
-          serializePlusMinus accountingType q ++
+          serializeNumber accountingType accountType q ++
           [c,
            ident,
            T.pack $ show accountType,
@@ -154,53 +164,57 @@ printTransactions start end l accountingType =
 
 -- Split accounts between Asset, Liability and Equity
 -- and Revenue Expense
-splitAccounts :: M.Map AccountName AccountType -> Account -> (Account, Account)
-splitAccounts accTypes (Node VirtualAccount{aQName = []} as) =
-  let (b, i) = partition part as
-  in (Node VirtualAccount{aQName = []} b, Node VirtualAccount{aQName = []} i)
+splitAccounts :: M.Map AccountName AccountType -> AccountMap -> (AccountMap, AccountMap)
+splitAccounts accTypes m = M.partition (isBalanceSheetAccountType . (accTypes M.!) . NE.head . aQName) m
 
-  where part (Node info _) =
-           let accType = accTypes M.! (head $ aQName info)
-           in accType `elem` [Asset, Liability, Equity]
-splitAccounts _ _ = error "Invalid splitAccounts call"
-
-serializeAccounts ::  Account  -> [[T.Text]]
-serializeAccounts = snd . cata algebra
-        where algebra :: Algebra (TreeF AccountInfo) (Balance, [[T.Text]])
-              algebra (NodeF VirtualAccount{} []) = (M.empty, [])
-              algebra (NodeF info children)
+serializeAccounts :: M.Map AccountName AccountType ->  AccountMap  -> [[T.Text]]
+serializeAccounts accTypeMap = snd . cata algebra .  mapToTree
+        where algebra :: Algebra (TreeF (Either [AccountName] AccountInfo)) (Balance, [[T.Text]])
+              -- Case for empty balances
+              algebra (NodeF (Left _) children)
+                | all M.null (map fst children) = (M.empty, [])
+              algebra (NodeF (Right info) children)
                 | M.null (aBalance info) && all M.null (map fst children) = (M.empty, [])
+
+              -- Case for root
+              algebra (NodeF (Left []) children) =
+                (sumBalance $ map fst children,
+                 concatMap snd children)
+
+              -- General case 
               algebra (NodeF info children) =
-                let n = qualifiedNameToText $ aQName info
-                    b = if isRealAccount info
-                        then aBalance info
-                        else M.empty
+                let n = either last (NE.last . aQName) info
+                    b = either (const M.empty) aBalance info
+
+                    accType = accTypeMap M.! either head (NE.head . aQName) info
                     
                     balance = sumBalance (b : map fst children)
 
                     accLines' :: [[T.Text]]
-                    accLines' =  map (\(c, x) -> n : serializeAmount PlusMinus x ++ [c])
+                    accLines' =  map (\(c, x) -> n :
+                                                 serializeAmount (OneColumnSignedNumber SignDependsOnAccountType) accType x ++
+                                                 [c])
                                  (M.toList b)
 
                     accLines = if null accLines' then [[n]] else accLines'
  
                     total :: [[T.Text]]
                     total = map (\(c, x) -> T.append "Total - "  n :
-                                  serializeAmount PlusMinus x  ++
+                                  serializeAmount (OneColumnSignedNumber SignDependsOnAccountType) accType x  ++
                                   [c])
                             (M.toList balance)
 
-                    shiftCellsToTheRight :: [[T.Text]] -> [[T.Text]]
-                    shiftCellsToTheRight = map ("" :)
-
                 in (balance, accLines ++
                              shiftCellsToTheRight (concatMap snd children) ++
-                             total)
+                             if null children then [] else total)
+
+              shiftCellsToTheRight :: [[T.Text]] -> [[T.Text]]
+              shiftCellsToTheRight = map ("" :)
 
       
 printBalanceSheet :: Maybe Day -> Maybe Day -> Ledger -> B.ByteString
 printBalanceSheet start end l =
-  let root = mapToTree (lAccounts l)
+  let --root = mapToTree (lAccounts l)
       accTypes = cAccountTypeMapping $ lConfiguration l
       (sDate, eDate) = printDate start end l
   
@@ -210,23 +224,23 @@ printBalanceSheet start end l =
                 "End date", eDate]
       
       -- Compute the earnings
-      (balanceAccounts', incomeAccounts) = splitAccounts accTypes root
+      (balanceAccounts', incomeAccounts) = splitAccounts accTypes $ lAccounts l
       earnings = totalBalance incomeAccounts
       earningAccount = cEarningsAccount $ lConfiguration l
-      balanceAccounts = updateAccount
-                        (\info -> info{aBalance = sumBalance [aBalance info, earnings]})
+      balanceAccounts = M.adjust
+                        (\info -> info{aBalance = mergeBalance (aBalance info) earnings})
                         earningAccount
                         balanceAccounts'
 
                              
       csvlines ::  [[T.Text]]
-      csvlines = title : [] : serializeAccounts balanceAccounts
+      csvlines = title : [] : serializeAccounts accTypes balanceAccounts
   in
     encodeWith csvOptions csvlines
 
 printIncomeStatement :: Maybe Day -> Maybe Day -> Ledger -> B.ByteString
 printIncomeStatement start end l =
-  let root = mapToTree (lAccounts l)
+  let --root = mapToTree (lAccounts l)
       accTypes = cAccountTypeMapping $ lConfiguration l
       (sDate, eDate) = printDate start end l
   
@@ -236,9 +250,9 @@ printIncomeStatement start end l =
                 "End date", eDate]
       
       -- Compute the earnings for the period
-      (_, incomeAccounts) = splitAccounts accTypes root
+      (_, incomeAccounts) = splitAccounts accTypes $ lAccounts l
                         
       csvlines ::  [[T.Text]]
-      csvlines = title : [] : serializeAccounts incomeAccounts
+      csvlines = title : [] : serializeAccounts accTypes incomeAccounts
   in
     encodeWith csvOptions csvlines

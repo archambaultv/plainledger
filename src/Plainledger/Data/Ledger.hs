@@ -28,6 +28,7 @@ import Plainledger.Data.Account
 import Plainledger.Data.Balance
 import Plainledger.Data.Transaction
 import Plainledger.Error
+import qualified Data.List.NonEmpty as NE
 
 -- Returns the ledger that corresponds to the journal file.
 journalToLedger :: (MonadError Error m) => Journal -> m Ledger
@@ -81,7 +82,7 @@ addAccounts (OpenEntry date ys) l = do
         checkAccountType :: (MonadError Error m) =>
                             OpenAccountEntry -> m ()
         checkAccountType x =
-          let name = head $ oaName x
+          let name = NE.head $ oaName x
               err = throwError $ T.unpack name ++ " does not have an account type in the configuration"
           in maybe err (const $ pure ()) (M.lookup name (cAccountTypeMapping $ lConfiguration l))
         
@@ -315,7 +316,7 @@ adjustDate l maybeStart maybeEnd =
 computeOpeningBalance :: QualifiedName -> M.Map AccountName AccountType -> AccountMap -> AccountMap
 computeOpeningBalance initAcc accTypeMap accBalanceMap =
   let target :: AccountInfo -> Bool
-      target = not . isBalanceSheetAccount . (accTypeMap M.!) . head . aQName
+      target = not . isBalanceSheetAccountType . (accTypeMap M.!) . NE.head . aQName
 
       openingBalance :: Balance
       openingBalance = sumBalance $ M.elems $ fmap (netBalance . aBalance) $ M.filter target accBalanceMap
@@ -356,4 +357,4 @@ accountsSortedByType :: Ledger -> [(QualifiedName, AccountInfo)]
 accountsSortedByType l = sortBy sortByType (M.toList $ lAccounts l)
   where sortByType (n1, _) (n2, _) =
           let accMap = cAccountTypeMapping $ lConfiguration l
-          in compare (accMap M.! head n1, n1) (accMap M.! head n2, n2)
+          in compare (accMap M.! NE.head n1, n1) (accMap M.! NE.head n2, n2)

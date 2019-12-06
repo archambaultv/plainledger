@@ -44,10 +44,11 @@ import Text.Read
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+import qualified Control.Monad.Combinators.NonEmpty as CNE
 import Plainledger.Data.Type
 import Plainledger.Data.QualifiedName
 import qualified Data.SExpresso.Parse as SL
- 
+  
 type Parser s = Parsec Void (SL.SExprStream s Char Char Tok)
 
 type Lexer s = Parsec Void s (SL.SExprStream s Char Char Tok)
@@ -188,10 +189,10 @@ escape :: (MonadParsec e s m, Token s ~ Char) => m Char
 escape = char '\\'
 
 qualifiedName :: (MonadParsec e s m, Token s ~ Char) => m QualifiedName
-qualifiedName = label "qualified name" $ fmap (map T.pack) stringQName
+qualifiedName = label "qualified name" $ fmap (fmap T.pack) stringQName
 
   where stringQName = between (char '\'') (char '\'')
-                      (sepBy1 (some qualifiedChar) (char ':'))
+                      (CNE.sepBy1 (some qualifiedChar) (char ':'))
 
         newEscape = escape >> ((char ':' *> pure ':') <|>
                                (char '\'' *> pure '\''))
@@ -258,7 +259,7 @@ tokNonEmptyText = tokNonEmptyString <|> tokIdentifier
 tokProperty :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
 tokProperty = SL.atomToken (\t -> case t of {TProperty x -> Just x; _ -> Nothing}) Nothing <?> "property"
 
-tokQName :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m [T.Text]
+tokQName :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m QualifiedName
 tokQName = SL.atomToken (\t -> case t of {TQName x -> Just x; _ -> Nothing}) Nothing <?> "qualified name"
 
 tokCommodity :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text

@@ -28,7 +28,7 @@ data TrialBalanceCommand = TrialBalanceCommand {
   tbcOutputFile :: Maybe String,
   tbcStart :: Maybe Day,
   tbcEnd :: Maybe Day,
-  tbcAccType :: AccountingType
+  tbcAccType :: AccountingFormat
   }
   
 data TransactionsCommand = TransactionsCommand {
@@ -36,7 +36,7 @@ data TransactionsCommand = TransactionsCommand {
   tcOutputFile :: Maybe String,
   tcStart :: Maybe Day,
   tcEnd :: Maybe Day,
-  tcAccType :: AccountingType
+  tcAccType :: AccountingFormat
   }
   
 data IncomeCommand = IncomeCommand {
