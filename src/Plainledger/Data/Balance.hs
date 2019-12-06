@@ -1,7 +1,9 @@
 module Plainledger.Data.Balance (
   zeroBalance,
   sumBalance,
-  netBalance
+  netBalance,
+  mergeBalance,
+  addQuantity
 )
 where
 
@@ -15,7 +17,7 @@ zeroBalance b = M.foldr' (&&) True (fmap (\(d,c) -> d - c == 0) b)
 sumBalance :: [Balance] -> Balance
 sumBalance = cata algebra
   where algebra Nil = M.empty
-        algebra (Cons x acc) = M.unionWith (\(d1, c1) (d2, c2) -> (d1 + d2, c1 + c2))
+        algebra (Cons x acc) = mergeBalance
                                acc
                                x
 
@@ -26,3 +28,9 @@ netBalance b = fmap f b
                       in if total >= 0
                          then (total, 0)
                          else (0, negate total)
+
+mergeBalance :: Balance -> Balance -> Balance
+mergeBalance = M.unionWith addQuantity
+
+addQuantity :: (Quantity, Quantity) -> (Quantity, Quantity) -> (Quantity, Quantity)
+addQuantity (d1, c1) (d2, c2) = (d1 + d2, c1 + c2)

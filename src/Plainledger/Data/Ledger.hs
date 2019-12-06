@@ -231,6 +231,7 @@ verifyBalance be l = do
          " while the assertion is " ++ show (bQuantity be)
   
 
+-- FixMe : Double check we are not closing the opening balance or earnings account
 closeAccounts :: (MonadError Error m) =>
                  CloseAccountEntry ->
                  Ledger ->
@@ -295,15 +296,40 @@ adjustDate l maybeStart maybeEnd =
       cleanAccount :: AccountMap
       cleanAccount = fmap (\info -> info{aBalance = M.empty}) (lAccounts l)
 
+      config = lConfiguration l
   in case (beforeT, afterT) of
        -- The ledger is the same as the one we received
        ([],[]) -> l
        -- We discard the afterT transactions and build an initial balance
        -- with the beforeT transactions
        _ -> let openedAccount = foldr updateBalance cleanAccount beforeT
-                keepAccount = foldr updateBalance openedAccount keepT
+                openingBalance = computeOpeningBalance
+                                 (cOpeningBalanceAccount config)
+                                 (cAccountTypeMapping config)
+                                 openedAccount
+                keepAccount = foldr updateBalance openingBalance keepT
             in l{lTransactions = keepT, lAccounts = keepAccount}
-  
+
+-- Reset to zero the revenue and expense balance
+-- Writes the total to the initial balance account
+computeOpeningBalance :: QualifiedName -> M.Map AccountName AccountType -> AccountMap -> AccountMap
+computeOpeningBalance initAcc accTypeMap accBalanceMap =
+  let target :: AccountInfo -> Bool
+      target = not . isBalanceSheetAccount . (accTypeMap M.!) . head . aQName
+
+      openingBalance :: Balance
+      openingBalance = sumBalance $ M.elems $ fmap (netBalance . aBalance) $ M.filter target accBalanceMap
+
+      clean :: AccountMap
+      clean = fmap (\info -> if target info
+                             then info{aBalance = M.empty}
+                             else info)
+              accBalanceMap
+  in M.adjust
+     (\info -> info{aBalance = mergeBalance (aBalance info) openingBalance})
+     initAcc
+     clean
+     
 updateBalance :: Transaction -> AccountMap -> AccountMap
 updateBalance t amap =
   let ps = tPostings t

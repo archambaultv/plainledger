@@ -9,6 +9,7 @@ module Plainledger.Data.Account (
   isVirtualAccount,
   isCreditAccount,
   isDebitAccount,
+  isBalanceSheetAccount,
   isAllowedCommodity,
   guardAllowedCommodity,
 --  pruneEmptyAccounts,
@@ -88,6 +89,9 @@ isCreditAccount a = a `elem` [Liability, Equity, Revenue]
 
 isDebitAccount :: AccountType -> Bool
 isDebitAccount a = a `elem` [Asset, Expense]
+
+isBalanceSheetAccount :: AccountType -> Bool
+isBalanceSheetAccount a = a `elem` [Asset, Liability, Equity]
 
 -- depth :: Account -> Integer
 -- depth = cata algebra
