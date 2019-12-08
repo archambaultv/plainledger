@@ -214,14 +214,29 @@ serializeAccounts accTypeMap = snd . cata algebra .  mapToTree
       
 printBalanceSheet :: Maybe Day -> Maybe Day -> Ledger -> B.ByteString
 printBalanceSheet start end l =
+  -- 2 Colonnes, un colonne montant (gauche) et un autre total (droite). Avoir une
+  -- profondeur p (en partant de la racine).
+
+  -- Si il y a des enfants, dans la colonne de droite. Si il n'y a pas
+  -- d'enfants dans le colonne de gauche.
+
+  -- Pour tous les noeuds de profondeur plus petites, on décale d'une
+  -- colonne les noeuds de profondeurs plus grandes. On fait un titre
+  -- en haut et décale d'une ligne et un total en bas
+
+  -- Pour les noeuds de profondeur plus grand, on ne décale pas. On
+  -- fait un total à la fin des enfants mais pas de titre en haut. On
+  -- décale d'un ligne au lieu d'un titre
+  
   let --root = mapToTree (lAccounts l)
       accTypes = cAccountTypeMapping $ lConfiguration l
       (sDate, eDate) = printDate start end l
   
       -- Header
-      title :: [T.Text]
-      title = ["Balance Sheet", "Start date", sDate,
-                "End date", eDate]
+      title :: [[T.Text]]
+      title = [["Balance Sheet"],
+               ["Start date", sDate],
+               ["End date", eDate]]
       
       -- Compute the earnings
       (balanceAccounts', incomeAccounts) = splitAccounts accTypes $ lAccounts l
@@ -234,7 +249,7 @@ printBalanceSheet start end l =
 
                              
       csvlines ::  [[T.Text]]
-      csvlines = title : [] : serializeAccounts accTypes balanceAccounts
+      csvlines = title ++ [[]] ++ serializeAccounts accTypes balanceAccounts
   in
     encodeWith csvOptions csvlines
 
