@@ -200,7 +200,10 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
                         [] -> if s == 0
                               then return withQuantity
                               else throwError $ 
-                             " Transaction does not balance for commodity " ++ T.unpack curr
+                             " Transaction does not balance for commodity " ++
+                             T.unpack curr ++
+                             "\n The net balance is : " ++
+                             (show s) ++ "\n"
                         [x] -> let negS = negate s
                                in return $ x{pQuantity = negS} : withQuantity
                         _ -> throwError $ 
