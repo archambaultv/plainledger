@@ -145,8 +145,8 @@ initialList = "!$%&*/<=>?^_~@."
 subsequentList :: String
 subsequentList = initialList ++ "+-"
 
-graphicChar :: (MonadParsec e s m, Token s ~ Char) => m Char
-graphicChar = satisfy isGraphicChar <?> "printable character"
+--graphicChar :: (MonadParsec e s m, Token s ~ Char) => m Char
+--graphicChar = satisfy isGraphicChar <?> "printable character"
 
 isGraphicChar :: Char -> Bool
 isGraphicChar '"' = False
@@ -157,12 +157,26 @@ isGraphicChar x = C.isAlphaNum x ||
                   C.isMark x ||
                   C.isSymbol x
 
-pString :: (MonadParsec e s m, Token s ~ Char) => m String
-pString = label "string" $ between (char '"') (char '"') $
-          many (escapedChar <|> graphicChar)
+pString :: forall e s m. (MonadParsec e s m, Token s ~ Char) => m String
+pString = label "string" $ do
+  _ <- char '"'
+  inner
+
+   where inner :: m String
+         inner = do
+          x <- chunkToTokens (Proxy :: Proxy s) <$> takeWhileP (Just "printable character") isGraphicChar
+          n <- (escape >> (fmap Just escapedChar <|> (skipSpace >> pure Nothing))) <|>
+               fmap Just (char '"')
+          case n of
+            Just '"' -> return x
+            Nothing -> inner >>= return . (x ++)
+            Just y -> inner >>= return . (x ++) . (y :)
+            
+         skipSpace :: (MonadParsec e s m, Token s ~ Char) => m ()
+         skipSpace = some (space1 <|> lineComment <|> blockComment) >> escape >> return ()
 
 escapedChar :: (MonadParsec e s m, Token s ~ Char) => m Char
-escapedChar = escape >>
+escapedChar = 
               ((char 'n' >> pure '\n') <|>
                (char 't' >> pure '\t') <|>
                (char 'r' *> pure '\r') <|>
@@ -198,7 +212,7 @@ qualifiedName = label "qualified name" $ fmap (fmap T.pack) stringQName
                                (char '\'' *> pure '\''))
 
         qualifiedChar = try newEscape <|>
-                        escapedChar <|>
+                        (escape >> escapedChar) <|>
                         (satisfy (\c -> c /= ':' &&
                                         c /= '\'' &&
                                         isGraphicChar c))
