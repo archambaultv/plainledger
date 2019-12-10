@@ -12,7 +12,7 @@ module Plainledger.Data.Account (
   isBalanceSheetAccountType,
   isAllowedCommodity,
   guardAllowedCommodity,
---  pruneEmptyAccounts,
+  pruneEmptyAccounts,
 --  flattenBalance,
   minAndMaxDates,
   flattenBalance,
@@ -59,39 +59,55 @@ aName = NE.last . aQName
 -- Build a tree by using the QualifiedName
 -- Nodes that are absent from the AccountMap only contains the qualified name
 -- for that node
-mapToTree :: AccountMap -> Tree (Either [AccountName] AccountInfo)
-mapToTree = ana coAlgebra . (Nothing,) . M.toAscList
+mapToTree :: AccountMap -> AccountTree
+mapToTree = Node (Left []) . map (buildTree []) . groupByHead . M.toAscList --ana coAlgebra . (Nothing,) . M.toAscList
 
-  where coAlgebra :: CoAlgebra
-                     (TreeF (Either [AccountName] AccountInfo))
-                     (Maybe [AccountName], [(QualifiedName, AccountInfo)])
-        -- If we are given an empty list, we build the empty tree without children
-        coAlgebra (info, []) = NodeF (Left $ fromMaybe [] info) []
-        
-        -- Nothing means we start building the tree
-        coAlgebra (Nothing, xs) =
-          let xsGroup = groupByHead xs
-          in NodeF (Left []) $ map (Just [],) xsGroup
-
-        -- If we have a qualified name with 1 element, this element in the node
-        coAlgebra (_, ((_ :| [] , info) : xs)) =
-          let xsGroup = groupByHead $ map (first tailNE) xs
-              node = Right info
-          in NodeF node $ map (Just $ NE.toList $ aQName info,) xsGroup
-
-        -- If no qualified name has 1 element, this node is a virtual node
-        coAlgebra (Just parent, ((v :| (v1 : v1s), info) : xs)) =
-          let xsGroup = groupByHead $ (v1 :| v1s, info) : map (first tailNE) xs
-              name = parent ++ [v]
-              node = Left name
-          in NodeF node $ map (Just name,) xsGroup
-
-        groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]  
+  where groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]  
         groupByHead = groupBy ((==) `on` (NE.head . fst))
+
+        buildTree :: [AccountName] -> [(QualifiedName, AccountInfo)] -> Tree (Either [AccountName] AccountInfo)
+        buildTree _ [] = error "Account:mapToTree:buildTree empty list"
+        buildTree n (((x :| []), info) : more) =
+          let name = n ++ [x]
+          in Node (Right info) $ map (buildTree name) $ groupByHead $ map (first tailNE) more
+        buildTree n xs@(((x :| _), _) : _) =
+          let name = n ++ [x]
+          in Node (Left name) $ map (buildTree name) $ groupByHead $ map (first tailNE) xs
 
         tailNE :: NonEmpty a -> NonEmpty a
         tailNE (_ :| []) = error "Account:mapToTree:tailNE singleton NonEmpty list"
         tailNE (_ :| (y:ys)) = y :| ys 
+
+  -- where coAlgebra :: CoAlgebra
+  --                    (TreeF (Either [AccountName] AccountInfo))
+  --                    (Maybe [AccountName], [(QualifiedName, AccountInfo)])
+  --       -- If we are given an empty list, we build the empty tree without children
+  --       coAlgebra (info, []) = NodeF (Left $ fromMaybe [] info) []
+        
+  --       -- Nothing means we start building the tree
+  --       coAlgebra (Nothing, xs) =
+  --         let xsGroup = groupByHead xs
+  --         in NodeF (Left []) $ map (Just [],) xsGroup
+
+  --       -- If we have a qualified name with 1 element, this element is the node
+  --       coAlgebra (Just _, ((_ :| [] , info) : xs)) =
+  --         let xsGroup = groupByHead $ map (first tailNE) xs
+  --             node = Right info
+  --         in NodeF node $ map (Just $ NE.toList $ aQName info,) xsGroup
+
+  --       -- If no qualified name has 1 element, this node is a virtual node
+  --       coAlgebra (Just parent, ((v :| (v1 : v1s), info) : xs)) =
+  --         let xsGroup = groupByHead $ (v1 :| v1s, info) : map (first tailNE) xs
+  --             name = parent ++ [v]
+  --             node = Left name
+  --         in NodeF node $ map (Just name,) xsGroup
+
+  --       groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]  
+  --       groupByHead = groupBy ((==) `on` (NE.head . fst))
+
+  --       tailNE :: NonEmpty a -> NonEmpty a
+  --       tailNE (_ :| []) = error "Account:mapToTree:tailNE singleton NonEmpty list"
+  --       tailNE (_ :| (y:ys)) = y :| ys 
 
         -- coAlgebra (info, children) =
         --   let xsGroup :: [[(QualifiedName, AccountInfo)]]
@@ -156,22 +172,24 @@ isBalanceSheetAccountType a = a `elem` [Asset, Liability, Equity]
 --  where algebra :: TreeF a Integer -> Integer
 --        algebra (NodeF _ xs) = 1 + sum xs
 
--- pruneEmptyAccounts :: Account -> Maybe Account
--- pruneEmptyAccounts = filterAccounts (not . M.null . aBalance)
+pruneEmptyAccounts :: AccountTree -> AccountTree
+pruneEmptyAccounts = filterAccounts (not . M.null . aBalance)
 
--- filterAccounts :: (AccountInfo -> Bool) -> Account -> Maybe Account
--- filterAccounts f s = cata algebra
---  where algebra :: TreeF AccountInfo (Maybe Account) -> Maybe Account
---        algebra (NodeF info xs) =
---          let nonEmpty = catMaybes $ xs
---              test = f info
---          in if null nonEmpty &&
---                (isVirtualAccount info ||  not test)
---             then Nothing
---             else if test
---                  then Just $ Node info nonEmpty
---                  else Just $ Node VirtualAccount nonEmpty
-           
+filterAccounts :: (AccountInfo -> Bool) -> AccountTree -> AccountTree
+filterAccounts f s = fromMaybe (Node (Left []) []) $ cata algebra s
+ where algebra :: Algebra (TreeF (Either [AccountName] AccountInfo)) (Maybe AccountTree)
+       algebra (NodeF (Left x) xs) =
+         let nonEmpty = catMaybes $ xs
+         in if null nonEmpty
+            then Nothing
+            else Just $ Node (Left x) nonEmpty
+
+       algebra (NodeF (Right info) xs) =
+         let nonEmpty = catMaybes $ xs
+         in if null nonEmpty && not (f info)
+            then Nothing
+            else Just $ Node (Right info) nonEmpty
+
 -- minAndMaxDates :: Account -> (Day, Day)
 -- minAndMaxDates = cata algebra
 --   where algebra (NodeF (Left _) dts) =

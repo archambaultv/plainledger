@@ -38,7 +38,7 @@ module Plainledger.Data.Type (
   AccountType(..),
 --  VirtualAccount(..),
   AccountInfo(..),
---  Account,
+  AccountTree,
   AccountMap,
   AccountName,
   QualifiedName,
@@ -201,13 +201,12 @@ makeBaseFunctor ''Tree
 instance Show1 (TreeF (a, AccountInfo)) where
   liftShowsPrec _ _ _ (NodeF (_, n) _) = shows n
   
-type TreeAnn info a = Fix (Compose ((,) info) (TreeF a))
+-- type TreeAnn info a = Fix (Compose ((,) info) (TreeF a))
 
-pattern CNode :: info -> a -> [TreeAnn info a] -> TreeAnn info a
-pattern CNode info a as = Fix (Compose (info, NodeF a as))
+-- pattern CNode :: info -> a -> [TreeAnn info a] -> TreeAnn info a
+-- pattern CNode info a as = Fix (Compose (info, NodeF a as))
 
-type NodeA = Either VirtualAccount AccountInfo
-type Account = Tree NodeA
+type AccountTree = Tree (Either [AccountName] AccountInfo)
 type AccountMap = M.Map QualifiedName AccountInfo
 
 data Configuration = Configuration {

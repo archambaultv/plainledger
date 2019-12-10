@@ -8,6 +8,7 @@ where
 import Data.Csv
 import qualified Data.List.NonEmpty as NE
 import Data.Time
+import Data.List
 import Data.Maybe
 import Data.Functor.Foldable
 import qualified Data.ByteString.Lazy as B
@@ -168,18 +169,13 @@ splitAccounts :: M.Map AccountName AccountType -> AccountMap -> (AccountMap, Acc
 splitAccounts accTypes m = M.partition (isBalanceSheetAccountType . (accTypes M.!) . NE.head . aQName) m
 
 serializeAccounts :: M.Map AccountName AccountType ->  AccountMap  -> [[T.Text]]
-serializeAccounts accTypeMap = snd . cata algebra .  mapToTree
-        where algebra :: Algebra (TreeF (Either [AccountName] AccountInfo)) (Balance, [[T.Text]])
-              -- Case for empty balances
-              algebra (NodeF (Left _) children)
-                | all M.null (map fst children) = (M.empty, [])
-              algebra (NodeF (Right info) children)
-                | M.null (aBalance info) && all M.null (map fst children) = (M.empty, [])
+serializeAccounts accTypeMap = snd . snd . cata algebra . pruneEmptyAccounts .  mapToTree
+        where algebra :: Algebra (TreeF (Either [AccountName] AccountInfo)) (Balance, (Bool, [[T.Text]]))
 
               -- Case for root
               algebra (NodeF (Left []) children) =
                 (sumBalance $ map fst children,
-                 concatMap snd children)
+                 (False, concat $ intersperse [[]] $  map (snd . snd) children))
 
               -- General case 
               algebra (NodeF info children) =
@@ -188,28 +184,45 @@ serializeAccounts accTypeMap = snd . cata algebra .  mapToTree
 
                     accType = accTypeMap M.! either head (NE.head . aQName) info
                     
-                    balance = sumBalance (b : map fst children)
+                    balance = sumBalance (b : map (fst) children)
 
+                    -- Print one line per commodity for this account
+                    -- name, amount, commodity
                     accLines' :: [[T.Text]]
                     accLines' =  map (\(c, x) -> n :
                                                  serializeAmount (OneColumnSignedNumber SignDependsOnAccountType) accType x ++
                                                  [c])
                                  (M.toList b)
 
-                    accLines = if null accLines' then [[n]] else accLines'
- 
+                    --accLines = if null accLines' then [[n]] else accLines'
+
+                    -- Print one line per commodity for the total of this subtree
                     total :: [[T.Text]]
-                    total = map (\(c, x) -> T.append "Total - "  n :
+                    total = map (\(c, x) -> T.concat ["Total ", n, ":"] :
                                   serializeAmount (OneColumnSignedNumber SignDependsOnAccountType) accType x  ++
                                   [c])
                             (M.toList balance)
 
-                in (balance, accLines ++
-                             shiftCellsToTheRight (concatMap snd children) ++
-                             if null children then [] else total)
+                    -- Prints children first, then the lines for this
+                    -- account and total if we have any children                    
+                    lines1 :: (Bool, [[T.Text]])
+                    lines1 = if null children
+                             then (True, accLines')
+                             else let (noChild, withChildren) = partition (fst . snd) children
+                                      withChildren' = concat $ intersperse [[]] $ map (snd . snd) withChildren
+                                      noChild' = concat $ map (snd . snd) noChild
+                                      children' = if null withChildren'
+                                                  then noChild'
+                                                  else withChildren' ++ [[]] ++ noChild'
+                                  in (False, [[n]] ++
+                                             children' ++
+                                             accLines' ++
+                                             total)
 
-              shiftCellsToTheRight :: [[T.Text]] -> [[T.Text]]
-              shiftCellsToTheRight = map ("" :)
+                in (balance, lines1)
+
+              --shiftCellsToTheRight :: [[T.Text]] -> [[T.Text]]
+              --shiftCellsToTheRight = map ("" :)
 
       
 printBalanceSheet :: Maybe Day -> Maybe Day -> Ledger -> B.ByteString

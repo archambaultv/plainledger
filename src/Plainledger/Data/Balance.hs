@@ -3,7 +3,7 @@ module Plainledger.Data.Balance (
   sumBalance,
   netBalance,
   mergeBalance,
-  addQuantity
+  addQuantity,
 )
 where
 
