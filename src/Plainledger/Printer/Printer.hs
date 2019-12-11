@@ -168,8 +168,12 @@ printTransactions start end l accountingType =
 splitAccounts :: M.Map AccountName AccountType -> AccountMap -> (AccountMap, AccountMap)
 splitAccounts accTypes m = M.partition (isBalanceSheetAccountType . (accTypes M.!) . NE.head . aQName) m
 
-serializeAccounts :: M.Map AccountName AccountType ->  AccountMap  -> [[T.Text]]
-serializeAccounts accTypeMap = snd . snd . cata algebra . pruneEmptyAccounts .  mapToTree
+serializeAccounts :: AccountTypeMap ->  AccountMap  -> [[T.Text]]
+serializeAccounts accTypeMap = snd . snd .
+                               cata algebra .
+                               orderTreeByAccountType accTypeMap .
+                               pruneEmptyAccounts .
+                               mapToTree
         where algebra :: Algebra (TreeF (Either [AccountName] AccountInfo)) (Balance, (Bool, [[T.Text]]))
 
               -- Case for root
@@ -211,9 +215,13 @@ serializeAccounts accTypeMap = snd . snd . cata algebra . pruneEmptyAccounts .  
                              else let (noChild, withChildren) = partition (fst . snd) children
                                       withChildren' = concat $ intersperse [[]] $ map (snd . snd) withChildren
                                       noChild' = concat $ map (snd . snd) noChild
-                                      children' = if null withChildren'
-                                                  then noChild'
-                                                  else withChildren' ++ [[]] ++ noChild'
+                                      children' = case (noChild', withChildren') of
+                                                       ([], _) -> withChildren' ++ [[]]
+                                                       (_ , []) -> noChild'
+                                                       _ -> withChildren' ++
+                                                            [[]] ++
+                                                            noChild' ++
+                                                            [[]]
                                   in (False, [[n]] ++
                                              children' ++
                                              accLines' ++

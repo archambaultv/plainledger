@@ -18,6 +18,7 @@ module Plainledger.Data.Account (
   flattenBalance,
   totalBalance,
   totalNetBalance,
+  orderTreeByAccountType
 --  updateAccount
 )
 where
@@ -56,6 +57,17 @@ guardAllowedCommodity c info =
 aName :: AccountInfo -> T.Text
 aName = NE.last . aQName
 
+-- Orders the first level by account type (all trees in a subtree have
+-- the same account type)
+orderTreeByAccountType :: AccountTypeMap -> AccountTree -> AccountTree
+orderTreeByAccountType accType (Node (Left []) xs) =
+  let xs' = sortBy (compare `on` foo) xs
+      foo (Node (Left []) _) = error "Account:orderTreeByAccountType:foo root node"
+      foo (Node (Left (a:_)) _) = accType M.! a
+      foo (Node (Right info) _) = accType M.! (NE.head $ aQName info)
+  in Node (Left []) xs'
+orderTreeByAccountType _ x = x
+
 -- Build a tree by using the QualifiedName
 -- Nodes that are absent from the AccountMap only contains the qualified name
 -- for that node
@@ -65,7 +77,7 @@ mapToTree = Node (Left []) . map (buildTree []) . groupByHead . M.toAscList --an
   where groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]  
         groupByHead = groupBy ((==) `on` (NE.head . fst))
 
-        buildTree :: [AccountName] -> [(QualifiedName, AccountInfo)] -> Tree (Either [AccountName] AccountInfo)
+        buildTree :: [AccountName] -> [(QualifiedName, AccountInfo)] -> AccountTree
         buildTree _ [] = error "Account:mapToTree:buildTree empty list"
         buildTree n (((x :| []), info) : more) =
           let name = n ++ [x]

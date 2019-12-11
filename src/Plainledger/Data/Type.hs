@@ -41,6 +41,7 @@ module Plainledger.Data.Type (
   AccountTree,
   AccountMap,
   AccountName,
+  AccountTypeMap,
   QualifiedName,
   
   Configuration(..),
@@ -209,9 +210,11 @@ instance Show1 (TreeF (a, AccountInfo)) where
 type AccountTree = Tree (Either [AccountName] AccountInfo)
 type AccountMap = M.Map QualifiedName AccountInfo
 
+type AccountTypeMap = M.Map AccountName AccountType
+
 data Configuration = Configuration {
   cDefaultCommodity :: Commodity,
-  cAccountTypeMapping :: M.Map AccountName AccountType,
+  cAccountTypeMapping :: AccountTypeMap,
   cOpeningBalanceAccount :: QualifiedName,
   cEarningsAccount :: QualifiedName,
   cTagDescription :: M.Map T.Text TagDescription,
