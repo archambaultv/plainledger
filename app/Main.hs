@@ -87,7 +87,7 @@ transactionsInfo = info (transactionsCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the transactions")
 
-                   
+
 trialBalanceCommand :: Parser Command
 trialBalanceCommand = CTrialBalance <$> (TrialBalanceCommand
     <$> journalFile
@@ -101,32 +101,9 @@ trialBalanceInfo = info (trialBalanceCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the trial balance")
 
-
-importCommand :: Parser Command
-importCommand = CImport <$> (ImportCommand
-    <$> argument str (metavar "CSV-FILE" <> help "The CSV file containing the new transactions")
-    <*> strOption (short 'c' <>
-                   long "config" <>
-                   metavar "CONFIG-FILE" <>
-                   help "The configuration file that specifies how to parse the CSV-FILE")
-    <*> switch ( long "dry-run" <>
-                 short 'd' <>
-                 help "Just show the transactions to be imported. Does not append the new transactions to JOURNAL-FILE")
-    <*> optional (strOption (short 'j' <>
-                             long "journal" <>
-                             metavar "JOURNAL-FILE" <>
-                             help ("The journal to which the new transactions will be appended. " ++
-                                   "A new file will be created if it doesn't exists. Defaults to STDOUT."))))
-
-importInfo :: ParserInfo Command
-importInfo = info (importCommand <**> helper)
-              (fullDesc
-               <> progDesc "Imports new transactions from a CSV file")
-             
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "balancesheet" balanceInfo <>
-    command "import" importInfo <>
     command "incomestatement" incomeInfo <>
     command "transactions" transactionsInfo <>
     command "trialbalance" trialBalanceInfo

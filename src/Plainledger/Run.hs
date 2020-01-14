@@ -5,10 +5,6 @@ module Plainledger.Run
   run
   ) where
 
-import Data.Char
-import Data.Csv
-import qualified Data.List as DL
-import qualified Data.Csv.Parser.Megaparsec as M
 import Data.Time
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy.Encoding as EL
@@ -20,21 +16,17 @@ import System.IO
 import Plainledger.Parser.Lexer
 import Plainledger.Data.Type
 import Plainledger.Parser.Journal
-import Plainledger.Parser.Csv
-import Plainledger.Data.Csv
 import Plainledger.Commands
 import Plainledger.Error
 import Plainledger.Data.Ledger
-import Plainledger.Data.Transaction
 import Plainledger.Printer.Printer
 
 run :: Command -> IO ()
 run c = runExceptT (runT c) >>= either (hPutStr stderr) return
 
-runT :: Command -> ExceptT Error IO () 
-runT command = 
+runT :: Command -> ExceptT Error IO ()
+runT command =
   case command of
-    CImport c -> runImport c
     CModify c -> runModify c
     CBalanceSheet c -> runBalanceSheet c
     CIncome c -> runIncome c
@@ -54,38 +46,6 @@ printStream f s =
   case f of
     Nothing -> lift $ putStrLn $ L.unpack $ EL.decodeUtf8 s
     Just output -> lift $ B.writeFile output s
-
-printString :: Maybe String -> String -> ExceptT Error IO ()
-printString f s =
-  case f of
-    Nothing -> lift $ putStrLn $ s
-    Just output -> lift $ writeFile output s
-    
-runImport :: ImportCommand -> ExceptT Error IO ()
-runImport c = do
-  -- Read configuration
-  lift $ putStrLn "Reading File"
-  stream <- lift $ readFile (icConfig c)
-
-  _ <- lift $ putStrLn "Tokenize"
-  tokens1 <- liftEither $ first errorBundlePretty $ parse (lexer :: Lexer String) (icConfig c) stream
-
-  _ <- lift $ putStrLn "Read Config"
-  (config, csvStatement) <- liftEither $ first errorBundlePretty $ parse parseCsv (icConfig c) tokens1
-
-  -- Read the csv file
-  _ <- lift $ putStrLn "Read Csv"
-  csvStream <- lift $ B.readFile (icCsvFile c)
-  let csvOpts = defaultDecodeOptions {
-        decDelimiter = fromIntegral (ord (columnDelimiter config))
-        }
-  csvData <- liftEither $ first errorBundlePretty $ M.decodeWith csvOpts NoHeader (icCsvFile c) csvStream
-
-  -- Build transactions
-  ts <- liftEither $ evalCsv config csvStatement csvData
-
-  -- Print transactions
-  printString (icJournalFile c) (DL.intercalate "\n\n" $ map printTransaction ts)
 
 runModify :: ModifyCommand -> ExceptT Error IO ()
 runModify _ = return ()

@@ -15,18 +15,18 @@ module Plainledger.Data.Type (
   SourceOffset,
 
   AccountingFormat(..),
-  SignConvention(..),  
+  SignConvention(..),
 
   TagF(..),
   Tag,
   TagDescription(..),
-  
+
   Quantity,
   Commodity,
 
   PostingF(..),
   Posting,
-  
+
   TransactionF(..),
   Transaction,
 
@@ -43,7 +43,7 @@ module Plainledger.Data.Type (
   AccountName,
   AccountTypeMap,
   QualifiedName,
-  
+
   Configuration(..),
   Ledger(..),
 
@@ -56,18 +56,6 @@ module Plainledger.Data.Type (
   TransactionEntry,
   BalanceEntry(..),
   PostingEntry,
-
-  FieldType(..),
-  CsvConfiguration(..),
-  CsvStatementF(..),
-  CsvStatement,
-  CsvStatementAnn,
-  CsvPrim(..),
-  CsvExpr(..),
-  CsvExprF(..),
-  CsvExprAnn,
---  pattern CVar,
-  CsvValue(..)
 )
 where
 
@@ -77,9 +65,9 @@ import Data.Tree
 import Data.Decimal
 import Data.Time
 import Data.Bifunctor.TH
-import Data.Functor.Foldable
+--import Data.Functor.Foldable
 import Data.Functor.Foldable.TH
-import Data.Functor.Compose
+--import Data.Functor.Compose
 import Data.Functor.Classes
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
@@ -201,7 +189,7 @@ makeBaseFunctor ''Tree
 
 instance Show1 (TreeF (a, AccountInfo)) where
   liftShowsPrec _ _ _ (NodeF (_, n) _) = shows n
-  
+
 -- type TreeAnn info a = Fix (Compose ((,) info) (TreeF a))
 
 -- pattern CNode :: info -> a -> [TreeAnn info a] -> TreeAnn info a
@@ -255,12 +243,12 @@ data BalanceEntry = BalanceEntry {bDate :: Day,
                     deriving (Show)
 
 
-  
+
 data OpenEntry = OpenEntry {oaDate :: Day,
                             oaAccountEntry :: [Located OpenAccountEntry]
                            }
                  deriving (Show)
-                 
+
 data OpenAccountEntry = OpenAccountEntry {
   oaName :: QualifiedName,
   oaNumber :: Maybe Integer,
@@ -269,85 +257,3 @@ data OpenAccountEntry = OpenAccountEntry {
   oaDefaultCommodity :: Maybe Commodity
   }
   deriving (Show)
-
-------
-data CsvStatementF text expr
-  = CsvDefine text [text] expr
-  | CsvEvalRules text
-  | CsvExpr expr
-  deriving (Eq, Show)
-
-type CsvStatement = CsvStatementF T.Text CsvExpr
-
-data CsvPrim
-  = OpMinus
-  | OpPlus
-  | OpMult
-  | OpDiv
-  | OpRound
-  | OpGT
-  | OpLT
-  | OpEQ
-  | OpNEQ
-  | OpAnd
-  | OpOr
-  | OpNot
-  | OpIf
-  | OpYear
-  | OpMonth
-  | OpDay
-  | OpDate
-  | OpPass
-  | OpSkipline
-  | OpTransaction
-  | OpPosting
-  | OpTag
-  deriving (Eq, Show)
-
-data CsvExpr
-  = EVar T.Text
-  | EBool Bool
-  | EPrim CsvPrim
-  | EDate Day
-  | EString T.Text
-  | EQName QualifiedName
-  | ENumber Decimal
-  | ECall CsvExpr [CsvExpr]
-  deriving (Eq, Show)
-
-makeBaseFunctor ''CsvExpr
-
-type CsvStatementAnn info = CsvStatementF (info, T.Text) (CsvExprAnn info)
-type CsvExprAnn info = Fix (Compose ((,) info) CsvExprF)
-
--- pattern CVar :: info -> T.Text -> CsvExprAnn info
--- pattern CVar info x = Fix (Compose (info, EVarF x))
-
-data CsvValue
-  -- Values available in the journal file
-  = VDate Day
-  | VString T.Text
-  | VNumber Decimal
-  | VQualifiedName QualifiedName
-  | VIdentifier T.Text
-  -- Extra values for this little language  
-  | VBool Bool  
-  | VTransaction
-  | VSkipLine
-  | VPass
-  deriving (Eq, Show)
-
-
--- Csv configuration
-data FieldType
-  = FText
-  | FNumber
-  | FDate
-  deriving (Show, Eq)
-
-data CsvConfiguration = CsvConfiguration {
-  columnDelimiter :: Char,
-  skip :: Integer,
-  fields :: [(T.Text, Integer, FieldType)]
-  }
-  deriving (Show, Eq)

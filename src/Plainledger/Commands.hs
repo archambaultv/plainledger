@@ -1,7 +1,6 @@
 module Plainledger.Commands
   (
   Command(..),
-  ImportCommand(..),
   TrialBalanceCommand(..),
   TransactionsCommand(..),
   IncomeCommand(..),
@@ -14,8 +13,7 @@ import Data.Time
 import Plainledger.Data.Type
 
 data Command
-  = CImport ImportCommand
-  | CModify ModifyCommand
+  = CModify ModifyCommand
   | CBalanceSheet BalanceSheetCommand
   | CIncome IncomeCommand
   | CTransactions TransactionsCommand
@@ -30,7 +28,7 @@ data TrialBalanceCommand = TrialBalanceCommand {
   tbcEnd :: Maybe Day,
   tbcAccType :: AccountingFormat
   }
-  
+
 data TransactionsCommand = TransactionsCommand {
   tcInputFile :: String,
   tcOutputFile :: Maybe String,
@@ -38,7 +36,7 @@ data TransactionsCommand = TransactionsCommand {
   tcEnd :: Maybe Day,
   tcAccType :: AccountingFormat
   }
-  
+
 data IncomeCommand = IncomeCommand {
   incInputFile :: String,
   incOutputFile :: Maybe String,
@@ -51,13 +49,6 @@ data BalanceSheetCommand = BalanceSheetCommand {
   bcOutputFile :: Maybe String,
   bcStart :: Maybe Day,
   bcEnd :: Maybe Day
-  }
-  
-data ImportCommand = ImportCommand {
-  icCsvFile :: String,
-  icConfig :: String,
-  icDryRun :: Bool,
-  icJournalFile :: Maybe String
   }
 
 data ModifyCommand = ModifyCommand {
