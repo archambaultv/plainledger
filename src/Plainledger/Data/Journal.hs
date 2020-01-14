@@ -29,7 +29,7 @@ journalEntryDate (JEConfiguration _) = error "Configuration has no date"
 sortJournal :: Journal -> Journal
 sortJournal = sortBy foo
   where foo x y = ordJournalEntries (snd x) (snd y)
-  
+
 ordJournalEntries :: JournalEntry -> JournalEntry -> Ordering
 ordJournalEntries (JEConfiguration _) _ = LT
 ordJournalEntries _ (JEConfiguration _) = GT
@@ -49,13 +49,13 @@ ordJournalEntries x y =
             (JEBalance _, JEBalance _) -> EQ
             (JEBalance _, _) -> LT
             (_, JEBalance _) -> GT
-            
+
             (_,_) -> EQ
 
--- Journal must be sorted         
+-- Journal must be sorted
 configuration :: MonadError Error m => Journal -> m Configuration
 configuration [] = throwError "No configuration in the journal"
-configuration ((span, (JEConfiguration _)) : (span2, (JEConfiguration _)) : _) =
+configuration ((_, (JEConfiguration _)) : (_, (JEConfiguration _)) : _) =
   throwError $
   "More than one configuration found in the journal\n" ++
   "One at " ++ {- startPosPretty span ++ -} "\n" ++
@@ -68,7 +68,7 @@ configuration _ = throwError "No configuration in the journal"
 --              mapMaybe (traverse isBalance) j
 --   where isBalance (JEBalance d x y z) = Just (d, x, y, z)
 --         isBalance _ = Nothing
-        
+
 -- transactions :: Journal -> [(Day, [Located RawPosting], (S.Set (Located Tag)))]
 -- transactions j = sortBy (\(d1,_,_) (d2,_,_) -> compare d1 d2) $
 --                  mapMaybe (isTransaction . unlocate) j
@@ -80,11 +80,10 @@ configuration _ = throwError "No configuration in the journal"
 --                   mapMaybe (traverse isClose) j
 --   where isClose (JECloseAccount d x) = Just (d, x)
 --         isClose _ = Nothing
-        
+
 -- openAccounts :: Journal -> [Located RawOpen]
 -- openAccounts j = sortBy (\d1 d2 -> compare (rDate $ unlocate d1) (rDate $ unlocate d2)) $
 --                  concat $
 --                  mapMaybe (isOpen . unlocate) j
 --   where isOpen (JEOpenAccount x) = Just x
 --         isOpen _ = Nothing
-        
