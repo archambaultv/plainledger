@@ -39,7 +39,7 @@ open =  do
   d <- tokDate
   os <- many (located $ rawOpen)
   return $ JEOpenAccount $ OpenEntry d os
-    
+
 rawOpen :: (Stream s) => Parser s OpenAccountEntry
 rawOpen = paren $ do
   n <- tokQName
@@ -50,11 +50,11 @@ rawOpen = paren $ do
           <*> toPermutationWithDefault False allowAnyC
 
   return $ OpenAccountEntry n num aCurr aAny d
-  
+
   where number = property "number" *> (Just <$> tokInteger)
         allowedC = property "allowed-commodities" *> (Just <$> some tokText)
         defaultC = property "default-commodity" *> (Just <$> tokText)
-        allowAnyC = property "allow-any-commodities" *> pure True 
+        allowAnyC = property "allow-any-commodities" *> pure True
 
 close :: (Stream s) => Parser s JournalEntry
 close =  do
@@ -68,7 +68,7 @@ tag = do
   key <- tokProperty
   value <- optional (tokText <|> (T.pack . show <$> tokNumber) <|> (T.pack . show <$> tokDate))
   return $ Tag key value
-  
+
 transaction :: (Stream s) => Parser s JournalEntry
 transaction = do
   _ <- symbol "transaction"
@@ -79,7 +79,7 @@ transaction = do
   tags2 <- option [] tags
   let tagss = tags1 ++ tags2
   return $ JETransaction $ Transaction d tagss postings
-  
+
   where posting = property "postings" *> (some (located rawPosting) <?> "posting")
         tags = many (located tag)
 
@@ -102,8 +102,8 @@ configuration = do
         <*> toPermutationWithDefault "True" tagDefaultValue
         <*> toPermutationWithDefault "False" tagValueIfMissing
   return $ JEConfiguration c
-  
-  where defaultCommodityP = property "main-currency" *> tokText
+
+  where defaultCommodityP = property "main-currency" *> tokCommodity
         accountTypeC = property "account-type" *> accountType
         openingAccount = property "opening-balance-account" *> tokQName
         earningsAccount = property "earnings-account" *> tokQName
@@ -126,7 +126,7 @@ accountType = paren $ do
    then return $ M.fromList xs
    else let dStr = intercalate " " $ map T.unpack d
         in setParserState s >> fail ("The following names appear more than once in :account-type " ++ dStr)
-  
+
   where
     category :: (Stream s) => T.Text -> AccountType -> Parser s [(T.Text, AccountType)]
     category s t = (map (,t) . S.toList . S.fromList) <$> (property s *> some tokText)
@@ -141,7 +141,7 @@ tagDescription = toMap <$> (many $ paren $ do
            <*> toPermutationWithDefault "True" defaultValue
            <*> toPermutationWithDefault "False" valueIfMissing
   return td)
-  
+
   where name = property "header" *> tokText
         unique = property "unique" *> pure True
         foreignKey = property "foreign-key" *> (Just <$> tokText)

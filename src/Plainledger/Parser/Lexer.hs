@@ -19,7 +19,7 @@ module Plainledger.Parser.Lexer
   property,
   SL.atomToken,
   SL.atomSatisfy,
-  
+
   tokDate,
   tokDecimal,
   tokInteger,
@@ -48,11 +48,11 @@ import qualified Control.Monad.Combinators.NonEmpty as CNE
 import Plainledger.Data.Type
 import Plainledger.Data.QualifiedName
 import qualified Data.SExpresso.Parse as SL
-  
+
 type Parser s = Parsec Void (SL.SExprStream s Char Char Tok)
 
 type Lexer s = Parsec Void s (SL.SExprStream s Char Char Tok)
-                                  
+
 lexer :: (MonadParsec e s m, Token s ~ Char) => m (SL.SExprStream s Char Char Tok)
 lexer = SL.sexprStream (char '(') (char ')') tok pSpace sepRule <* eof
 
@@ -107,7 +107,7 @@ tok = (TDate <$> try date) <|>
 
 -- integer :: (MonadParsec e s m, Token s ~ Char) => m Integer
 -- integer = L.signed (pure ()) L.decimal
-  
+
 decimal :: (MonadParsec e s m, Token s ~ Char) => m Decimal
 decimal = realToFrac <$> L.signed (pure ()) L.scientific
 
@@ -171,12 +171,12 @@ pString = label "string" $ do
             Just '"' -> return x
             Nothing -> inner >>= return . (x ++)
             Just y -> inner >>= return . (x ++) . (y :)
-            
+
          skipSpace :: (MonadParsec e s m, Token s ~ Char) => m ()
          skipSpace = some (space1 <|> lineComment <|> blockComment) >> escape >> return ()
 
 escapedChar :: (MonadParsec e s m, Token s ~ Char) => m Char
-escapedChar = 
+escapedChar =
               ((char 'n' >> pure '\n') <|>
                (char 't' >> pure '\t') <|>
                (char 'r' *> pure '\r') <|>
@@ -194,7 +194,7 @@ escapedChar =
           if i <= 0x10FFFF
           then return $ C.chr i
           else fail $ show i ++ " is greater than the maximum unicode valid code point (x10FFFF)"
-          
+
 
         uniOctal = char 'o'
         uniHexa = char 'x'
@@ -277,4 +277,4 @@ tokQName :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m QualifiedN
 tokQName = SL.atomToken (\t -> case t of {TQName x -> Just x; _ -> Nothing}) Nothing <?> "qualified name"
 
 tokCommodity :: (MonadParsec e s m, Token s ~ SL.SExprToken b c Tok) => m T.Text
-tokCommodity = tokNonEmptyString <?> "commodity"
+tokCommodity = tokNonEmptyText <?> "commodity"
