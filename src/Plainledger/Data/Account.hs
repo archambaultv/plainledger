@@ -49,7 +49,7 @@ guardAllowedCommodity :: (MonadError Error m) => Commodity -> AccountInfo -> m (
 guardAllowedCommodity c info =
   if isAllowedCommodity c info
   then pure ()
-  else throwError $
+  else throwError $ ErrMsg $
        "Commodity " ++ T.unpack c ++
        " is not allowed for account " ++
        (qualifiedNameToString $ aQName info)
@@ -74,7 +74,7 @@ orderTreeByAccountType _ x = x
 mapToTree :: AccountMap -> AccountTree
 mapToTree = Node (Left []) . map (buildTree []) . groupByHead . M.toAscList --ana coAlgebra . (Nothing,) . M.toAscList
 
-  where groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]  
+  where groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]
         groupByHead = groupBy ((==) `on` (NE.head . fst))
 
         buildTree :: [AccountName] -> [(QualifiedName, AccountInfo)] -> AccountTree
@@ -88,14 +88,14 @@ mapToTree = Node (Left []) . map (buildTree []) . groupByHead . M.toAscList --an
 
         tailNE :: NonEmpty a -> NonEmpty a
         tailNE (_ :| []) = error "Account:mapToTree:tailNE singleton NonEmpty list"
-        tailNE (_ :| (y:ys)) = y :| ys 
+        tailNE (_ :| (y:ys)) = y :| ys
 
   -- where coAlgebra :: CoAlgebra
   --                    (TreeF (Either [AccountName] AccountInfo))
   --                    (Maybe [AccountName], [(QualifiedName, AccountInfo)])
   --       -- If we are given an empty list, we build the empty tree without children
   --       coAlgebra (info, []) = NodeF (Left $ fromMaybe [] info) []
-        
+
   --       -- Nothing means we start building the tree
   --       coAlgebra (Nothing, xs) =
   --         let xsGroup = groupByHead xs
@@ -114,12 +114,12 @@ mapToTree = Node (Left []) . map (buildTree []) . groupByHead . M.toAscList --an
   --             node = Left name
   --         in NodeF node $ map (Just name,) xsGroup
 
-  --       groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]  
+  --       groupByHead :: [(QualifiedName, AccountInfo)] -> [[(QualifiedName, AccountInfo)]]
   --       groupByHead = groupBy ((==) `on` (NE.head . fst))
 
   --       tailNE :: NonEmpty a -> NonEmpty a
   --       tailNE (_ :| []) = error "Account:mapToTree:tailNE singleton NonEmpty list"
-  --       tailNE (_ :| (y:ys)) = y :| ys 
+  --       tailNE (_ :| (y:ys)) = y :| ys
 
         -- coAlgebra (info, children) =
         --   let xsGroup :: [[(QualifiedName, AccountInfo)]]
@@ -134,7 +134,7 @@ mapToTree = Node (Left []) . map (buildTree []) . groupByHead . M.toAscList --an
         -- nodeName (Left VRoot) = []
         -- nodeName (Left (VNode n)) = n
         -- nodeName (Right acc) = aQName acc
-                        
+
 -- updateAccount :: (AccountInfo -> AccountInfo) -> QualifiedName -> Account -> Account
 -- updateAccount f n a = apo coAlgebra (n, a)
 --  where coAlgebra :: RCoAlgebra (TreeF NodeA) Account (QualifiedName, Account)
@@ -159,10 +159,10 @@ mapToTree = Node (Left []) . map (buildTree []) . groupByHead . M.toAscList --an
 
 --        coAlgebra (x :| _, Node y@(Left (VNode (z :| _))) children)
 --          | x /= z = NodeF y (map Left children)
-         
---        coAlgebra (_ :| (y : ys), Node z children)  
+
+--        coAlgebra (_ :| (y : ys), Node z children)
 --          NodeF z $ map (Right . ((y :| ys),)) children
-       
+
 -- isRealAccount :: AccountInfo -> Bool
 -- isRealAccount VirtualAccount{} = False
 -- isRealAccount RealAccount{} = True
@@ -217,7 +217,7 @@ minAndMaxDates x =
                                                         (aCloseDate info)))
                              x
   in (minimum $ map fst dates, maximum $ map fst dates)
-  
+
 -- flattenBalance :: Tree NodeA -> [(AccountInfo, Commodity, (Quantity, Quantity))]
 -- flattenBalance = cata algebra
 --   where
@@ -231,7 +231,7 @@ flattenBalance :: AccountMap ->  [(AccountInfo, Commodity, (Quantity, Quantity))
 flattenBalance x =
   let infoToLines a = map (\(c, amount) -> (a, c, amount)) $ M.toList $ aBalance a
   in concat $ M.elems $ fmap infoToLines x
-  
+
 -- A new balance where :
 -- Credit = sum of all the credits
 -- Debit = sum of all the debits

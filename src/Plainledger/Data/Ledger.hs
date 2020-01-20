@@ -20,7 +20,7 @@ import Data.Functor.Foldable
 import Control.Monad
 import Control.Monad.Except
 --import Control.Monad.State
---import Text.Megaparsec (SourcePos(..), sourcePosPretty, mkPos)  
+--import Text.Megaparsec (SourcePos(..), sourcePosPretty, mkPos)
 import Plainledger.Data.Type
 import Plainledger.Data.QualifiedName
 import Plainledger.Data.Journal
@@ -44,24 +44,24 @@ fillLedger :: (MonadError Error m) =>
               m Ledger
 fillLedger journal = cata algebra journal
   where  algebra Nil = return
-         algebra (Cons (_, entry) xMonad) =
+         algebra (Cons (err, entry) xMonad) =
           let res = case entry of
                       JEOpenAccount x -> addAccounts x
                       JETransaction x -> addTransaction x
                       JEBalance x -> verifyBalance x
                       JECloseAccount x -> closeAccounts x
                       JEConfiguration _ -> error "Configuration must be handle before fillLedger"
-          in \l -> res l >>= xMonad
+          in \l -> (offSetHandler err $ res l) >>= xMonad
 
 -- addEntry :: Ledger -> Located JournalEntry -> Either Error Ledger
--- addEntry l (_, entry) = 
+-- addEntry l (_, entry) =
 --           case entry of
 --             JEOpenAccount x -> addAccounts x l
 --             JETransaction x -> addTransaction x l
 --             JEBalance x -> verifyBalance x l
 --             JECloseAccount x -> closeAccounts x l
 --             JEConfiguration _ -> error "Configuration must be handle before addEntry"
-        
+
 addAccounts :: (MonadError Error m) =>
                OpenEntry ->
                Ledger ->
@@ -74,18 +74,18 @@ addAccounts (OpenEntry date ys) l = do
                       AccountMap ->
                       (Located OpenAccountEntry) ->
                       m AccountMap
-        addAccount m (_, x) = do
+        addAccount m (offset, x) = offSetHandler offset $ do
           _ <- checkAccountType x
           acc <- buildAccount x
           insertAccount m acc
-                                    
+
         checkAccountType :: (MonadError Error m) =>
                             OpenAccountEntry -> m ()
         checkAccountType x =
           let name = NE.head $ oaName x
-              err = throwError $ T.unpack name ++ " does not have an account type in the configuration"
+              err = throwError $ ErrMsg $ T.unpack name ++ " does not have an account type in the configuration"
           in maybe err (const $ pure ()) (M.lookup name (cAccountTypeMapping $ lConfiguration l))
-        
+
         buildAccount :: (MonadError Error m) =>
                         OpenAccountEntry -> m AccountInfo
         buildAccount x = do
@@ -100,7 +100,7 @@ addAccounts (OpenEntry date ys) l = do
                 aBalance = M.empty
                 }
           return accInfo
-                
+
         allowedCommodities :: (MonadError Error m) =>
                               OpenAccountEntry -> m (Commodity, Maybe (S.Set Commodity))
         allowedCommodities x =
@@ -109,21 +109,22 @@ addAccounts (OpenEntry date ys) l = do
               allowedC = oaAllowedCommodities x
               configC = cDefaultCommodity $ lConfiguration l
           in case (defaultC, allowedC, anyC) of
-            (_, Just _, True) -> throwError ":allowed-commodities and :allow-any-commodities cannot be set at the same time"
+            (_, Just _, True) -> throwError $ ErrMsg
+                                  ":allowed-commodities and :allow-any-commodities cannot be set at the same time"
             (_, _, True) -> pure (maybe configC id defaultC, Nothing)
             (Nothing, Nothing, _) -> pure (configC, Just (S.singleton configC))
-            (Just _, Nothing, _) -> throwError ":default-commodity is not in the :allowed-commodities list"
+            (Just _, Nothing, _) -> throwError $ ErrMsg ":default-commodity is not in the :allowed-commodities list"
             (Nothing, (Just xs), _) -> pure (head xs, Just $ S.fromList xs)
             (Just d, (Just xs), _) -> if d `elem` xs
                                       then pure (d, Just $ S.fromList xs)
-                                      else throwError ":default-commodity is not in the :allowed-commodities list"
+                                      else throwError $ ErrMsg ":default-commodity is not in the :allowed-commodities list"
 
         insertAccount :: (MonadError Error m) =>
                          AccountMap -> AccountInfo -> m AccountMap
         insertAccount m acc =
           case M.insertLookupWithKey (\_ a _ -> a) (aQName acc) acc m of
             (Nothing, m') -> return m'
-            (Just _, _) -> throwError $ "Account " ++ qualifiedNameToString (aQName acc) ++ " is already open"
+            (Just _, _) -> throwError $ ErrMsg $ "Account " ++ qualifiedNameToString (aQName acc) ++ " is already open"
 
 
 addTransaction :: (MonadError Error m) =>
@@ -139,7 +140,7 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
   let t' = t{tPostings = rawPostings4, tTags = map snd tags}
   let acc' = updateBalance t' (lAccounts l)
   return $ l{lTransactions = t'  : lTransactions l, lAccounts = acc'}
-  
+
   where
    checkBetweenOpenCloseDate :: (MonadError Error m) => [PostingEntry] -> m ()
    checkBetweenOpenCloseDate rps =
@@ -149,10 +150,10 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
          closeDate = filter (\(_,a) -> maybe False (\d -> d < day) (aCloseDate a)) $ zip rps accounts
      in case (openDate, closeDate) of
          ([],[]) -> return ()
-         (((rp,a):_),_) -> throwError $ 
+         (((rp,a):_),_) -> throwError $ ErrMsg $
                             " Posting to the account "++ (qualifiedNameToString $ pAccount rp) ++
                             " before the account was opened (opened on :" ++ (show $ aOpenDate a) ++ ")"
-         (_, ((rp,a):_)) -> throwError $ 
+         (_, ((rp,a):_)) -> throwError $ ErrMsg $
                             " Posting to the account " ++ (qualifiedNameToString $ pAccount rp) ++
                             " after the account was closed (closed on :" ++ (show $ aCloseDate a) ++ ")"
 
@@ -182,11 +183,11 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
             in case S.size candidates of
                  0 -> return x{pCommodity = aDefaultCommodity accountInfo}
                  1 -> return x{pCommodity = S.elemAt 0 candidates}
-                 _ -> throwError $ " Unable to infer commodity for this posting. Possible candidates are :"
+                 _ -> throwError $ ErrMsg $ " Unable to infer commodity for this posting. Possible candidates are :"
                        ++ intercalate ", " (map T.unpack $ S.toList candidates)
          fill r = return r{pCommodity = fromJust (pCommodity r)}
      in mapM fill rp
-                               
+
    balancePostings :: (MonadError Error m) => [PostingF QualifiedName (Maybe Quantity) Commodity] -> m [Posting]
    balancePostings rp =
        let grp :: [(Commodity, [PostingF QualifiedName (Maybe Quantity) Commodity])]
@@ -199,14 +200,14 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
               in case noQuantity of
                         [] -> if s == 0
                               then return withQuantity
-                              else throwError $ 
+                              else throwError $ ErrMsg $
                              " Transaction does not balance for commodity " ++
                              T.unpack curr ++
                              "\n The net balance is : " ++
                              (show s) ++ "\n"
                         [x] -> let negS = negate s
                                in return $ x{pQuantity = negS} : withQuantity
-                        _ -> throwError $ 
+                        _ -> throwError $ ErrMsg $
                              "More than one postings with no specified quantity for the commodity " ++ T.unpack curr
 
        in concat <$> traverse f grp
@@ -216,7 +217,7 @@ addTransaction t@Transaction{tTags = tags, tDate = day, tPostings = rawPostings}
    groupPostings rps =
      let x = map (\r -> (pCommodity r, [r])) rps
      in M.toList $ M.fromListWith (++) x
-     
+
 verifyBalance :: (MonadError Error m) =>
                  BalanceEntry ->
                  Ledger ->
@@ -229,11 +230,11 @@ verifyBalance be l = do
   let (d,c) = fromMaybe (0,0) $ M.lookup comm $ aBalance $ acc
   if (d - c) == (bQuantity be)
     then return l
-    else throwError $ "Balance assertion failed for account \"" ++
+    else throwError $ ErrMsg $ "Balance assertion failed for account \"" ++
          qualifiedNameToString (aQName acc) ++
          "\"\n The computed balance is " ++ show (d - c) ++
          " while the assertion is " ++ show (bQuantity be)
-  
+
 
 -- FixMe : Double check we are not closing the opening balance or earnings account
 closeAccounts :: (MonadError Error m) =>
@@ -257,10 +258,10 @@ closeAccounts (CloseAccountEntry date names) l = do
 
         checkOpenDate :: (MonadError Error m) =>
                          AccountInfo -> m ()
-        checkOpenDate acc = 
+        checkOpenDate acc =
             let openDate = aOpenDate $ acc
             in if openDate > date
-               then throwError $ "closing account date (" ++
+               then throwError $ ErrMsg $ "closing account date (" ++
                     show date ++ ") is before the opening account date ("
                     ++ show openDate ++ ")"
                else return ()
@@ -271,9 +272,9 @@ closeAccounts (CloseAccountEntry date names) l = do
         checkBalanceAtZero acc =
           if zeroBalance $ aBalance $ acc
           then return ()
-          else throwError $ "Unable to close account " ++ qualifiedNameToString (aQName acc) ++
+          else throwError $ ErrMsg $ "Unable to close account " ++ qualifiedNameToString (aQName acc) ++
                " because its balance is not at zero"
-    
+
 -- checkUniqueGUID :: Ledger -> Either Error ()
 -- checkUniqueGUID l =
 --   let ts = lTransactions l
@@ -291,7 +292,7 @@ closeAccounts (CloseAccountEntry date names) l = do
 --               p2 = sourcePosPretty $ fst $ second firstBad
 --           in Left $ "Duplicate transcation GUID : " ++ guid ++
 --                     ". Found at\n  " ++ p1 ++
---                     " and\n  " ++ p2 
+--                     " and\n  " ++ p2
 
 adjustDate :: Ledger -> Maybe Day -> Maybe Day -> Ledger
 adjustDate l maybeStart maybeEnd =
@@ -333,7 +334,7 @@ computeOpeningBalance initAcc accTypeMap accBalanceMap =
      (\info -> info{aBalance = mergeBalance (aBalance info) openingBalance})
      initAcc
      clean
-     
+
 updateBalance :: Transaction -> AccountMap -> AccountMap
 updateBalance t amap =
   let ps = tPostings t

@@ -6,6 +6,9 @@ module Plainledger.Run
   ) where
 
 import Data.Time
+import Data.Void
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Set as S
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy.Encoding as EL
 import qualified Data.Text.Lazy as L
@@ -22,7 +25,22 @@ import Plainledger.Data.Ledger
 import Plainledger.Printer.Printer
 
 run :: Command -> IO ()
-run c = runExceptT (runT c) >>= either (hPutStr stderr) return
+run c = runExceptT (runT c) >>= either handler return
+  where handler (ErrMsg e) = hPutStr stderr (curate e)
+        handler (ErrSrc (offset, _) e) = do
+          let input = commandInputFile c
+          stream <- readFile input
+          let fe = FancyError offset
+                   (S.singleton $ (ErrorFail e :: ErrorFancy Void))
+          let err = errorBundlePretty $
+                    ParseErrorBundle (fe NE.:| [])
+                    (PosState stream 0 (initialPos input) defaultTabWidth "")
+          hPutStr stderr (curate err)
+
+        curate :: String -> String
+        curate [] = []
+        curate s | last s == '\n' = s
+        curate s = s ++ "\n"
 
 runT :: Command -> ExceptT Error IO ()
 runT command =
@@ -30,14 +48,16 @@ runT command =
     CModify c -> runModify c
     CBalanceSheet c -> runBalanceSheet c
     CIncome c -> runIncome c
-    CTrialBalance c -> runTrialBalance c --return $ printTrialBalance startDate endDate adjustedLedger accountingType
+    CTrialBalance c -> runTrialBalance c
     CTransactions c -> runTransactions c
 
 getLedger :: String -> Maybe Day -> Maybe Day -> ExceptT Error IO Ledger
 getLedger input startDate endDate = do
   stream <- lift $ readFile input
-  tokens1 <- liftEither $ first errorBundlePretty $ parse (lexer :: Lexer String) input stream
-  j <- liftEither $ first errorBundlePretty $ parse journal input tokens1
+  tokens1 <- liftEither $ first (ErrMsg . errorBundlePretty) $
+             parse (lexer :: Lexer String) input stream
+  j <- liftEither $ first (ErrMsg . errorBundlePretty) $
+       parse journal input tokens1
   ledger <- liftEither $ journalToLedger j
   return $ adjustDate ledger startDate endDate
 

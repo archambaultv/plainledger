@@ -5,7 +5,8 @@ module Plainledger.Commands
   TransactionsCommand(..),
   IncomeCommand(..),
   ModifyCommand(..),
-  BalanceSheetCommand(..)
+  BalanceSheetCommand(..),
+  commandInputFile
   )
 where
 
@@ -20,6 +21,12 @@ data Command
   | CTrialBalance TrialBalanceCommand
   -- | CAccounts --Export accounts
 
+commandInputFile :: Command -> String
+commandInputFile (CModify x) = mcInputFile x
+commandInputFile (CBalanceSheet x) = bcInputFile x
+commandInputFile (CIncome x) = incInputFile x
+commandInputFile (CTransactions x) = tcInputFile x
+commandInputFile (CTrialBalance x) = tbcInputFile x
 
 data TrialBalanceCommand = TrialBalanceCommand {
   tbcInputFile :: String,

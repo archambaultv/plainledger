@@ -54,14 +54,14 @@ ordJournalEntries x y =
 
 -- Journal must be sorted
 configuration :: MonadError Error m => Journal -> m Configuration
-configuration [] = throwError "No configuration in the journal"
+configuration [] = throwError $ ErrMsg "No configuration in the journal"
 configuration ((_, (JEConfiguration _)) : (_, (JEConfiguration _)) : _) =
-  throwError $
+  throwError $ ErrMsg $
   "More than one configuration found in the journal\n" ++
   "One at " ++ {- startPosPretty span ++ -} "\n" ++
   "The other at " -- ++ startPosPretty span2
 configuration ((_, JEConfiguration x) : _) = pure x
-configuration _ = throwError "No configuration in the journal"
+configuration _ = throwError $ ErrMsg "No configuration in the journal"
 
 -- balances :: Journal -> [Located (Day, QualifiedName, Quantity, (Maybe Commodity))]
 -- balances j = sortBy (\(At _ (d1,_,_,_)) (At _ (d2,_,_,_)) -> compare d1 d2) $
