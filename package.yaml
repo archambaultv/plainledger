@@ -1,5 +1,5 @@
 name:                plainledger
-version:             0.1.0.0
+version:             0.2.0.0
 github:              "archambaultv/plainledger"
 license:             OtherLicense # OBSD
 author:              "Vincent Archambault-Bouffard"
@@ -21,25 +21,23 @@ description:         Please see the README on GitHub at <https://github.com/arch
 
 dependencies:
 - base >= 4.7 && < 5
-- time
-- containers
-- text
-- megaparsec
 - Decimal
-- optparse-applicative
-- mtl
+- time
+- text
+- yaml
 - cassava
-- cassava-megaparsec
-- bytestring
-- sexpresso
-- parser-combinators
-- recursion-schemes
-- bifunctors
 - vector
+- aeson
+- scientific
+- bytestring
 
 ghc-options:
-  - -Wall
-  
+- -Wall
+- -Wcompat
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wredundant-constraints
+
 library:
   source-dirs: src
 

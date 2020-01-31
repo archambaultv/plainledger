@@ -1,0 +1,93 @@
+## This file is a dummy journal file for testing and debugging.
+
+# Configuration options
+configuration:
+  default-commodity: CAD
+  opening-balance-account: Opening Balance
+  earnings-account: Earnings
+  
+# Chart of accounts
+accounts:
+- id: Chequing
+  name: Bank Chequing
+  number: 1005
+  group: Asset
+  subgroup: Short term
+
+- id: Saving
+  name: Bank Saving
+  number: 1025
+  group: Asset
+  subgroup: Long term
+  
+- id: Credit card
+  number: 2055
+  group: Liability
+  subgroup: Short term
+
+- id: Opening Balance
+  number: 3001
+  group: Equity
+
+- id: Earnings
+  number: 3005
+  group: Equity
+  
+- id: Work
+  name: Company A
+  number: 4012
+  group: Revenue
+  
+- id: Music
+  number: 5055
+  group: Expense
+  subgroup: Shopping
+
+# Transactions
+# Transactions do not need to apprear in chronological order.  
+transactions:
+- date: 2019-01-23
+  conterparty: Great Disk Company
+  transfers:
+  - from: Credit card
+    to: Music
+    amount: 25
+  tags:
+  - id: Gift
+
+- date: 2019-01-23
+  balance-date: 2019-01-25
+  transfers:
+  - from: Credit card
+    to: Music
+    amount: 40
+    
+- date: 2018-10-12
+  note: Unused movie budget transfered to saving
+  transfers:
+  - from: Chequing
+    to: Saving
+    amount: 250
+    commodity: CAD
+
+- date: 2019-02-15
+  transfers:
+  - from: Work
+    to: Chequing
+    amount: 1450
+  - from: Unpaid Income Tax
+    to: Income Tax
+    amount: 200
+    note: "Provision for end of year income tax"
+    
+# Balance assertions
+balance-assertions:
+- date: 2018-11-30
+  account: Chequing
+  amount: 1456
+  commodity: CAD
+  
+- date: 2019-01-31
+  account: Chequing
+  amount: 1238
+  commodity: CAD

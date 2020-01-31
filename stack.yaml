@@ -1,7 +1,4 @@
-resolver: lts-14.13
+resolver: lts-14.20
 
 packages:
 - .
-extra-deps:
-- git: https://github.com/archambaultv/sexpresso.git
-  commit: d6989686c83863e41b69749828f02ea29fa7efc9 
