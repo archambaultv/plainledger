@@ -14,6 +14,7 @@ module Plainledger.Journal.Balance (
 where
 
 import Data.Time
+import Data.Scientific
 import qualified Data.Csv as C
 import Data.Csv (FromRecord(..),
                  FromNamedRecord(..),
@@ -21,14 +22,14 @@ import Data.Csv (FromRecord(..),
                  ToNamedRecord(..),
                  ToField(..),
                  (.!),
-                 (.=),
                  record,
                  namedRecord,
                  DefaultOrdered)
 import qualified Data.Yaml as Y
-import Data.Yaml (FromJSON(..), (.:), (.:?))
+import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.=), (.:?))
 import qualified Data.Text as T
 import Control.Monad (mzero)
+import Data.Aeson (pairs)
 import Plainledger.Journal.Amount
 
 -- | The Transfer data type reprensents the flow of one commodity from
@@ -39,7 +40,7 @@ data Balance = Balance
    _bAmount :: Quantity,
    _bCommodity :: Maybe Commodity
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- FromJSON instances
 instance FromJSON Balance where
@@ -50,6 +51,21 @@ instance FromJSON Balance where
     <*> (v .: "amount" >>= Y.withScientific "amount" (return . realToFrac))
     <*> v .:? "commodity"
   parseJSON _ = fail "Expected Object for Balance value"
+
+instance ToJSON Balance where
+  toJSON (Balance date acc amnt com) =
+    Y.object
+    $ ["date" .= date,
+       "account" .= acc,
+       "amount" .= (realToFrac amnt :: Scientific)]
+    ++ maybe [] (\x -> ["commodity" .= x]) com
+
+  toEncoding (Balance date acc amnt com) =
+    pairs
+    $ "date"   .= date
+    <> "account"   .= acc
+    <> "amount" .= (realToFrac amnt :: Scientific)
+    <> (maybe mempty (\x -> "commodity" .= x) com)
 
 instance FromRecord Balance where
     parseRecord v
@@ -80,10 +96,10 @@ instance ToRecord Balance where
 instance ToNamedRecord Balance where
     toNamedRecord (Balance d acc amnt com) =
       namedRecord [
-        "date" .= (show d),
-        "account" .= acc,
-        "amount" .= (show amnt),
-        "commodity" .= com]
+        "date" C..= (show d),
+        "account" C..= acc,
+        "amount" C..= (show amnt),
+        "commodity" C..= com]
 
 instance DefaultOrdered Balance where
   headerOrder _ = record ["date","account","amount","commodity"]

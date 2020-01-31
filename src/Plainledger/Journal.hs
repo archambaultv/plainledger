@@ -23,8 +23,9 @@ where
 import Data.Ord
 import qualified Data.Yaml as Y
 import qualified Data.Yaml.Pretty as P
-import Data.Yaml (FromJSON(..), (.:))
+import Data.Yaml (FromJSON(..), (.:), ToJSON(..), (.=))
 import qualified Data.Text as T
+import Data.Aeson (pairs)
 import Plainledger.Journal.Transaction
 import Plainledger.Journal.Balance
 import Plainledger.Journal.Configuration
@@ -38,7 +39,7 @@ data Journal = Journal
    _transactions :: [Transaction],
    _balances :: [Balance]
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 
 -- | The Data.Yaml.Pretty configuration object created so that the
@@ -65,3 +66,19 @@ instance FromJSON Journal where
     <*> v .: "transactions"
     <*> v .: "balance-assertions"
   parseJSON _ = fail "Expected Object for Journal value"
+
+-- To JSON instance
+instance ToJSON Journal where
+  toJSON (Journal config accounts txns bals) =
+    Y.object
+    $ ["configuration" .= config,
+       "accounts" .= accounts,
+       "transactions" .= txns,
+       "balance-assertions" .= bals]
+
+  toEncoding (Journal config accounts txns bals) =
+    pairs
+    $ "configuration"   .= config
+    <> "accounts"   .= accounts
+    <> "transactions" .= txns
+    <> "balance-assertions" .= bals

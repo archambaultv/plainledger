@@ -48,7 +48,7 @@ data CsvTransfer = CsvTransfer
    _cDateBalance :: Maybe Day, -- | The date use for balance assertion
    _cTransfer :: Transfer
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 csvBalanceDate :: CsvTransfer -> Day
 csvBalanceDate c = maybe (_cDate c) id $ _cDateBalance c

@@ -14,8 +14,9 @@ module Plainledger.Journal.Configuration (
 where
 
 import qualified Data.Yaml as Y
-import Data.Yaml (FromJSON(..), (.:))
+import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.=))
 import qualified Data.Text as T
+import Data.Aeson (pairs)
 import Plainledger.Journal.Amount
 
 -- | The Configuration of the journal file
@@ -24,7 +25,7 @@ data Configuration = Configuration
    _earningsAccount :: T.Text,
    _defaultCommodity :: Commodity
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- FromJSON instances
 instance FromJSON Configuration where
@@ -34,3 +35,17 @@ instance FromJSON Configuration where
     <*> v .: "earnings-account"
     <*> v .: "default-commodity"
   parseJSON _ = fail "Expected Object for Configuration value"
+
+-- To JSON instance
+instance ToJSON Configuration where
+  toJSON (Configuration openBal earnAcc defComm) =
+    Y.object
+    $ ["opening-balance-account" .= openBal,
+       "earnings-account" .= earnAcc,
+       "default-commodity" .= defComm]
+
+  toEncoding (Configuration openBal earnAcc defComm) =
+    pairs
+    $ "opening-balance-account"   .= openBal
+    <> "earnings-account"   .= earnAcc
+    <> "default-commodity" .= defComm

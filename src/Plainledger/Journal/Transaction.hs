@@ -48,7 +48,7 @@ data Transfer = Transfer
    _tfCommodity :: Maybe Commodity,
    _tfNote :: Maybe T.Text
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- | A transaction is a collection of transfers on a specific date
 data Transaction = Transaction
@@ -59,7 +59,7 @@ data Transaction = Transaction
    _tConterparty :: Maybe T.Text,
    _tags :: [Tag]
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- | dateBalance returns the date field if the DateBalance field is empty
 balanceDate :: Transaction -> Day
@@ -70,7 +70,7 @@ data Tag = Tag
   {_tagKey :: T.Text,
    _tagValue :: Maybe T.Text
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- FromJSON instances
 instance FromJSON Transfer where

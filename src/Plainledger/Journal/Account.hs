@@ -23,13 +23,13 @@ import Data.Csv (FromRecord(..),
                  ToNamedRecord(..),
                  ToField(..),
                  (.!),
-                 (.=),
                  record,
                  namedRecord,
                  DefaultOrdered)
 import qualified Data.Yaml as Y
-import Data.Yaml (FromJSON(..), (.:), (.:?))
+import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import qualified Data.Text as T
+import Data.Aeson (pairs)
 import Control.Monad (mzero)
 
 -- | The Account data type serves as aggregation point for commodities
@@ -42,7 +42,7 @@ data Account = Account
    _subgroup :: Maybe T.Text,
    _subsubgroup :: Maybe T.Text
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- | The top level grouping of an account. Must be Asset, Liability,
 -- Equity, Revenue or Expense.
@@ -65,6 +65,25 @@ instance FromJSON Account where
     <*> v .:? "subsubgroup"
   parseJSON _ = fail "Expected Object for Account value"
 
+instance ToJSON Account where
+  toJSON (Account aId name number group subgroup subsubgroup) =
+    Y.object
+    $ ["id" .= aId,
+       "name" .= name,
+       "number" .= number,
+       "group" .= group]
+    ++ maybe [] (\x -> ["subgroup" .= x]) subgroup
+    ++ maybe [] (\x -> ["subsubgroup" .= x]) subsubgroup
+
+  toEncoding (Account aId name number group subgroup subsubgroup) =
+    pairs
+    $ "id"   .= aId
+    <> "name" .= name
+    <> "number"   .= number
+    <> "group" .= group
+    <> (maybe mempty (\x -> "subgroup" .= x) subgroup)
+    <> (maybe mempty (\x -> "subsubgroup" .= x) subsubgroup)
+
 instance FromJSON AccountGroup where
   parseJSON (Y.String "Asset") = return Asset
   parseJSON (Y.String "Liability") = return Liability
@@ -74,6 +93,13 @@ instance FromJSON AccountGroup where
   parseJSON (Y.String _) =
     fail "Expected Asset, Liability, Equity, Revenue or Expense"
   parseJSON _ = fail "Expected String for AccountGroup value"
+
+instance ToJSON AccountGroup where
+  toJSON Asset = Y.String "Asset"
+  toJSON Liability = Y.String "Liability"
+  toJSON Equity = Y.String "Equity"
+  toJSON Revenue = Y.String "Revenue"
+  toJSON Expense = Y.String "Expense"
 
 instance FromRecord Account where
     parseRecord v
@@ -115,12 +141,12 @@ instance ToRecord Account where
 instance ToNamedRecord Account where
     toNamedRecord (Account aId name num grp subgrp subsubgrp) =
       namedRecord [
-        "id" .= aId,
-        "name" .= name,
-        "number" .= num,
-        "group" .= (show grp),
-        "subgroup" .= (maybe "" id subgrp),
-        "subsubgroup" .= (maybe "" id subsubgrp)]
+        "id" C..= aId,
+        "name" C..= name,
+        "number" C..= num,
+        "group" C..= (show grp),
+        "subgroup" C..= (maybe "" id subgrp),
+        "subsubgroup" C..= (maybe "" id subsubgrp)]
 
 instance DefaultOrdered Account where
   headerOrder _ = record ["id", "name","number","group","subgroup","subsubgroup"]
