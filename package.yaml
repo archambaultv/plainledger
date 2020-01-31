@@ -45,12 +45,15 @@ default-extensions:
 - DeriveTraversable
 - FlexibleContexts
 - FlexibleInstances
+- InstanceSigs
 - LambdaCase
 - MultiParamTypeClasses
 - MultiWayIf
 - NamedFieldPuns
 - OverloadedStrings
 - PatternSynonyms
+- ScopedTypeVariables
+- TupleSections
 - ViewPatterns
 
 library:
@@ -77,3 +80,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - plainledger
+    - tasty >= 0.8
+    - tasty-hunit >= 0.10.0.1
+    - tasty-smallcheck >= 0.8
+    - smallcheck >= 1.0
