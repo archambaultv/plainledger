@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 -- |
 -- Module      :  Plainledger.Journal
 -- Copyright   :  © 2020 Vincent Archambault

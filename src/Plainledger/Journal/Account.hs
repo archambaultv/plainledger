@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+
 
 -- |
 -- Module      :  Plainledger.Journal.Account

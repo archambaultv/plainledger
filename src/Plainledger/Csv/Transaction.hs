@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 -- |
 -- Module      :  Plainledger.Csv.Transaction
 -- Copyright   :  © 2020 Vincent Archambault

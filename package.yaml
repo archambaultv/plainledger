@@ -38,6 +38,21 @@ ghc-options:
 - -Wincomplete-uni-patterns
 - -Wredundant-constraints
 
+default-extensions:
+- DeriveFoldable
+- DeriveFunctor
+- DeriveGeneric
+- DeriveTraversable
+- FlexibleContexts
+- FlexibleInstances
+- LambdaCase
+- MultiParamTypeClasses
+- MultiWayIf
+- NamedFieldPuns
+- OverloadedStrings
+- PatternSynonyms
+- ViewPatterns
+
 library:
   source-dirs: src
 
