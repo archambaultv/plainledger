@@ -1,30 +1,34 @@
-## This file is a dummy journal file for testing and debugging.
+## This file is a dummy journal file for testing and debugging the parser
 
 # Configuration options
 configuration:
   default-commodity: CAD
   opening-balance-account: Opening Balance
   earnings-account: Earnings
-  
+
 # Chart of accounts
 accounts:
+  # All fields
 - id: Chequing
   name: Bank Chequing
   number: 1005
   group: Asset
   subgroup: Short term
+  subsubgroup: Bank 1
 
+  # sub group and subsubgroup are optional
 - id: Saving
   name: Bank Saving
   number: 1025
   group: Asset
-  subgroup: Long term
-  
+
+  # Name is optional if it is the same as id
 - id: Credit card
   number: 2055
   group: Liability
   subgroup: Short term
 
+  # The shortest possible description
 - id: Opening Balance
   number: 3001
   group: Equity
@@ -32,36 +36,48 @@ accounts:
 - id: Earnings
   number: 3005
   group: Equity
-  
+
 - id: Work
   name: Company A
   number: 4012
   group: Revenue
-  
+
 - id: Music
   number: 5055
   group: Expense
   subgroup: Shopping
 
 # Transactions
-# Transactions do not need to apprear in chronological order.  
+# Transactions do not need to apprear in chronological order.
 transactions:
+  # All fields
 - date: 2019-01-23
+  balance-date: 2019-01-23
   conterparty: Great Disk Company
+  note: "Good music"
   transfers:
   - from: Credit card
     to: Music
     amount: 25
+    currency: CAD
+    note: For my special one
+  - from: Credit card
+    to: Music
+    amount: 20
+    currency: CAD
+    note: For myself
   tags:
   - id: Gift
+  - id: Location
+    value: Montreal
 
+  # Most fields are optional
 - date: 2019-01-23
-  balance-date: 2019-01-25
   transfers:
   - from: Credit card
     to: Music
     amount: 40
-    
+
 - date: 2018-10-12
   note: Unused movie budget transfered to saving
   transfers:
@@ -79,14 +95,14 @@ transactions:
     to: Income Tax
     amount: 200
     note: "Provision for end of year income tax"
-    
+
 # Balance assertions
 balance-assertions:
 - date: 2018-11-30
   account: Chequing
   amount: 1456
   commodity: CAD
-  
+
 - date: 2019-01-31
   account: Chequing
   amount: 1238
