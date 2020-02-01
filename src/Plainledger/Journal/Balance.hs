@@ -32,8 +32,8 @@ import Control.Monad (mzero)
 import Data.Aeson (pairs)
 import Plainledger.Journal.Amount
 
--- | The Transfer data type reprensents the flow of one commodity from
--- one account to another. Quantity should always be positive.
+-- | The Balance data type reprensents an assertion about the total of an
+-- account at a particular date.
 data Balance = Balance
   {_bDate :: Day,
    _bAccount   :: T.Text,
