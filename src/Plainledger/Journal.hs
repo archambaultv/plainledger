@@ -47,14 +47,39 @@ data Journal = Journal
 yamlPrettyConfig :: P.Config
 yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
  where fieldOrder :: T.Text -> Int
+       -- Id always come first
        fieldOrder "id" = 0
+       -- Transaction fields
        fieldOrder "date" = 1
        fieldOrder "balance-date" = 2
-       fieldOrder "transfers" = 3
+       fieldOrder "note" = 3
+       fieldOrder "counterparty" = 4
+       fieldOrder "transfers" = 5
+       fieldOrder "tags" = 6
+       -- Balance fields
+       fieldOrder "account" = 8
+       -- Transfer fields
        fieldOrder "from" = 10
        fieldOrder "to" = 11
        fieldOrder "amount" = 12
        fieldOrder "commodity" = 13
+
+       -- Top level fields
+       fieldOrder "configuration" = 20
+       fieldOrder "accounts" = 21
+       fieldOrder "transactions" = 22
+       fieldOrder "balance-assertions" = 23
+       -- Configuration fields
+       fieldOrder "default-commodity" = 30
+       fieldOrder "opening-balance-account" = 31
+       fieldOrder "earnings-account" = 32
+       -- Account fields
+       fieldOrder "name" = 40
+       fieldOrder "number" = 41
+       fieldOrder "group" = 42
+       fieldOrder "subgroup" = 43
+       fieldOrder "subsubgroup" = 44
+
        fieldOrder _ = 99
 
 -- FromJSON instances
