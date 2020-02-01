@@ -53,7 +53,7 @@ transactions:
   # All fields
 - date: 2019-01-23
   balance-date: 2019-01-23
-  conterparty: Great Disk Company
+  counterparty: Great Disk Company
   note: "Good music"
   transfers:
   - from: Credit card
