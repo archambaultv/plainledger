@@ -107,25 +107,25 @@ instance FromJSON Transaction where
     <*> v .:? "balance-date"
     <*> v .: "transfers"
     <*> v .:? "note"
-    <*> v .:? "conterparty"
+    <*> v .:? "counterparty"
     <*> ((v .:? "tags") >>= maybe (return []) return)
   parseJSON _ = fail "Expected Object for Transaction value"
 
 instance ToJSON Transaction where
-  toJSON (Transaction date balDate xfers note conterparty tags) =
+  toJSON (Transaction date balDate xfers note counterparty tags) =
     Y.object
     $ ["date" .= date, "transfers" .= xfers]
     ++ maybe [] (\x -> ["balance-date" .= x]) balDate
     ++ maybe [] (\x -> ["note" .= x]) note
-    ++ maybe [] (\x -> ["conterparty" .= x]) conterparty
+    ++ maybe [] (\x -> ["counterparty" .= x]) counterparty
     ++ if null tags then [] else ["tags" .= tags]
 
-  toEncoding (Transaction date balDate xfers note conterparty tags) =
+  toEncoding (Transaction date balDate xfers note counterparty tags) =
     pairs
     $ "date" .= date
     <> (maybe mempty (\x -> "balance-date" .= x) balDate)
     <> (maybe mempty (\x -> "note" .= x) note)
-    <> (maybe mempty (\x -> "conterparty" .= x) conterparty)
+    <> (maybe mempty (\x -> "counterparty" .= x) counterparty)
     <> "transfers" .= xfers
     <> (if null tags then mempty else "tags" .= tags)
 
