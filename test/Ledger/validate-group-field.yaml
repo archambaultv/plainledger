@@ -11,27 +11,10 @@ configuration:
 
 accounts:
 - id: Compte chèque
-  name: Compte chèque conjoint
   number: 1005
   group: Avoi # <-- Missing a 'r'
-  subgroup: Court terme
-  subsubgroup: Banque ABC
-  tags:
-    - id: Transit
-      value: 12345
-    - id: Banque
-      value: Banque ABC du Canada
-    - id: No Compte
-      value: 01-234-567
 
-transfers:
-- date: 2019-01-23
-  from: Mastercard
-  to: Musique
-  amount: 40
 
-balance-assertions:
-- date: 2018-11-30
-  account: Compte chèque
-  amount: 1456
-  commodity: CAD
+transfers: []
+
+balance-assertions: []
