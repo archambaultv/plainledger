@@ -30,6 +30,9 @@ dependencies:
 - aeson
 - scientific
 - bytestring
+- unordered-containers
+- utf8-string
+- hashable
 
 ghc-options:
 - -Wall

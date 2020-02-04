@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Journal.Balance
+-- Module      :  Plainledger.Ledger.Balance
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,7 +8,7 @@
 --
 -- This module defines the Balance data type representing balance assertions.
 
-module Plainledger.Journal.Balance (
+module Plainledger.Ledger.Balance (
   Balance(..)
   )
 where
@@ -30,15 +30,16 @@ import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.=), (.:?))
 import qualified Data.Text as T
 import Control.Monad (mzero)
 import Data.Aeson (pairs)
-import Plainledger.Journal.Amount
+import Plainledger.Ledger.Amount
+import Plainledger.Ledger.Day
 
 -- | The Balance data type reprensents an assertion about the total of an
 -- account at a particular date.
 data Balance = Balance
-  {_bDate :: Day,
-   _bAccount   :: T.Text,
-   _bAmount :: Quantity,
-   _bCommodity :: Maybe Commodity
+  {bDate :: Day,
+   bAccount   :: T.Text,
+   bAmount :: Quantity,
+   bCommodity :: Commodity
   }
   deriving (Eq, Show)
 
@@ -49,7 +50,7 @@ instance FromJSON Balance where
     <$> v .: "date"
     <*> v .: "account"
     <*> (v .: "amount" >>= Y.withScientific "amount" (return . realToFrac))
-    <*> v .:? "commodity"
+    <*> (maybe "" id <$> (v .:? "commodity"))
   parseJSON _ = fail "Expected Object for Balance value"
 
 instance ToJSON Balance where
@@ -57,48 +58,48 @@ instance ToJSON Balance where
     Y.object
     $ ["date" .= date,
        "account" .= acc,
-       "amount" .= (realToFrac amnt :: Scientific)]
-    ++ maybe [] (\x -> ["commodity" .= x]) com
+       "amount" .= (realToFrac amnt :: Scientific),
+       "commodity" .= com]
 
   toEncoding (Balance date acc amnt com) =
     pairs
-    $ "date"   .= date
+    $  "date"  .= date
     <> "account"   .= acc
     <> "amount" .= (realToFrac amnt :: Scientific)
-    <> (maybe mempty (\x -> "commodity" .= x) com)
+    <> "commodity" .= com
 
 instance FromRecord Balance where
     parseRecord v
         | length v == 4 = Balance
-                          <$> (read <$> v .! 0)
+                          <$> (v .! 0 >>= parseISO8601M)
                           <*> v .! 1
-                          <*> (read <$> v .! 2)
+                          <*> (realToFrac <$>
+                               (v .! 2 >>= C.parseField :: C.Parser Scientific))
                           <*> v .! 3
         | otherwise     = mzero
 
 instance FromNamedRecord Balance where
     parseNamedRecord m =
       Balance
-      <$> (read <$> m C..: "date")
+      <$> (m C..: "date" >>= parseISO8601M)
       <*> m C..: "account"
       <*> (read <$> m C..: "amount")
       <*> m C..: "commodity"
 
-
 instance ToRecord Balance where
     toRecord (Balance d acc amnt com) =
       record [
-      toField (show d),
+      toField (toISO8601 d),
       toField acc,
-      toField (show amnt),
+      toField (realToFrac amnt :: Scientific),
       toField com]
 
 instance ToNamedRecord Balance where
     toNamedRecord (Balance d acc amnt com) =
       namedRecord [
-        "date" C..= (show d),
+        "date" C..= (toISO8601 d),
         "account" C..= acc,
-        "amount" C..= (show amnt),
+        "amount" C..= (realToFrac amnt :: Scientific),
         "commodity" C..= com]
 
 instance DefaultOrdered Balance where

@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Journal
+-- Module      :  Plainledger.Ledger
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -9,14 +9,14 @@
 -- This module defines the journal data type and reexports all the
 -- data types and functions related to the journal file.
 
-module Plainledger.Journal (
-  Journal(..),
+module Plainledger.Ledger (
+  Ledger(..),
   yamlPrettyConfig,
-  module Plainledger.Journal.Transaction,
-  module Plainledger.Journal.Balance,
-  module Plainledger.Journal.Configuration,
-  module Plainledger.Journal.Account,
-  module Plainledger.Journal.Amount
+  module Plainledger.Ledger.Transfer,
+  module Plainledger.Ledger.Balance,
+  module Plainledger.Ledger.Configuration,
+  module Plainledger.Ledger.Account,
+  module Plainledger.Ledger.Amount
   )
 where
 
@@ -26,21 +26,21 @@ import qualified Data.Yaml.Pretty as P
 import Data.Yaml (FromJSON(..), (.:), ToJSON(..), (.=))
 import qualified Data.Text as T
 import Data.Aeson (pairs)
-import Plainledger.Journal.Transaction
-import Plainledger.Journal.Balance
-import Plainledger.Journal.Configuration
-import Plainledger.Journal.Account
-import Plainledger.Journal.Amount
+import Plainledger.Ledger.Transfer
+import Plainledger.Ledger.Balance
+import Plainledger.Ledger.Configuration
+import Plainledger.Ledger.Account
+import Plainledger.Ledger.Amount
 
--- | The Journal data type represents a journal file
-data Journal = Journal
-  {_configuration :: Configuration,
-   _accounts   :: [Account],
-   _transactions :: [Transaction],
-   _balances :: [Balance]
+-- | The Ledger data type represents a graph where the accounts are the nodes
+-- and the transfers are the edges
+data Ledger = Ledger
+  {lConfiguration :: Configuration,
+   lAccounts   :: [Account],
+   lTransfer :: [Transfer],
+   lBalances :: [Balance]
   }
   deriving (Eq, Show)
-
 
 -- | The Data.Yaml.Pretty configuration object created so that the
 -- fields in the yaml file follow the convention of this software.
@@ -83,27 +83,27 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder _ = 99
 
 -- FromJSON instances
-instance FromJSON Journal where
+instance FromJSON Ledger where
   parseJSON (Y.Object v) =
-    Journal
+    Ledger
     <$> v .: "configuration"
     <*> v .: "accounts"
-    <*> v .: "transactions"
+    <*> v .: "transfers"
     <*> v .: "balance-assertions"
   parseJSON _ = fail "Expected Object for Journal value"
 
 -- To JSON instance
-instance ToJSON Journal where
-  toJSON (Journal config accounts txns bals) =
+instance ToJSON Ledger where
+  toJSON (Ledger config accounts txns bals) =
     Y.object
     $ ["configuration" .= config,
        "accounts" .= accounts,
-       "transactions" .= txns,
+       "transfers" .= txns,
        "balance-assertions" .= bals]
 
-  toEncoding (Journal config accounts txns bals) =
+  toEncoding (Ledger config accounts txns bals) =
     pairs
     $ "configuration"   .= config
     <> "accounts"   .= accounts
-    <> "transactions" .= txns
+    <> "transfers" .= txns
     <> "balance-assertions" .= bals

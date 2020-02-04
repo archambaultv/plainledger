@@ -1,7 +1,7 @@
 module Main where
 
 import Test.Tasty
-import Syntax.Syntax
+import Ledger.Syntax
 
 main :: IO ()
 main = defaultMain tests
