@@ -36,6 +36,9 @@ accounts:
   name: Compte épargne de Yvon
   number: 1025
   group: Actif
+  tags:
+    - id: Banque
+      value:  # Value can be null
 
   # Name is optional if it is the same as id
 - id: Mastercard
