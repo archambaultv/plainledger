@@ -9,7 +9,8 @@
 -- This module defines the Configuration object of the journal file
 
 module Plainledger.Ledger.Configuration (
-  Configuration(..)
+  Configuration(..),
+  AccountGroup(..)
   )
 where
 

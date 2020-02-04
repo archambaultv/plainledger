@@ -33,6 +33,7 @@ dependencies:
 - unordered-containers
 - utf8-string
 - hashable
+- mtl
 
 ghc-options:
 - -Wall

@@ -1,10 +1,10 @@
 module Main where
 
 import Test.Tasty
-import Ledger.Syntax
+import Ledger.Ledger
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "tests" [syntaxTestTree]
+tests = testGroup "tests" [ledgerTestTree]
