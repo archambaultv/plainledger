@@ -44,7 +44,8 @@ validationTestTree =
        case validateLedger ledger of
          Left err -> assertFailure err
          Right _ -> return (),
-      validationFailure "validate-group-field.yaml"
+      validationFailure "validate-group-field.yaml",
+      validationFailure "validate-account-id.yaml"
     ]
 
 validationFailure :: String -> TestTree

@@ -1,0 +1,22 @@
+configuration:
+  default-commodity: CAD
+  opening-balance-account: Solde d'ouverture
+  earnings-account: Bénéfice net
+  group-mapping:
+    asset: [Actif]
+    liability: [Passif]
+    equity: [Avoir]
+    revenue: [Revenu]
+    expense: [Dépense]
+
+accounts:
+- id: Compte chèque
+  number: 1005
+  group: Avoir
+- id: Compte chèque # <- Duplicate account id
+  number: 1010
+  group: Avoir
+
+transfers: []
+
+balance-assertions: []

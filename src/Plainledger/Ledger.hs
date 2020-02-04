@@ -23,6 +23,7 @@ where
 
 import Data.Ord
 import Data.Maybe
+import Data.List
 import qualified Data.Yaml as Y
 import qualified Data.Yaml.Pretty as P
 import Data.Yaml (FromJSON(..), (.:), ToJSON(..), (.=))
@@ -51,6 +52,7 @@ data Ledger = Ledger
 -- | validateLedger verifies a series of properties that a valid ledger should
 -- satisfies :
 -- Asserts all accounts group field are in the configuration group mapping.
+-- Asserts all accounts Id are unique
 -- Asserts all transfers have valid from and to field
 -- Asserts all transfers have positive amount
 -- Asserts all transfers have a well defined commodity
@@ -64,7 +66,7 @@ validateLedger l =
       transfers = lTransfers l
       balances = lBalances l
   in do
-    validateGroupField (cGroupMapping config) accounts
+    validateAccounts (cGroupMapping config) accounts
     transfers' <- validateTransfers (cDefaultCommodity config) accounts transfers
     balances' <- validateBalances (cDefaultCommodity config) accounts balances
     return $ Ledger config accounts transfers' balances'
@@ -74,7 +76,8 @@ validateTransfers :: (MonadError Error m) =>
                       [Account] ->
                       [Transfer] ->
                       m [Transfer]
-validateTransfers _ _ x = return x
+validateTransfers defComm accounts transfers = return transfers
+
 
 validateBalances :: (MonadError Error m) =>
                       Commodity ->
@@ -82,6 +85,31 @@ validateBalances :: (MonadError Error m) =>
                       [Balance] ->
                       m [Balance]
 validateBalances _ _ x = return x
+
+validateAccounts :: (MonadError Error m) =>
+                      HashMap T.Text AccountGroup ->
+                      [Account] ->
+                      m ()
+validateAccounts m accounts = do
+  validateGroupField m accounts
+  validateAccountId accounts
+  return ()
+
+validateAccountId :: (MonadError Error m) =>
+                      [Account] ->
+                      m ()
+validateAccountId accounts =
+  let dup = HM.filter (/= 1)
+          $ HM.fromListWith (+)
+          $ zip (map aId accounts) (repeat 1)
+  in if HM.size dup /= 0
+     then throwError
+          $ "Duplicate account id : "
+          ++ (intercalate " "
+             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
+             $ HM.keys dup)
+          ++ "."
+     else return ()
 
 validateGroupField :: (MonadError Error m) =>
                       HashMap T.Text AccountGroup ->
