@@ -52,7 +52,8 @@ data Ledger = Ledger
 -- | validateLedger verifies a series of properties that a valid ledger should
 -- satisfies :
 -- Asserts all accounts group field are in the configuration group mapping.
--- Asserts all accounts Id are unique
+-- Asserts all accounts Id are unique and non null
+-- Asserts configuration earning and opening balance accounts exists
 -- Asserts all transfers have valid from and to field
 -- Asserts all transfers have positive amount
 -- Asserts all transfers have a well defined commodity
@@ -92,13 +93,30 @@ validateAccounts :: (MonadError Error m) =>
                       m ()
 validateAccounts m accounts = do
   validateGroupField m accounts
-  validateAccountId accounts
+  validateAccountIdNonNull accounts
+  validateAccountIdNoDup accounts
   return ()
 
-validateAccountId :: (MonadError Error m) =>
+validateAccountIdNonNull :: (MonadError Error m) =>
+                            [Account] ->
+                            m ()
+validateAccountIdNonNull accounts =
+  let nullId = filter
+               (T.null . fst)
+               (map (\a -> (aId a, aName a)) accounts)
+  in if null nullId
+     then return ()
+     else throwError
+          $ "Unallowed zero length account id for the following accounts : "
+          ++ (intercalate " "
+             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
+             $ map snd nullId)
+          ++ "."
+
+validateAccountIdNoDup :: (MonadError Error m) =>
                       [Account] ->
                       m ()
-validateAccountId accounts =
+validateAccountIdNoDup accounts =
   let dup = HM.filter (/= 1)
           $ HM.fromListWith (+)
           $ zip (map aId accounts) (repeat 1)

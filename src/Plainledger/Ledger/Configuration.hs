@@ -44,12 +44,21 @@ instance ToJSONKey AccountGroup
 instance FromJSONKey AccountGroup
 instance Hashable AccountGroup
 
--- | The Configuration of the journal file
-data Configuration = Configuration
-  {cOpeningBalanceAccount :: T.Text,
+-- | The Configuration of the ledger
+data Configuration = Configuration {
+   -- | The account in the balance sheet that contains the total of all the
+   -- other balance sheet accounts at the start of the financial period.
+   cOpeningBalanceAccount :: T.Text,
+   -- | The account in the balance sheet that contains the total of Revenue and
+   -- Expense
    cEarningsAccount :: T.Text,
+   -- | The commodity to use when the user doesn't provide one
    cDefaultCommodity :: Commodity,
-   cGroupMapping :: HashMap T.Text AccountGroup
+   -- | Map between the group field and its accounting group (Asset, Liability, ..)
+   cGroupMapping :: HashMap T.Text AccountGroup,
+   -- | The tag id to use when grouping transfer into transactions
+   -- | Defaults to : "Transaction id"
+   cTransactionTagId :: T.Text
   }
   deriving (Eq, Show)
 
@@ -67,11 +76,12 @@ instance FromJSON Configuration where
             <*> v2 .: "equity"
             <*> v2 .: "revenue"
             <*> v2 .: "expense" )
+    <*> (maybe "Transaction id" id <$> v .:? "transaction-tag-id")
   parseJSON _ = fail "Expected Object for Configuration value"
 
 -- To JSON instance
 instance ToJSON Configuration where
-  toJSON (Configuration openBal earnAcc defComm gmap) =
+  toJSON (Configuration openBal earnAcc defComm gmap txnId) =
     Y.object
     $ ["opening-balance-account" .= openBal,
        "earnings-account" .= earnAcc,
@@ -83,18 +93,25 @@ instance ToJSON Configuration where
                              "equity" .= HM.lookup Equity x,
                              "revenue" .= HM.lookup Revenue x,
                              "expense" .= HM.lookup Expense x]]
-  toEncoding (Configuration openBal earnAcc defComm gmap) =
+    ++ (if txnId == "transaction-tag-id"
+        then []
+        else ["transaction-tag-id" .= txnId])
+
+  toEncoding (Configuration openBal earnAcc defComm gmap txnId) =
     pairs
     $ "opening-balance-account"   .= openBal
     <> "earnings-account"   .= earnAcc
     <> "default-commodity" .= defComm
-    <> "group-mapping" .= let x = fromGroupMapping gmap
+    <> ("group-mapping" .= let x = fromGroupMapping gmap
                           in Y.object
                              ["asset" .= HM.lookup Asset x,
                               "liability" .= HM.lookup Liability x,
                               "equity" .= HM.lookup Equity x,
                               "revenue" .= HM.lookup Revenue x,
-                              "expense" .= HM.lookup Expense x]
+                              "expense" .= HM.lookup Expense x])
+    <> (if txnId == "transaction-tag-id"
+        then mempty
+        else "transaction-tag-id" .= txnId)
 
 toGroupMapping :: [T.Text] ->
                   [T.Text] ->

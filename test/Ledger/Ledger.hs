@@ -45,7 +45,8 @@ validationTestTree =
          Left err -> assertFailure err
          Right _ -> return (),
       validationFailure "validate-group-field.yaml",
-      validationFailure "validate-account-id.yaml"
+      validationFailure "validate-account-id-duplicate.yaml",
+      validationFailure "validate-account-id-non-null.yaml"
     ]
 
 validationFailure :: String -> TestTree

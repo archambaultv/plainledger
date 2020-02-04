@@ -13,6 +13,7 @@ configuration:
     equity: [Avoir]
     revenue: [Revenu]
     expense: [Dépense]
+  transaction-tag-id: No Transaction
 
 # Chart of accounts
 accounts:
