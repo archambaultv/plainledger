@@ -69,7 +69,7 @@ validateJTransactionsId ts = do
     --    generate an id of the form YYYY-MM-DD-N
     withDate <- traverse findDate noId
     let groupDate = groupBy ((==) `on` fst) $ sortBy (comparing fst) withDate
-    return $ concatMap (createId knownIds 1) groupDate
+    return $ concatMap (createId knownIds 1) groupDate ++ withId
 
   where createId :: HS.HashSet T.Text ->
                     Int ->

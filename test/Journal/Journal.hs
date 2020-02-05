@@ -4,6 +4,7 @@ module Journal.Journal (
 
 import Test.Tasty
 import Test.Tasty.HUnit
+import qualified Data.Text as T
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
@@ -41,13 +42,47 @@ validationTestTree :: TestTree
 validationTestTree =
    testGroup "Validation"
     [ testCase "journal-syntax.yaml is valid" $ do
-       ledger <- decodeFileThrow journalPath
-       case journalToLedger ledger of
+       journal <- decodeFileThrow journalPath
+       case journalToLedger journal of
          Left err -> assertFailure err
          Right _ -> return (),
       validationFailure "validate-transaction-id-dup.yaml",
-      validationFailure "validate-transaction-transfer-no-date.yaml"
+      validationFailure "validate-transaction-transfer-no-date.yaml",
+      testCase "transaction id" $ do
+         journal <- decodeFileThrow (dir ++ "validate-transaction-id-new.yaml")
+         case journalToLedger journal of
+           Left err -> assertFailure err
+           Right ledger ->
+            let transfers = lTransfers ledger
+                nbTransfers = length transfers
+            in if nbTransfers /= 7
+               then assertFailure
+                     $ "Wrong number of transfers. Got "
+                     ++ show nbTransfers
+                     ++ ".\n"
+                     -- ++ show transfers
+               else traverse validateTransactionId transfers >> return ()
     ]
+
+validateTransactionId :: Transfer -> IO ()
+validateTransactionId t =
+  let tId = lookup "Transaction id" $ map tagToTuple $ tfTags t
+      tAmount = tfAmount t
+  in case (tAmount, tId) of
+       (_, Nothing) -> assertFailure "No Transaction id tag"
+       (1, Just "2019-01-23-100") -> return ()
+       (2, Just "2019-01-23-1") -> return ()
+       (3, Just "2019-01-23-2") -> return ()
+       (4, Just "2019-01-23-2") -> return ()
+       (5, Just "2019-01-22-1") -> return ()
+       (6, Just "2019-01-24-1") -> return ()
+       (7, Just "2019-01-24-2") -> return ()
+       (_, Just x) -> assertFailure
+                 $ "Incorrect transaction id \""
+                 ++ T.unpack x
+                 ++ "\" for amount "
+                 ++ show tAmount
+                 ++ "."
 
 validationFailure :: String -> TestTree
 validationFailure file =

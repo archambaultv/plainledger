@@ -1,0 +1,89 @@
+configuration:
+  default-commodity: CAD
+  opening-balance-account: Solde d'ouverture
+  earnings-account: Bénéfice net
+  group-mapping:
+    asset: [Actif]
+    liability: [Passif]
+    equity: [Avoir]
+    revenue: [Revenu]
+    expense: [Dépense]
+
+accounts:
+  - id: Compte chèque
+    number: 1005
+    group: Avoir
+
+  - id: Compte épargne
+    number: 1025
+    group: Actif
+
+  - id: Mastercard
+    number: 2055
+    group: Passif
+
+  - id: Solde d'ouverture
+    number: 3001
+    group: Avoir
+
+  - id: Bénéfice net
+    number: 3005
+    group: Avoir
+
+  - id: Travail
+    number: 4012
+    group: Revenu
+
+  - id: Musique
+    number: 5055
+    group: Dépense
+
+transactions:
+- date: 2019-01-23
+  transaction-id: 2019-01-23-100 # <- This transaction id must be preserved
+  transfers:
+  - from: Mastercard
+    to: Musique
+    amount: 1 # <- We use the amount to identify the transfer
+
+- date: 2019-01-23
+  # Transaction id will be generated
+  transfers:
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 2 # <- We use the amount to identify the transfer
+
+- date: 2019-01-22
+  # Transaction id will be generated
+  transfers:
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 5 # <- We use the amount to identify the transfer
+
+- date: 2019-01-23
+  # Transaction id will be generated
+  transfers:
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 3 # <- We use the amount to identify the transfer
+
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 4 # <- We use the amount to identify the transfer
+
+- date: 2019-01-24
+  transaction-id: 2019-01-24-1
+  transfers:
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 6 # <- We use the amount to identify the transfer
+
+- date: 2019-01-24
+  # Transaction id will be generated
+  transfers:
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 7 # <- We use the amount to identify the transfer
+
+# Balance assertions
+balance-assertions: []
