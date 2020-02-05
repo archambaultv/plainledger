@@ -17,7 +17,8 @@ module Plainledger.Ledger (
   module Plainledger.Ledger.Balance,
   module Plainledger.Ledger.Configuration,
   module Plainledger.Ledger.Account,
-  module Plainledger.Ledger.Amount
+  module Plainledger.Ledger.Amount,
+  module Plainledger.Ledger.Tag
   )
 where
 
@@ -34,6 +35,7 @@ import Plainledger.Ledger.Balance
 import Plainledger.Ledger.Configuration
 import Plainledger.Ledger.Account
 import Plainledger.Ledger.Amount
+import Plainledger.Ledger.Tag
 import qualified Data.HashMap.Strict as HM
 import Data.HashMap.Strict (HashMap)
 import Control.Monad.Except
@@ -193,7 +195,7 @@ instance FromJSON Ledger where
     <*> v .: "accounts"
     <*> v .: "transfers"
     <*> v .: "balance-assertions"
-  parseJSON _ = fail "Expected Object for Journal value"
+  parseJSON _ = fail "Expected Object for Ledger value"
 
 -- To JSON instance
 instance ToJSON Ledger where

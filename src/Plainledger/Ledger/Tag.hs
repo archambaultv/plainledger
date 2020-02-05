@@ -12,7 +12,8 @@
 module Plainledger.Ledger.Tag (
   Tag(..),
   tagToHashMap,
-  tagToTuple
+  tagToTuple,
+  tupleToTag
   )
 where
 
@@ -32,7 +33,8 @@ import GHC.Generics
 import qualified Data.HashMap.Strict as HM
 import Data.HashMap.Strict (HashMap)
 
--- | Tags
+-- | The Tag datatype representing metadata provided by the user. It is
+-- basically a tuple with better ToJSON and FromJSON instances.
 data Tag = Tag
   {tagId :: T.Text,
    tagValue :: T.Text -- | Empty text indicates no value
@@ -79,6 +81,9 @@ instance DefaultOrdered Tag where
 
 tagToTuple :: Tag -> (T.Text, T.Text)
 tagToTuple (Tag k v) = (k, v)
+
+tupleToTag :: (T.Text, T.Text) -> Tag
+tupleToTag (k, v) = (Tag k v)
 
 tagToHashMap :: [Tag] -> HashMap T.Text T.Text
 tagToHashMap = HM.fromList . map tagToTuple

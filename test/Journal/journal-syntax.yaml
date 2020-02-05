@@ -67,15 +67,28 @@ accounts:
 
 # Transactions
 # Transactions do not need to apprear in chronological order.
-transfers:
+transactions:
   # All fields
 - date: 2019-01-23
   balance-date-from: 2019-01-24
   balance-date-to: 2019-01-25
-  from: Compte chèque
-  to: Mastercard
-  amount: 200
-  commodity: CAD
+  transaction-id: 2019-01-23-1
+  transfers:
+    - date: 2019-01-23
+      balance-date-from: 2019-01-24
+      balance-date-to: 2019-01-25
+      from: Compte chèque
+      to: Mastercard
+      amount: 200
+      commodity: CAD
+      tags:
+      - id: Note-2
+        value: Super bon album
+      - id: Contrepartie-2
+        value: Magasin de musique FooBar
+      - id: Cadeau-2
+      - id: Lieu-2
+        value: Montréal
   tags:
   - id: Note
     value: Super bon album
@@ -87,31 +100,33 @@ transfers:
 
   # Most fields are optional
 - date: 2019-01-23
-  from: Mastercard
-  to: Musique
-  amount: 40
+  transfers:
+  - from: Mastercard
+    to: Musique
+    amount: 40
 
 - date: 2018-10-12
-  from: Compte chèque
-  to: Compte épargne
-  amount: 250
-  commodity: CAD
+  transfers:
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 250
+    commodity: CAD
   tags:
   - id: Note
     value: Budget film non utilisé.
 
 - date: 2019-02-15
-  from: Work
-  to: Chequing
-  amount: 1450
+  transfers:
+  - from: Work
+    to: Chequing
+    amount: 1450
 
-- date: 2019-02-15
-  from: Impôt non payé
-  to: Impôt fédéral
-  amount: 200
-  tag:
-  - id: Note
-    value: "Provision pour l'impôt fédéral"
+  - from: Impôt non payé
+    to: Impôt fédéral
+    amount: 200
+    tag:
+    - id: Note
+      value: "Provision pour l'impôt fédéral"
 
 # Balance assertions
 balance-assertions:

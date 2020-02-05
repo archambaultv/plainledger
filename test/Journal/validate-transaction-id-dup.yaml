@@ -1,0 +1,57 @@
+configuration:
+  default-commodity: CAD
+  opening-balance-account: Solde d'ouverture
+  earnings-account: Bénéfice net
+  group-mapping:
+    asset: [Actif]
+    liability: [Passif]
+    equity: [Avoir]
+    revenue: [Revenu]
+    expense: [Dépense]
+
+accounts:
+- id: Compte chèque
+  number: 1005
+  group: Avoir
+
+- id: Compte épargne
+  number: 1025
+  group: Actif
+
+- id: Mastercard
+  number: 2055
+  group: Passif
+
+- id: Solde d'ouverture
+  number: 3001
+  group: Avoir
+
+- id: Bénéfice net
+  number: 3005
+  group: Avoir
+
+- id: Travail
+  number: 4012
+  group: Revenu
+
+- id: Musique
+  number: 5055
+  group: Dépense
+
+transactions:
+- date: 2019-01-23
+  transaction-id: 2019-01-23-1 # <- Duplicate transaction id
+  transfers:
+  - from: Mastercard
+    to: Musique
+    amount: 40
+
+- date: 2018-10-12
+  transaction-id: 2019-01-23-1 # <- Duplicate transaction id
+  transfers:
+  - from: Compte chèque
+    to: Compte épargne
+    amount: 250
+
+# Balance assertions
+balance-assertions: []

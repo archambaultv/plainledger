@@ -55,10 +55,7 @@ data Configuration = Configuration {
    -- | The commodity to use when the user doesn't provide one
    cDefaultCommodity :: Commodity,
    -- | Map between the group field and its accounting group (Asset, Liability, ..)
-   cGroupMapping :: HashMap T.Text AccountGroup,
-   -- | The tag id to use when grouping transfer into transactions
-   -- | Defaults to : "Transaction id"
-   cTransactionTagId :: T.Text
+   cGroupMapping :: HashMap T.Text AccountGroup
   }
   deriving (Eq, Show)
 
@@ -76,12 +73,11 @@ instance FromJSON Configuration where
             <*> v2 .: "equity"
             <*> v2 .: "revenue"
             <*> v2 .: "expense" )
-    <*> (maybe "Transaction id" id <$> v .:? "transaction-tag-id")
   parseJSON _ = fail "Expected Object for Configuration value"
 
 -- To JSON instance
 instance ToJSON Configuration where
-  toJSON (Configuration openBal earnAcc defComm gmap txnId) =
+  toJSON (Configuration openBal earnAcc defComm gmap) =
     Y.object
     $ ["opening-balance-account" .= openBal,
        "earnings-account" .= earnAcc,
@@ -93,11 +89,8 @@ instance ToJSON Configuration where
                              "equity" .= HM.lookup Equity x,
                              "revenue" .= HM.lookup Revenue x,
                              "expense" .= HM.lookup Expense x]]
-    ++ (if txnId == "transaction-tag-id"
-        then []
-        else ["transaction-tag-id" .= txnId])
 
-  toEncoding (Configuration openBal earnAcc defComm gmap txnId) =
+  toEncoding (Configuration openBal earnAcc defComm gmap) =
     pairs
     $ "opening-balance-account"   .= openBal
     <> "earnings-account"   .= earnAcc
@@ -109,9 +102,6 @@ instance ToJSON Configuration where
                               "equity" .= HM.lookup Equity x,
                               "revenue" .= HM.lookup Revenue x,
                               "expense" .= HM.lookup Expense x])
-    <> (if txnId == "transaction-tag-id"
-        then mempty
-        else "transaction-tag-id" .= txnId)
 
 toGroupMapping :: [T.Text] ->
                   [T.Text] ->
