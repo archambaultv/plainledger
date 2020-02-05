@@ -156,9 +156,8 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder "id" = 0
        -- Transaction fields
        fieldOrder "date" = 1
-       fieldOrder "balance-date" = 2
-       fieldOrder "note" = 3
-       fieldOrder "counterparty" = 4
+       fieldOrder "balance-date-from" = 2
+       fieldOrder "balance-date-to" = 3
        fieldOrder "transfers" = 5
        fieldOrder "tags" = 6
        -- Balance fields
