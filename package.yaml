@@ -34,6 +34,7 @@ dependencies:
 - utf8-string
 - hashable
 - mtl
+- optparse-applicative
 
 ghc-options:
 - -Wall

@@ -1,17 +1,25 @@
+-- |
+-- Module      :  Main
+-- Copyright   :  © 2020 Vincent Archambault
+-- License     :  0BSD
+--
+-- Maintainer  :  Vincent Archambault <archambault.v@gmail.com>
+-- Stability   :  experimental
+--
+-- The plainledger command line tool
 
 module Main where
 
 -- import Data.Void
--- import Data.Semigroup ( (<>) )
+import Data.Semigroup ( (<>) )
 -- import Data.Time
 -- import Data.Bifunctor ( first )
--- import Options.Applicative
+import Options.Applicative
 -- import qualified Text.Megaparsec as M
 
 -- import Plainledger.Data.Type (AccountingFormat(..), SignConvention(..))
--- import qualified Plainledger.Parser.Lexer as L
--- import Plainledger.Commands
--- import Plainledger.Run
+import Plainledger.CLI.Command
+import Plainledger.CLI.Run
 
 -- dateparser :: Char -> String -> String -> String -> Parser (Maybe Day)
 -- dateparser shortOption optionStr helpStr meta = option
@@ -43,12 +51,31 @@ module Main where
 --                help "Indicates whether to prints an amount using two columns (debit and credit) or with one column (+ for inflow, - for outflow)"
 --               )
 --
--- journalFile :: Parser String
--- journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
---
--- outputFile :: Parser (Maybe String)
--- outputFile = optional (strOption (short 'o' <> long "output" <> metavar "OUTPUT-FILE" <> help "The output file. Defaults to STDOUT."))
---
+journalFile :: Parser String
+journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
+
+outputArg :: Parser String
+outputArg = argument str (metavar "OUTPUT-FILE" <> help "The ouptut file")
+
+outputOpt :: Parser (Maybe String)
+outputOpt = optional
+           $ strOption
+           $ short 'o'
+           <> long "output"
+           <> metavar "OUTPUT-FILE"
+           <> help "The output file."
+
+accountsCommand :: Parser Command
+accountsCommand = CAccounts
+               <$> (AccountCommand
+                   <$> journalFile
+                   <*> outputArg)
+
+accountsInfo :: ParserInfo Command
+accountsInfo = info (accountsCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints all accounts and their properties\
+                            \ in a CSV format")
 -- balanceCommand :: Parser Command
 -- balanceCommand = CBalanceSheet <$> (BalanceSheetCommand
 --     <$> journalFile
@@ -101,20 +128,24 @@ module Main where
 --               (fullDesc
 --                <> progDesc "Prints the trial balance")
 --
--- parseCommand :: Parser Command
--- parseCommand = subparser
---   ( command "balancesheet" balanceInfo <>
---     command "incomestatement" incomeInfo <>
---     command "transactions" transactionsInfo <>
---     command "trialbalance" trialBalanceInfo
---   )
---
--- opts :: ParserInfo Command
--- opts = info (parseCommand <**> helper)
---        (fullDesc
---          <> progDesc "Executes COMMAND. Use plainledger -h to list the possible commands. Use plainledger COMMAND -h for help on a specific command."
---          <> header "Plain ledger - Plain text accouting command line tool")
---
+parseCommand :: Parser Command
+parseCommand = subparser
+  ( command "accounts" accountsInfo)
+
+  -- ( command "balancesheet" balanceInfo <>
+  --   command "incomestatement" incomeInfo <>
+  --   command "transactions" transactionsInfo <>
+  --   command "trialbalance" trialBalanceInfo
+  -- )
+
+opts :: ParserInfo Command
+opts = info (parseCommand <**> helper)
+       (fullDesc
+         <> progDesc "Executes COMMAND. Use plainledger -h to list the \
+                     \possible commands. Use plainledger COMMAND -h for help \
+                     \on a specific command."
+         <> header "Plain ledger - Plain text accouting command line tool")
+
 
 main :: IO ()
-main = putStrLn "Hello world !"--execParser opts >>= run
+main = execParser opts >>= runCommand

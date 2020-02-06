@@ -7,6 +7,7 @@ import Test.Tasty.HUnit
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
+import Data.ByteString.Lazy as BL
 
 
 dir :: String
@@ -18,7 +19,8 @@ ledgerPath = "test/Ledger/ledger-syntax.yaml"
 ledgerTestTree :: TestTree
 ledgerTestTree = testGroup "Ledger tests"
               [syntaxTestTree,
-               validationTestTree]
+               validationTestTree,
+               csvTestTree]
 
 syntaxTestTree :: TestTree
 syntaxTestTree =
@@ -47,6 +49,16 @@ validationTestTree =
       validationFailure "validate-group-field.yaml",
       validationFailure "validate-account-id-duplicate.yaml",
       validationFailure "validate-account-id-non-null.yaml"
+    ]
+
+csvTestTree :: TestTree
+csvTestTree =
+  testGroup "CSV"
+    [ testCase "Accounts : encode decode" $ do
+       l <- Y.decodeFileThrow ledgerPath
+       let encodeAcc = encodeAccounts $ lAccounts l
+       csvAccounts <- either assertFailure return $ decodeAccounts encodeAcc
+       (lAccounts l) @?= csvAccounts
     ]
 
 validationFailure :: String -> TestTree

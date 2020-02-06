@@ -58,13 +58,13 @@ instance FromJSON Tag where
     Tag
     <$> v .: "id"
     <*> ((v .:? "value") >>= maybe (return "") valueToText)
+  parseJSON _ = Fail.fail "Expected Object for Tag value"
 
 valueToText :: (MonadFail m) => Y.Value -> m T.Text
 valueToText (Y.String t) = return t
 valueToText (Y.Number n) = return $ T.pack $ show n
-valueToText Y.Null = return ""
 valueToText (Y.Bool b) = return $ T.pack $ show b
-valueToText _ = Fail.fail "Expected String, Number, Null or Bool for a tag value field"
+valueToText _ = Fail.fail "Expected String, Number or Bool for a tag value field"
 
 -- Csv instances.
 csvTransferOptions :: C.Options

@@ -10,23 +10,29 @@
 
 module Plainledger.Ledger.Account (
   Account(..),
+  encodeAccounts,
+  decodeAccounts
   )
 where
 
+import Data.Ord (comparing)
+import Data.Maybe
+import Data.List
 import Data.Char (toLower)
+import Data.ByteString.Lazy (ByteString)
 import qualified Data.Csv as C
-import Data.Csv (FromNamedRecord(..),
-                 ToNamedRecord(..),
-                 ToField(..),
-                 record,
-                 namedRecord,
-                 DefaultOrdered)
+import Data.Csv (Record, Field, ToField(..), FromField(..),toRecord)
 import qualified Data.Yaml as Y
 import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import qualified Data.Text as T
 import Data.Aeson as A
 import Plainledger.Ledger.Tag
+import Plainledger.Error
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
+import qualified Data.Vector as V
+import Plainledger.Internal.Csv
+import Control.Monad.Except
 import GHC.Generics
 
 -- | The Account data type serves as aggregation point for commodities
@@ -40,7 +46,20 @@ data Account = Account
    aSubsubgroup :: T.Text, -- | Empty means no subsubgroup
    aTags :: [Tag]
   }
-  deriving (Eq, Show, Generic)
+  deriving (Show, Generic)
+
+-- / We sort the accounts when comparing two accounts
+-- The Eq instance is mainly used in the unittests. In a validated ledger,
+-- you can rely on the aId to identify an account.
+instance Eq Account where
+  a1 == a2 =  aId a1 == aId a2
+           && aName a1 == aName a2
+           && aNumber a1 == aNumber a2
+           && aGroup a1 == aGroup a2
+           && aSubgroup a1 == aSubgroup a2
+           && aSubsubgroup a1 == aSubsubgroup a2
+           && sortBy (comparing tagId) (aTags a1) ==
+              sortBy (comparing tagId) (aTags a2)
 
 -- JSON instances
 instance ToJSON Account where
@@ -77,41 +96,42 @@ instance FromJSON Account where
     <*> (maybe [] id <$> (v .:? "tags"))
   parseJSON _ = fail "Expected Object for Account value"
 
--- CSV instances
-instance FromNamedRecord Account where
-  parseNamedRecord m =
-        Account
-        <$> m C..: "id"
-        <*> m C..: "name"
-        <*> m C..: "number"
-        <*> m C..: "group"
-        <*> m C..: "subgroup"
-        <*> m C..: "subsubgroup"
-        <*> (traverse (\(k,v) -> do
-                    kText <- C.parseField k
-                    vText <- C.parseField v
-                    return $ Tag kText vText)
-            $ HM.toList
-            $ HM.filterWithKey
-              (\k _ -> not $ k `elem` coreHeader)
-              m)
-
-instance ToNamedRecord Account where
-  toNamedRecord t =
-    namedRecord
-    $ ["id" C..= aId t,
-       "name" C..= aName t,
-       "number" C..= aNumber t,
-       "group" C..= aGroup t,
-       "subgroup" C..= aSubgroup t,
-       "subsubgroup" C..= aSubsubgroup t]
-    ++ map (\(Tag k v) -> (toField k) C..= v)
-           (aTags t)
-
-instance DefaultOrdered Account where
-  headerOrder t = record
-                $ coreHeader
-                ++ map (\(Tag k _) -> toField k) (aTags t)
-
-coreHeader :: [C.Field]
+-- CSV functions
+coreHeader :: [Field]
 coreHeader = ["id", "name", "number", "group", "subgroup", "subsubgroup"]
+
+-- / Encode a list of accounts as a Csv. The first line is the header
+encodeAccounts :: [Account] -> ByteString
+encodeAccounts accs =
+  let tagH = tagHeader $ concatMap aTags accs
+      header = toRecord $ coreHeader ++ tagH
+      lines = header : map (toLine tagH) accs
+  in C.encode lines
+
+  where toLine :: [Field] -> Account -> Record
+        toLine tagHeader a =
+          let coreLine = [toField $ aId a,
+                          toField $ aName a,
+                          toField $ aNumber a,
+                          toField $ aGroup a,
+                          toField $ aSubgroup a,
+                          toField $ aSubsubgroup a]
+          in toRecord $ coreLine ++ tagLine (aTags a) tagHeader
+
+-- | The first line is the header
+decodeAccounts :: (MonadError Error m) => ByteString -> m [Account]
+decodeAccounts bs = do
+  csv <- either throwError return $ C.decode C.NoHeader bs
+  csvToData (csv :: C.Csv) fromLine
+
+  where fromLine :: (MonadError Error m) =>
+                    HM.HashMap Field Field -> m Account
+        fromLine m = do
+          id' <- findColumn "id" m
+          name <- findColumn "name" m
+          number <- findColumn "number" m
+          group <- findColumn "group" m
+          subgroup <- findColumnDefault "" "subgroup" m
+          subsubgroup <- findColumnDefault "" "subsubgroup" m
+          tags <- recordToTags m (HS.fromList coreHeader)
+          return $ Account id' name number group subgroup subsubgroup tags
