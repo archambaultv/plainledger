@@ -22,9 +22,9 @@ import Plainledger.Ledger
 -- / Reads the journal file and the exports the accounts in CSV format
 runAccounts :: AccountCommand -> IO ()
 runAccounts c = do
-     journal <- Y.decodeFileThrow (acInputFile c)
+     journal <- Y.decodeFileThrow (acYamlFile c)
      case journalToLedger journal of
        Left err -> putStrLn err
        Right l -> BL.writeFile
-                  (acOutputFile c)
+                  (acCsvFile c)
                   (encodeAccounts $ lAccounts l)
