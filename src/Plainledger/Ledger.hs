@@ -159,7 +159,7 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder "balance-date-from" = 2
        fieldOrder "balance-date-to" = 3
        fieldOrder "transfers" = 5
-       fieldOrder "tags" = 6
+
        -- Balance fields
        fieldOrder "account" = 8
        -- Transfer fields
@@ -183,6 +183,9 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder "group" = 42
        fieldOrder "subgroup" = 43
        fieldOrder "subsubgroup" = 44
+
+       -- Tags always come last
+       fieldOrder "tags" = 90
 
        fieldOrder _ = 99
 
