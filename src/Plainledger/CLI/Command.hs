@@ -11,11 +11,14 @@
 module Plainledger.CLI.Command
   (
   Command(..),
-  module Plainledger.CLI.Command.Accounts
+  module Plainledger.CLI.Command.Accounts,
+  module Plainledger.CLI.Command.FromCsv
   )
 where
 
 import Plainledger.CLI.Command.Accounts
+import Plainledger.CLI.Command.FromCsv
 
 data Command
   = CAccounts AccountCommand
+  | CFromCsv FromCsvCommand

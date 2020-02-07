@@ -54,6 +54,18 @@ import Plainledger.CLI.Run
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
 
+csvFile :: Parser String
+csvFile = argument str (metavar "CSV-FILE" <> help "The csv file")
+
+csvType :: Parser CsvType
+csvType = flag' CsvAccounts
+          (  long "accounts"
+          <> short 'a'
+          <> help "The CSV-FILE contains records representing accounts" )
+
+yamlFile :: Parser String
+yamlFile = argument str (metavar "YAML-FILE" <> help "The yaml file")
+
 outputArg :: Parser String
 outputArg = argument str (metavar "OUTPUT-FILE" <> help "The ouptut file")
 
@@ -69,13 +81,26 @@ accountsCommand :: Parser Command
 accountsCommand = CAccounts
                <$> (AccountCommand
                    <$> journalFile
-                   <*> outputArg)
+                   <*> csvFile)
 
 accountsInfo :: ParserInfo Command
 accountsInfo = info (accountsCommand <**> helper)
               (fullDesc
                <> progDesc "Prints all accounts and their properties\
                             \ in a CSV format")
+
+fromCsvCommand :: Parser Command
+fromCsvCommand = CFromCsv
+               <$> (FromCsvCommand
+                   <$> csvFile
+                   <*> yamlFile
+                   <*> csvType)
+
+fromCsvInfo :: ParserInfo Command
+fromCsvInfo = info (fromCsvCommand <**> helper)
+              (fullDesc
+               <> progDesc "Converts the CSV file into a Yaml file")
+
 -- balanceCommand :: Parser Command
 -- balanceCommand = CBalanceSheet <$> (BalanceSheetCommand
 --     <$> journalFile
@@ -130,7 +155,8 @@ accountsInfo = info (accountsCommand <**> helper)
 --
 parseCommand :: Parser Command
 parseCommand = subparser
-  ( command "accounts" accountsInfo)
+  ( command "accounts" accountsInfo
+  <> command "fromcsv" fromCsvInfo)
 
   -- ( command "balancesheet" balanceInfo <>
   --   command "incomestatement" incomeInfo <>

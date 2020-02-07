@@ -24,14 +24,14 @@ reports in a debit and credit format that your accountant will love.
 Unless specified, all outputs are in CSV format. Most commands accept options
 to change their behavior (for example specifying the accounting period).
 
-- *Accounts* : List all accounts and their properties. Not implemented yet.
+- *Accounts* : List all accounts and their properties.
 - *Transfers* : List all transfers in a From-To style. Not implemented yet.
 - *Transactions* : List all transfers in the standard accounting
   style (Debit-Credit). Not implemented yet.
 - *Balance sheet* : Prints the balance sheet. Not implemented yet.
 - *Income statement* : Prints the income statement. Not implemented yet.
 - *Trial balance* : Prints the trial balance. Not implemented yet.
-- *Convert* : Convert a CSV file into a Yaml file readable by plainledger.
+- *From CSV* : Convert a CSV file into a Yaml file readable by plainledger.
   Use this command to batch modify (or import) transactions, accounts or balance assertions
   in Calc or Excel and then propagate back those changes to the Yaml journal file. Not implemented yet.
 
