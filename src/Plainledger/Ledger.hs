@@ -79,7 +79,7 @@ validateTransfers :: (MonadError Error m) =>
                       [Account] ->
                       [Transfer] ->
                       m [Transfer]
-validateTransfers defComm accounts transfers = return transfers
+validateTransfers _ _ transfers = return transfers
 
 
 validateBalances :: (MonadError Error m) =>
@@ -119,7 +119,7 @@ validateAccountIdNoDup :: (MonadError Error m) =>
                       [Account] ->
                       m ()
 validateAccountIdNoDup accounts =
-  let dup = HM.filter (/= 1)
+  let dup = HM.filter (/= (1 :: Int))
           $ HM.fromListWith (+)
           $ zip (map aId accounts) (repeat 1)
   in if HM.size dup /= 0

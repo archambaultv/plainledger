@@ -13,34 +13,15 @@ module Plainledger.Ledger.Transfer (
   )
 where
 
-import Data.Char
 import Data.Time
 import Data.Scientific
-import Data.ByteString (ByteString)
-import qualified Data.Csv as C
-import Data.Csv (FromRecord(..),
-                 FromNamedRecord(..),
-                 ToRecord(..),
-                 ToNamedRecord(..),
-                 ToField(..),
-                 FromField(..),
-                 (.!),
-                 record,
-                 namedRecord,
-                 DefaultOrdered)
+import Data.Aeson (pairs)
 import qualified Data.Yaml as Y
 import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import qualified Data.Text as T
-import qualified Data.Aeson as A
-import Data.Aeson (pairs, fieldLabelModifier, omitNothingFields)
-import Data.Bifunctor
-import qualified Data.Vector as V
-import qualified Data.HashMap.Strict as HM
-import GHC.Generics
-import Control.Monad (mzero)
+import GHC.Generics hiding (to, from)
 import Plainledger.Ledger.Amount
 import Plainledger.Ledger.Tag
-import Plainledger.Ledger.Day
 
 -- | The TransferF data type reprensents the flow of one commodity from
 -- one account to another.

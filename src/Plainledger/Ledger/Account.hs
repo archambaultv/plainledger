@@ -15,13 +15,12 @@ module Plainledger.Ledger.Account (
   )
 where
 
+import Prelude hiding (lines)
 import Data.Ord (comparing)
-import Data.Maybe
-import Data.List
-import Data.Char (toLower)
+import Data.List (sortBy)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Csv as C
-import Data.Csv (Record, Field, ToField(..), FromField(..),toRecord)
+import Data.Csv (Record, Field, ToField(..),toRecord)
 import qualified Data.Yaml as Y
 import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import qualified Data.Text as T
@@ -30,7 +29,6 @@ import Plainledger.Ledger.Tag
 import Plainledger.Error
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import qualified Data.Vector as V
 import Plainledger.Internal.Csv
 import Control.Monad.Except
 import GHC.Generics
@@ -109,14 +107,14 @@ encodeAccounts accs =
   in C.encode lines
 
   where toLine :: [Field] -> Account -> Record
-        toLine tagHeader a =
+        toLine tagH a =
           let coreLine = [toField $ aId a,
                           toField $ aName a,
                           toField $ aNumber a,
                           toField $ aGroup a,
                           toField $ aSubgroup a,
                           toField $ aSubsubgroup a]
-          in toRecord $ coreLine ++ tagLine (aTags a) tagHeader
+          in toRecord $ coreLine ++ tagLine (aTags a) tagH
 
 -- | The first line is the header
 decodeAccounts :: (MonadError Error m) => ByteString -> m [Account]

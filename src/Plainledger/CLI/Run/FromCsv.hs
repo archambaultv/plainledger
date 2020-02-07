@@ -13,12 +13,10 @@ module Plainledger.CLI.Run.FromCsv
   runFromCsv
   ) where
 
-import qualified Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 import Plainledger.CLI.Command
-import Plainledger.Journal
 import Plainledger.Ledger
 
 -- / Reads the journal file and the exports the accounts in CSV format

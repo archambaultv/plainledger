@@ -20,7 +20,6 @@ import Data.Time
 import Data.Function
 import Control.Monad.Except
 import Data.Aeson (pairs)
-import Data.HashMap.Strict (HashMap)
 import Data.List
 import Data.Maybe
 import Data.Ord
@@ -29,11 +28,9 @@ import Plainledger.Error
 import Plainledger.Internal.Utils
 import Plainledger.Journal.JTransaction
 import Plainledger.Ledger
-import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Yaml as Y
-import qualified Data.Yaml.Pretty as P
 
 -- | The Ledger data type represents a graph where the accounts are the nodes
 -- and the transfers are the edges
@@ -76,11 +73,11 @@ validateJTransactionsId ts = do
                     [(Day, JTransaction)] ->
                     [JTransaction]
         createId _ _ [] = []
-        createId knownIds n ((d, t):ts) =
+        createId knownIds n ((d, t):tss) =
           let tId = T.pack $ show d ++ "-" ++ show n
           in if HS.member tId knownIds
-             then createId knownIds (n + 1) ((d,t):ts)
-             else t{jtTransactionId = tId} : createId knownIds (n + 1) ts
+             then createId knownIds (n + 1) ((d,t):tss)
+             else t{jtTransactionId = tId} : createId knownIds (n + 1) tss
 
         findDate :: (MonadError Error m) =>
                     JTransaction -> m (Day, JTransaction)
