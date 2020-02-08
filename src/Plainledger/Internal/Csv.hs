@@ -20,7 +20,9 @@ module Plainledger.Internal.Csv
   recordToHashMap,
   csvToData,
   findColumn,
-  findColumnDefault
+  findColumnM,
+  findColumnDefault,
+  findColumnDefaultM
 ) where
 
 import Data.List (sort)
@@ -100,17 +102,38 @@ csvToData csv foo
 -- / Find the value in the HashMap or prints an friendly error message
 findColumn :: (MonadError Error m, FromField a) =>
               Field -> HashMap Field Field -> m a
-findColumn x m =
+findColumn x m = findColumnM x m return
+  -- case HM.lookup x m of
+  --   Nothing -> throwError
+  --              $ "\""
+  --              ++ (show x)
+  --              ++ " is not in the CSV header."
+  --   Just v -> either throwError return $ runParser $ parseField v
+
+findColumnM :: (MonadError Error m, FromField b) =>
+               Field -> HashMap Field Field -> (b -> m a) -> m a
+findColumnM x m f =
   case HM.lookup x m of
     Nothing -> throwError
                $ "\""
                ++ (show x)
                ++ " is not in the CSV header."
-    Just v -> either throwError return $ runParser $ parseField v
+    Just v -> do
+      b <- either throwError return $ runParser $ parseField v
+      f b
 
 findColumnDefault :: (MonadError Error m, FromField a) =>
                      a -> Field -> HashMap Field Field -> m a
-findColumnDefault v x m =
+findColumnDefault v x m = findColumnDefaultM v x m return
+  -- case HM.lookup x m of
+  --   Nothing -> return v
+  --   Just v2 -> either throwError return $ runParser $ parseField v2
+
+findColumnDefaultM :: (MonadError Error m, FromField b) =>
+                     a -> Field -> HashMap Field Field -> (b -> m a) -> m a
+findColumnDefaultM v x m f =
   case HM.lookup x m of
     Nothing -> return v
-    Just v2 -> either throwError return $ runParser $ parseField v2
+    Just v2 -> do
+      b <- either throwError return $ runParser $ parseField v2
+      f b

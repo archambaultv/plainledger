@@ -71,7 +71,7 @@ instance ToJSON Balance where
 instance FromRecord Balance where
     parseRecord v
         | length v == 4 = Balance
-                          <$> (v .! 0 >>= parseISO8601M)
+                          <$> (v .! 0 >>= either fail return . parseISO8601M)
                           <*> v .! 1
                           <*> (realToFrac <$>
                                (v .! 2 >>= C.parseField :: C.Parser Scientific))
@@ -81,7 +81,7 @@ instance FromRecord Balance where
 instance FromNamedRecord Balance where
     parseNamedRecord m =
       Balance
-      <$> (m C..: "date" >>= parseISO8601M)
+      <$> (m C..: "date" >>= either fail return . parseISO8601M)
       <*> m C..: "account"
       <*> (read <$> m C..: "amount")
       <*> m C..: "commodity"

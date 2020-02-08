@@ -12,10 +12,35 @@ module Plainledger.CLI.CLI (
   cli
 ) where
 
+import Data.Time
 import Data.Semigroup ( (<>) )
 import Options.Applicative
 import Plainledger.CLI.Command
 import Plainledger.CLI.Run
+import Plainledger.Ledger.Day
+
+dateparser :: Char -> String -> String -> String -> Parser (Maybe Day)
+dateparser shortOption optionStr helpStr meta = option
+  (eitherReader $ fmap Just . parseISO8601M)
+  (value Nothing <>
+   short shortOption <>
+   long optionStr <>
+   help helpStr <>
+   metavar meta)
+
+startDate :: Parser (Maybe Day)
+startDate = dateparser
+            's'
+            "startdate"
+            "All transactions in the journal file before this date are ignored"
+            "START-DATE"
+
+endDate :: Parser (Maybe Day)
+endDate = dateparser
+          'e'
+          "enddate"
+          "All transactions in the journal file after this date are ignored"
+          "END-DATE"
 
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
@@ -67,10 +92,24 @@ fromCsvInfo = info (fromCsvCommand <**> helper)
               (fullDesc
                <> progDesc "Converts the CSV file into a Yaml file")
 
+transfersCommand :: Parser Command
+transfersCommand = CTransfers
+               <$> (TransferCommand
+                   <$> journalFile
+                   <*> csvFile
+                   <*> startDate
+                   <*> endDate)
+
+transfersInfo :: ParserInfo Command
+transfersInfo = info (transfersCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints all transfers in a CSV format")
+
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "accounts" accountsInfo
-  <> command "fromcsv" fromCsvInfo)
+  <> command "fromcsv" fromCsvInfo
+  <> command "transfers" transfersInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

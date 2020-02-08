@@ -15,11 +15,16 @@ module Plainledger.Ledger.Day (
 where
 
 import Data.Time
-import Control.Monad.Fail
+import Plainledger.Error
+import Control.Monad.Except
 
 toISO8601 :: Day -> String
 toISO8601 = formatTime defaultTimeLocale (iso8601DateFormat Nothing)
 
-parseISO8601M :: (MonadFail m) => String -> m Day
-parseISO8601M = parseTimeM False defaultTimeLocale
-               (iso8601DateFormat Nothing)
+parseISO8601M :: (MonadError Error m) => String -> m Day
+parseISO8601M s =
+  let d = parseTimeM False defaultTimeLocale
+          (iso8601DateFormat Nothing) s
+  in case d of
+       Nothing -> throwError $ "Unable to parse date \"" ++ s ++ "\"."
+       Just d' -> return d'

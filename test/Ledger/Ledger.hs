@@ -7,7 +7,7 @@ import Test.Tasty.HUnit
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
-import Data.ByteString.Lazy as BL
+import Plainledger.Journal
 
 
 dir :: String
@@ -15,6 +15,9 @@ dir = "test/Ledger/"
 
 ledgerPath :: String
 ledgerPath = "test/Ledger/ledger-syntax.yaml"
+
+journalPath :: String
+journalPath = "test/Journal/journal-syntax.yaml"
 
 ledgerTestTree :: TestTree
 ledgerTestTree = testGroup "Ledger tests"
@@ -58,7 +61,14 @@ csvTestTree =
        l <- Y.decodeFileThrow ledgerPath
        let encodeAcc = encodeAccounts $ lAccounts l
        csvAccounts <- either assertFailure return $ decodeAccounts encodeAcc
-       (lAccounts l) @?= csvAccounts
+       (lAccounts l) @?= csvAccounts,
+
+       testCase "Transfers : encode decode" $ do
+          j <- Y.decodeFileThrow journalPath
+          l <- either assertFailure return $ journalToLedger j
+          let encodeAcc = encodeTransfers $ lTransfers l
+          csvTransfers <- either assertFailure return $ decodeTransfers encodeAcc
+          (lTransfers l) @?= csvTransfers
     ]
 
 validationFailure :: String -> TestTree
