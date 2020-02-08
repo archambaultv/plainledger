@@ -58,7 +58,7 @@ validateJTransactionsId :: (MonadError Error m) =>
 validateJTransactionsId ts = do
     let (noId, withId) = partition (T.null . jtTransactionId) ts
     validateTransactionsIdNoDup withId
-    let knownIds = HS.fromList (map jtTransactionId ts)
+    let knownIds = HS.fromList (map jtTransactionId withId)
     -- Now what we have to do :
     -- 1) Find a transaction date for the noId
     -- 2) Group by date
