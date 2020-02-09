@@ -15,6 +15,6 @@ accounts:
   group: Avoi # <-- Missing a 'r'
 
 
-transfers: []
+transactions: []
 
 balance-assertions: []

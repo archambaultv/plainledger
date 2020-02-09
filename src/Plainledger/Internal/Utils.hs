@@ -15,7 +15,7 @@ module Plainledger.Internal.Utils
 
 import Data.Hashable (Hashable)
 import qualified Data.HashMap.Strict as HM
-
+    
 -- | Returns the list of duplicates
 findDuplicates :: (Eq a, Hashable a) => [a] -> [a]
 findDuplicates xs = HM.keys

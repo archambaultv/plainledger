@@ -17,6 +17,6 @@ accounts:
   number: 1010
   group: Avoir
 
-transfers: []
+transactions: []
 
 balance-assertions: []

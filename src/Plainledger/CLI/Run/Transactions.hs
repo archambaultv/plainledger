@@ -8,32 +8,31 @@
 --
 -- This module defines the how to execute the accounts command
 
-module Plainledger.CLI.Run.Transfers
+module Plainledger.CLI.Run.Transactions
 (
-  runTransfers
+  runTransactions
   ) where
 
 import Data.Time
 import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
-import Plainledger.Journal
 import Plainledger.Ledger
 
 -- / Reads the journal file and the exports the transfers in CSV format
-runTransfers :: TransferCommand -> IO ()
-runTransfers c = do
+runTransactions :: TransactionsCommand -> IO ()
+runTransactions c = do
      journal <- Y.decodeFileThrow (tcYamlFile c)
      case journalToLedger journal of
        Left err -> putStrLn err
        Right l -> BL.writeFile
                   (tcCsvFile c)
-                  $ encodeTransfers
+                  $ encodeTransactions
                   $ filterDate (tcStartDate c) (tcEndDate c)
-                  $ lTransfers l
+                  $ lTransactions l
 
-filterDate :: Maybe Day -> Maybe Day -> [Transfer] -> [Transfer]
+filterDate :: Maybe Day -> Maybe Day -> [Transaction] -> [Transaction]
 filterDate Nothing Nothing ts = ts
 filterDate (Just s) e ts =
-  filterDate Nothing e $ filter (\t -> tfDate t >= s) ts
-filterDate _ (Just e) ts = filter (\t -> tfDate t <= e) ts
+  filterDate Nothing e $ filter (\t -> tDate t >= s) ts
+filterDate _ (Just e) ts = filter (\t -> tDate t <= e) ts

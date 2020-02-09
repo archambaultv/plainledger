@@ -8,15 +8,15 @@
 --
 -- This module defines the accounts command
 
-module Plainledger.CLI.Command.Transfers
+module Plainledger.CLI.Command.Transactions
   (
-  TransferCommand(..),
+  TransactionsCommand(..),
   )
 where
 
 import Data.Time
 
-data TransferCommand = TransferCommand {
+data TransactionsCommand = TransactionsCommand {
   tcYamlFile :: String,
   tcCsvFile :: String,
   tcStartDate :: Maybe Day,

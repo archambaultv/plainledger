@@ -11,27 +11,31 @@
 module Plainledger.Ledger.Account (
   Account(..),
   encodeAccounts,
-  decodeAccounts
+  decodeAccounts,
+  validateAccounts
   )
 where
 
-import Prelude hiding (lines)
-import Data.Ord (comparing)
-import Data.List (sortBy)
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.Csv as C
-import Data.Csv (Record, Field, ToField(..),toRecord)
-import qualified Data.Yaml as Y
-import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
-import qualified Data.Text as T
+import Control.Monad.Except
 import Data.Aeson as A
-import Plainledger.Ledger.Tag
+import Data.ByteString.Lazy (ByteString)
+import Data.Csv (Record, Field, ToField(..),toRecord)
+import Data.HashMap.Strict (HashMap)
+import Data.List
+import Data.Maybe
+import Data.Ord (comparing)
+import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
+import GHC.Generics
 import Plainledger.Error
+import Plainledger.Internal.Csv
+import Plainledger.Ledger.Configuration
+import Plainledger.Ledger.Tag
+import Prelude hiding (lines)
+import qualified Data.Csv as C
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Plainledger.Internal.Csv
-import Control.Monad.Except
-import GHC.Generics
+import qualified Data.Text as T
+import qualified Data.Yaml as Y
 
 -- | The Account data type serves as aggregation point for commodities
 -- relating to a particuliar purpose.
@@ -93,6 +97,64 @@ instance FromJSON Account where
     <*> (maybe "" id <$> (v .:? "subsubgroup"))
     <*> (maybe [] id <$> (v .:? "tags"))
   parseJSON _ = fail "Expected Object for Account value"
+
+validateAccounts :: (MonadError Error m) =>
+                      HashMap T.Text AccountGroup ->
+                      [Account] ->
+                      m ()
+validateAccounts m accounts = do
+  validateGroupField m accounts
+  validateAccountIdNonNull accounts
+  validateAccountIdNoDup accounts
+  return ()
+
+validateAccountIdNonNull :: (MonadError Error m) =>
+                            [Account] ->
+                            m ()
+validateAccountIdNonNull accounts =
+  let nullId = filter
+               (T.null . fst)
+               (map (\a -> (aId a, aName a)) accounts)
+  in if null nullId
+     then return ()
+     else throwError
+          $ "Unallowed zero length account id for the following accounts : "
+          ++ (intercalate " "
+             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
+             $ map snd nullId)
+          ++ "."
+
+validateAccountIdNoDup :: (MonadError Error m) =>
+                      [Account] ->
+                      m ()
+validateAccountIdNoDup accounts =
+  let dup = HM.filter (/= (1 :: Int))
+          $ HM.fromListWith (+)
+          $ zip (map aId accounts) (repeat 1)
+  in if HM.size dup /= 0
+     then throwError
+          $ "Duplicate account id : "
+          ++ (intercalate " "
+             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
+             $ HM.keys dup)
+          ++ "."
+     else return ()
+
+-- | Asserts all accounts group field are in the configuration group mapping.
+validateGroupField :: (MonadError Error m) =>
+                      HashMap T.Text AccountGroup ->
+                      [Account] ->
+                      m ()
+validateGroupField m accounts =
+  let wrong = filter (\a -> isNothing $ HM.lookup (aGroup a) m) accounts
+  in case wrong of
+      [] -> return ()
+      (a:_) -> throwError
+               $ "Group \""
+               ++ (T.unpack $ aGroup a)
+               ++ "\" of account \""
+               ++ (T.unpack $ aId a)
+               ++ "\" is not in the configuration group-mapping."
 
 -- CSV functions
 coreHeader :: [Field]

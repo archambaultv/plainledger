@@ -16,10 +16,10 @@ module Plainledger.CLI.Run
 import Plainledger.CLI.Command
 import Plainledger.CLI.Run.Accounts
 import Plainledger.CLI.Run.FromCsv
-import Plainledger.CLI.Run.Transfers
+import Plainledger.CLI.Run.Transactions
 
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
 runCommand (CAccounts x) = runAccounts x
 runCommand (CFromCsv x) = runFromCsv x
-runCommand (CTransfers x) = runTransfers x
+runCommand (CTransactions x) = runTransactions x

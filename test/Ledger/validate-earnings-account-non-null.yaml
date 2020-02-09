@@ -1,18 +1,19 @@
 configuration:
   default-commodity: CAD
   opening-balance-account: Solde d'ouverture
-  earnings-account: Bénéfice net
+  earnings-account: ""  # <-- Null string
   group-mapping:
     asset: [Actif]
-    liability: [Passif]
+    liability: ["Passif"]
     equity: [Avoir]
     revenue: [Revenu]
     expense: [Dépense]
 
 accounts:
-- id: "" # <- Account id must not be null
+- id: Compte chèque
   number: 1005
   group: Avoir
+
 
 transactions: []
 

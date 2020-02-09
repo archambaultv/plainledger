@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.CLI.CLI
+-- Module      :  Plainledger.CLI
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,7 +8,7 @@
 --
 -- This module defines the command line interface of plaingledger
 
-module Plainledger.CLI.CLI (
+module Plainledger.CLI (
   cli
 ) where
 
@@ -64,7 +64,7 @@ yamlFile = argument str (metavar "YAML-FILE" <> help "The yaml file")
 
 accountsCommand :: Parser Command
 accountsCommand = CAccounts
-               <$> (AccountCommand
+               <$> (AccountsCommand
                    <$> journalFile
                    <*> csvFile)
 
@@ -79,6 +79,10 @@ csvType = flag' CsvAccounts
           (  long "accounts"
           <> short 'a'
           <> help "The CSV-FILE contains records representing accounts" )
+       <|> flag' CsvTransactions
+                 (  long "transactions"
+                 <> short 't'
+                 <> help "The CSV-FILE contains records representing transfers")
 
 fromCsvCommand :: Parser Command
 fromCsvCommand = CFromCsv
@@ -93,8 +97,8 @@ fromCsvInfo = info (fromCsvCommand <**> helper)
                <> progDesc "Converts the CSV file into a Yaml file")
 
 transfersCommand :: Parser Command
-transfersCommand = CTransfers
-               <$> (TransferCommand
+transfersCommand = CTransactions
+               <$> (TransactionsCommand
                    <$> journalFile
                    <*> csvFile
                    <*> startDate

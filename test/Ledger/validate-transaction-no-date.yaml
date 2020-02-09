@@ -40,9 +40,9 @@ accounts:
 
 transactions:
 - # date: 2019-01-23  # <- No date specified at all for this transaction
-  transfers:
-  - from: Mastercard
-    to: Musique
+  postings:
+  - account: Mastercard
+  - account: Musique
     amount: 40
 
 # Balance assertions

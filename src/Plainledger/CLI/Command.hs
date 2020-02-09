@@ -13,15 +13,15 @@ module Plainledger.CLI.Command
   Command(..),
   module Plainledger.CLI.Command.Accounts,
   module Plainledger.CLI.Command.FromCsv,
-  module Plainledger.CLI.Command.Transfers
+  module Plainledger.CLI.Command.Transactions
   )
 where
 
 import Plainledger.CLI.Command.Accounts
 import Plainledger.CLI.Command.FromCsv
-import Plainledger.CLI.Command.Transfers
+import Plainledger.CLI.Command.Transactions
 
 data Command
-  = CAccounts AccountCommand
+  = CAccounts AccountsCommand
   | CFromCsv FromCsvCommand
-  | CTransfers TransferCommand
+  | CTransactions TransactionsCommand

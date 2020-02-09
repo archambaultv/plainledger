@@ -15,12 +15,11 @@ module Plainledger.CLI.Run.Accounts
 
 import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
-import Plainledger.CLI.Command (AccountCommand(..))
-import Plainledger.Journal
+import Plainledger.CLI.Command (AccountsCommand(..))
 import Plainledger.Ledger
 
 -- / Reads the journal file and the exports the accounts in CSV format
-runAccounts :: AccountCommand -> IO ()
+runAccounts :: AccountsCommand -> IO ()
 runAccounts c = do
      journal <- Y.decodeFileThrow (acYamlFile c)
      case journalToLedger journal of

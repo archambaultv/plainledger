@@ -15,7 +15,7 @@ module Plainledger.CLI.Command.FromCsv
   )
 where
 
-data CsvType = CsvAccounts
+data CsvType = CsvAccounts | CsvTransactions
 
 data FromCsvCommand = FromCsvCommand {
   fcsvCsvFile :: String,

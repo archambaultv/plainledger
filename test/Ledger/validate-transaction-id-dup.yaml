@@ -41,17 +41,18 @@ accounts:
 transactions:
 - date: 2019-01-23
   transaction-id: 2019-01-23-1 # <- Duplicate transaction id
-  transfers:
-  - from: Mastercard
-    to: Musique
+  postings:
+  - account: Mastercard
     amount: 40
+  - account: Musique
+
 
 - date: 2018-10-12
   transaction-id: 2019-01-23-1 # <- Duplicate transaction id
-  transfers:
-  - from: Compte chèque
-    to: Compte épargne
+  postings:
+  - account: Compte chèque
     amount: 250
+  - account: Compte épargne
 
 # Balance assertions
 balance-assertions: []

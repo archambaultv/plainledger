@@ -10,11 +10,11 @@
 
 module Plainledger.CLI.Command.Accounts
   (
-  AccountCommand(..),
+  AccountsCommand(..),
   )
 where
 
-data AccountCommand = AccountCommand {
+data AccountsCommand = AccountsCommand {
   acYamlFile :: String,
   acCsvFile :: String
   --acUsed :: Used

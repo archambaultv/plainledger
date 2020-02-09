@@ -10,21 +10,24 @@
 
 module Plainledger.Ledger.Configuration (
   Configuration(..),
-  AccountGroup(..)
+  AccountGroup(..),
+  validateConfig
   )
 where
 
-import Data.Char (toLower)
-import Data.Tuple (swap)
-import qualified Data.Yaml as Y
-import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.=))
-import qualified Data.Text as T
+import Control.Monad.Except
 import Data.Aeson as A
+import Data.Char (toLower)
+import Data.Hashable (Hashable)
+import Data.HashMap.Strict (HashMap)
+import Data.Tuple (swap)
+import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.=))
+import GHC.Generics
+import Plainledger.Error
 import Plainledger.Ledger.Amount
 import qualified Data.HashMap.Strict as HM
-import Data.HashMap.Strict (HashMap)
-import Data.Hashable (Hashable)
-import GHC.Generics
+import qualified Data.Text as T
+import qualified Data.Yaml as Y
 
 -- | The top level grouping of an account. Must be Asset, Liability,
 -- Equity, Revenue or Expense.
@@ -58,6 +61,29 @@ data Configuration = Configuration {
    cGroupMapping :: HashMap T.Text AccountGroup
   }
   deriving (Eq, Show)
+
+-- | validateConfig asserts
+-- - all members of the group mapping are non null
+-- - opening balance account is non null
+-- - earnings account is non null
+-- - default commodity is non null
+validateConfig :: (MonadError Error m) => Configuration -> m ()
+validateConfig c = do
+    checkNull cOpeningBalanceAccount "opening-balance-account"
+    checkNull cDefaultCommodity "default-commodity"
+    checkNull cEarningsAccount "earnings-account"
+    if null (filter T.null $ HM.keys (cGroupMapping c))
+      then return ()
+      else throwError "Unallowed zero length account id in \
+                      \configuration \"group-mapping\"."
+
+  where checkNull f n =
+          if T.null (f c)
+          then throwError
+               $ "Configuration \""
+               ++ n
+               ++ "\" cannot be the empty string."
+          else return ()
 
 -- FromJSON instances
 instance FromJSON Configuration where

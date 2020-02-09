@@ -10,7 +10,7 @@
 
 module Main where
 
-import Plainledger.CLI.CLI
+import Plainledger.CLI
 
 main :: IO ()
 main = cli

@@ -9,10 +9,12 @@
 -- This module defines the Balance data type representing balance assertions.
 
 module Plainledger.Ledger.Balance (
-  Balance(..)
+  Balance(..),
+  validateBalances
   )
 where
 
+import Control.Monad.Except
 import Data.Time
 import Data.Scientific
 import qualified Data.Csv as C
@@ -32,6 +34,8 @@ import Control.Monad (mzero)
 import Data.Aeson (pairs)
 import Plainledger.Ledger.Amount
 import Plainledger.Ledger.Day
+import Plainledger.Error
+import Plainledger.Ledger.Account
 
 -- | The Balance data type reprensents an assertion about the total of an
 -- account at a particular date.
@@ -42,6 +46,22 @@ data Balance = Balance
    bCommodity :: Commodity
   }
   deriving (Eq, Show)
+
+-- Balances :
+--  Asserts all balance have a valid account field
+--  Asserts all balance have a well defined commodity
+--  Asserts all balance assertions are correct
+validateBalances :: (MonadError Error m) =>
+                      Commodity ->
+                      [Account] ->
+                      [Balance] ->
+                      m [Balance]
+validateBalances defComm _ x =
+  let b1 = map (\c -> if T.null $ bCommodity c
+                      then c{bCommodity = defComm}
+                      else c)
+           x
+  in return b1
 
 -- FromJSON instances
 instance FromJSON Balance where

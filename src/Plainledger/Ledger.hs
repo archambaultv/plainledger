@@ -10,10 +10,13 @@
 -- data types and functions related to the journal file.
 
 module Plainledger.Ledger (
-  Ledger(..),
+  LedgerF(..),
+  Ledger,
+  Journal,
   yamlPrettyConfig,
-  validateLedger,
-  module Plainledger.Ledger.Transfer,
+  journalToLedger,
+  module Plainledger.Ledger.Posting,
+  module Plainledger.Ledger.Transaction,
   module Plainledger.Ledger.Balance,
   module Plainledger.Ledger.Configuration,
   module Plainledger.Ledger.Account,
@@ -30,7 +33,8 @@ import qualified Data.Yaml.Pretty as P
 import Data.Yaml (FromJSON(..), (.:), ToJSON(..), (.=))
 import qualified Data.Text as T
 import Data.Aeson (pairs)
-import Plainledger.Ledger.Transfer
+import Plainledger.Ledger.Posting
+import Plainledger.Ledger.Transaction
 import Plainledger.Ledger.Balance
 import Plainledger.Ledger.Configuration
 import Plainledger.Ledger.Account
@@ -41,111 +45,48 @@ import Data.HashMap.Strict (HashMap)
 import Control.Monad.Except
 import Plainledger.Error
 
--- | The Ledger data type represents a graph where the accounts are the nodes
--- and the transfers are the edges
-data Ledger = Ledger
+data LedgerF t = Ledger
   {lConfiguration :: Configuration,
    lAccounts   :: [Account],
-   lTransfers :: [Transfer],
+   lTransactions :: [t],
    lBalances :: [Balance]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
--- | validateLedger verifies a series of properties that a valid ledger should
+type Ledger = LedgerF Transaction
+type Journal = LedgerF JTransaction
+
+-- | Converts the journal to a ledger.
+-- journalToLedger verifies a series of properties that a valid ledger should
 -- satisfies :
--- Asserts all accounts group field are in the configuration group mapping.
--- Asserts all accounts Id are unique and non null
--- Asserts configuration earning and opening balance accounts exists
--- Asserts all transfers have valid from and to field
--- Asserts all transfers have positive amount
--- Asserts all transfers have a well defined commodity
--- Asserts all balance have a valid account field
--- Asserts all balance have a well defined commodity
--- Asserts all balance assertions are respected
-validateLedger :: (MonadError Error m) => Ledger -> m Ledger
-validateLedger l =
-  let config = lConfiguration l
-      accounts = lAccounts l
-      transfers = lTransfers l
-      balances = lBalances l
-  in do
-    validateAccounts (cGroupMapping config) accounts
-    transfers' <- validateTransfers (cDefaultCommodity config) accounts transfers
-    balances' <- validateBalances (cDefaultCommodity config) accounts balances
-    return $ Ledger config accounts transfers' balances'
-
-validateTransfers :: (MonadError Error m) =>
-                      Commodity ->
-                      [Account] ->
-                      [Transfer] ->
-                      m [Transfer]
-validateTransfers _ _ transfers = return transfers
-
-
-validateBalances :: (MonadError Error m) =>
-                      Commodity ->
-                      [Account] ->
-                      [Balance] ->
-                      m [Balance]
-validateBalances _ _ x = return x
-
-validateAccounts :: (MonadError Error m) =>
-                      HashMap T.Text AccountGroup ->
-                      [Account] ->
-                      m ()
-validateAccounts m accounts = do
-  validateGroupField m accounts
-  validateAccountIdNonNull accounts
-  validateAccountIdNoDup accounts
-  return ()
-
-validateAccountIdNonNull :: (MonadError Error m) =>
-                            [Account] ->
-                            m ()
-validateAccountIdNonNull accounts =
-  let nullId = filter
-               (T.null . fst)
-               (map (\a -> (aId a, aName a)) accounts)
-  in if null nullId
-     then return ()
-     else throwError
-          $ "Unallowed zero length account id for the following accounts : "
-          ++ (intercalate " "
-             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
-             $ map snd nullId)
-          ++ "."
-
-validateAccountIdNoDup :: (MonadError Error m) =>
-                      [Account] ->
-                      m ()
-validateAccountIdNoDup accounts =
-  let dup = HM.filter (/= (1 :: Int))
-          $ HM.fromListWith (+)
-          $ zip (map aId accounts) (repeat 1)
-  in if HM.size dup /= 0
-     then throwError
-          $ "Duplicate account id : "
-          ++ (intercalate " "
-             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
-             $ HM.keys dup)
-          ++ "."
-     else return ()
-
-validateGroupField :: (MonadError Error m) =>
-                      HashMap T.Text AccountGroup ->
-                      [Account] ->
-                      m ()
-validateGroupField m accounts =
-  let wrong = filter (\a -> isNothing $ HM.lookup (aGroup a) m) accounts
-  in case wrong of
-      [] -> return ()
-      (a:_) -> throwError
-               $ "Group \""
-               ++ (T.unpack $ aGroup a)
-               ++ "\" of account \""
-               ++ (T.unpack $ aId a)
-               ++ "\" is not in the configuration group-mapping."
-
+-- Configuration :
+--  Asserts all members of the group mapping are non null
+--  Asserts opening balance account is non null
+--  Asserts earnings account is non null
+--  Asserts default commodity is non null
+-- Accounts :
+--  Asserts all accounts group field are in the configuration group mapping.
+--  Asserts all accounts Id are unique and non null
+--  Asserts configuration earning and opening balance accounts truly exists
+-- Transactions :
+--  Asserts all transactions have valid unique transaction id
+--  Asserts all transactions have valid postings
+--  Asserts all transactions have a well defined commodity
+--  Asserts all transactions balance to zero for all commodities
+-- Balances :
+--  Asserts all balance have a valid account field
+--  Asserts all balance have a well defined commodity
+--  Asserts all balance assertions are correct
+journalToLedger :: (MonadError Error m) => Journal -> m Ledger
+journalToLedger (Ledger config accounts txns bals) = do
+  validateConfig config
+  validateAccounts (cGroupMapping config) accounts
+  transactions' <- validateTransactions
+                   (cDefaultCommodity config)
+                   accounts
+                   txns
+  balances' <- validateBalances (cDefaultCommodity config) accounts bals
+  return $ Ledger config accounts transactions' balances'
 
 -- | The Data.Yaml.Pretty configuration object created so that the
 -- fields in the yaml file follow the convention of this software.
@@ -158,7 +99,7 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder "date" = 1
        fieldOrder "balance-date-from" = 2
        fieldOrder "balance-date-to" = 3
-       fieldOrder "transfers" = 5
+       fieldOrder "transactions" = 5
 
        -- Balance fields
        fieldOrder "account" = 8
@@ -190,27 +131,27 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder _ = 99
 
 -- FromJSON instances
-instance FromJSON Ledger where
+instance FromJSON Journal where
   parseJSON (Y.Object v) =
     Ledger
     <$> v .: "configuration"
     <*> v .: "accounts"
-    <*> v .: "transfers"
+    <*> v .: "transactions"
     <*> v .: "balance-assertions"
   parseJSON _ = fail "Expected Object for Ledger value"
 
 -- To JSON instance
-instance ToJSON Ledger where
+instance ToJSON Journal where
   toJSON (Ledger config accounts txns bals) =
     Y.object
     $ ["configuration" .= config,
        "accounts" .= accounts,
-       "transfers" .= txns,
+       "transactions" .= txns,
        "balance-assertions" .= bals]
 
   toEncoding (Ledger config accounts txns bals) =
     pairs
     $ "configuration"   .= config
     <> "accounts"   .= accounts
-    <> "transfers" .= txns
+    <> "transactions" .= txns
     <> "balance-assertions" .= bals
