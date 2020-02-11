@@ -74,6 +74,9 @@ transactions:
     - account: Compte chèque
       amount: 200
       commodity: CAD
+      tags:
+      - id: Note
+        value: Utilisation du compte chèque
     - account: Mastercard
       amount: -200
       commodity: CAD
@@ -89,12 +92,14 @@ transactions:
 
   # Most fields are optional
 - date: 2019-01-23
+  transaction-id: 2019-01-23-2
   postings:
   - account: Mastercard
     amount: -40
   - account: Musique
 
 - date: 2018-10-12
+  transaction-id: 2018-10-12-1
   postings:
   - account: Compte chèque
     amount: 250
@@ -106,6 +111,7 @@ transactions:
     value: Budget film non utilisé.
 
 - date: 2019-02-15
+  transaction-id: 2019-02-15-1
   postings:
   - account: Work
     amount: 1450

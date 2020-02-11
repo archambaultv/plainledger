@@ -1,12 +1,12 @@
 -- |
--- Module      :  Plainledger.Ledger.Transfer
+-- Module      :  Plainledger.Ledger.Posting
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
 -- Maintainer  :  Vincent Archambault <archambault.v@gmail.com>
 -- Stability   :  experimental
 --
--- This module defines the Transaction and Transfer data type.
+-- This module defines the Posting data type.
 
 module Plainledger.Ledger.Posting (
   PostingF(..),
@@ -15,32 +15,25 @@ module Plainledger.Ledger.Posting (
   fromCommodity,
   fromAmount,
   fromBalanceDate,
-  balancePostings
+  balancePostings,
+  postingToJPosting
   )
 where
 
 import Data.Maybe
 import Control.Monad.Except
 import Data.Aeson (pairs)
-import Data.ByteString.Lazy (ByteString)
-import Data.Csv (Record, Field, ToField(..),toRecord)
 import Data.List
-import Data.Ord (comparing)
 import Data.Scientific
 import Data.Time
 import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import GHC.Generics hiding (to, from)
 import Plainledger.Error
-import Plainledger.Internal.Csv
 import Plainledger.Ledger.Amount
-import Plainledger.Ledger.Day
-import Plainledger.Ledger.Tag
 import Prelude hiding (lines)
-import qualified Data.Csv as C
-import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Yaml as Y
+import Data.Bifunctor
 
 -- | The Posting data type reprensents the change in the balance of an account.
 -- Transactions are made of at least two postings.
@@ -50,10 +43,17 @@ data PostingF d q = Posting
     pAccount :: T.Text,
     pAmount :: q,
     pCommodity :: Commodity
-  } deriving (Eq, Show, Generic, Functor, Foldable, Traversable)
+  } deriving (Eq, Show, Generic, Functor)
+
+instance Bifunctor PostingF where
+  first f (Posting b a amnt c) = Posting (f b) a amnt c
+  second f (Posting b a amnt c) = Posting b a (f amnt) c
 
 type Posting = PostingF Day Quantity
 type JPosting = PostingF (Maybe Day) (Maybe Quantity)
+
+postingToJPosting :: PostingF d q -> PostingF (Maybe d) (Maybe q)
+postingToJPosting p = first Just $ fmap Just p
 
 -- | Updates the balance date if it is Nothing
 fromBalanceDate :: Day -> PostingF (Maybe Day) q -> PostingF Day q
@@ -124,4 +124,4 @@ instance FromJSON JPosting where
     <*> v .: "account"
     <*> (fmap (fmap realToFrac) (v .:? "amount" :: Y.Parser (Maybe Scientific)))
     <*> (maybe "" id <$> v .:? "commodity")
-  parseJSON _ = fail "Expected Object for Transfer value"
+  parseJSON _ = fail "Expected Object for Posting value"

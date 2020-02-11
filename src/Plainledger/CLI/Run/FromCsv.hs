@@ -29,10 +29,9 @@ runFromCsv c = do
         Left err -> putStrLn err
         Right accs -> BS.writeFile (fcsvYamlFile c)
                       $ YP.encodePretty yamlPrettyConfig accs
-    CsvTransactions -> return ()
-      -- case decodeTransaction csvBS of
-      --   Left err -> putStrLn err
-      --   Right ts ->
-      --         -- FIXME : Transfers should be converted to JTransactions
-      --         BS.writeFile (fcsvYamlFile c)
-      --         $ YP.encodePretty yamlPrettyConfig ts
+    CsvTransactions opt ->
+      case decodeTransactions opt csvBS of
+        Left err -> putStrLn err
+        Right ts ->
+              BS.writeFile (fcsvYamlFile c)
+              $ YP.encodePretty yamlPrettyConfig ts

@@ -2,11 +2,16 @@ module Ledger.Ledger (
   ledgerTestTree
   )where
 
+import Data.Maybe
+import Data.List
+import Data.Ord
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
+import qualified Data.Text as T
+import qualified Data.ByteString.Lazy as BS
 
 
 dir :: String
@@ -54,6 +59,7 @@ validationTestTree =
                      $ "Validation of \""
                      ++ "validate-transaction-no-date.yaml"
                      ++ "\" should fail.",
+
       validationFailure "validate-group-field.yaml",
       validationFailure "validate-group-field-non-null.yaml",
       validationFailure "validate-default-commodity-non-null.yaml",
@@ -61,7 +67,21 @@ validationTestTree =
       validationFailure "validate-opening-balance-non-null.yaml",
       validationFailure "validate-account-id-duplicate.yaml",
       validationFailure "validate-account-id-non-null.yaml",
-      validationFailure "validate-transaction-id-dup.yaml"
+      validationFailure "validate-transaction-id-dup.yaml",
+      testCase "transaction id" $ do
+         journal <- decodeFileThrow (dir ++ "validate-transaction-id-new.yaml")
+         case journalToLedger journal of
+           Left err -> assertFailure err
+           Right ledger ->
+            let transactions = lTransactions ledger
+                nbTransactions = length transactions
+            in if nbTransactions /= 6
+               then assertFailure
+                     $ "Wrong number of Transactions. Got "
+                     ++ show nbTransactions
+                     ++ ".\n"
+                     -- ++ show Transactions
+               else traverse validateTransactionId transactions >> return ()
     ]
 
 csvTestTree :: TestTree
@@ -73,13 +93,40 @@ csvTestTree =
        csvAccounts <- either assertFailure return $ decodeAccounts encodeAcc
        (lAccounts l) @?= csvAccounts,
 
-       testCase "Transactions : encode decode" $ do
+       testCase "JTransactions : encode decode single line" $ do
           j <- Y.decodeFileThrow ledgerPath
-          l <- either assertFailure return $ journalToLedger j
-          let encodeAcc = encodeTransactions $ lTransactions l
-          csvTransactions <- either assertFailure return $ decodeTransactions encodeAcc
-          (lTransactions l) @?= csvTransactions
+          let encodeAcc = encodeTransactions EncodeAsSingleRecord
+                        $ lTransactions j
+          csvTransactions <- either assertFailure return
+                            $ decodeTransactions SingleRecord encodeAcc
+          lTransactions j @?= csvTransactions,
+
+      testCase "JTransactions : encode decode multiple lines" $ do
+         j <- Y.decodeFileThrow (dir ++ "validate-csv-multiple-lines.yaml")
+         let encodeAcc = encodeTransactions EncodeAsMultipleRecords
+                       $ lTransactions j
+         csvTransactions <- either assertFailure return
+                           $ decodeTransactions MultipleRecords encodeAcc
+         (sortBy (comparing tTransactionId) (lTransactions j)) @?=
+           (sortBy (comparing tTransactionId) csvTransactions),
+
+      csvValidationFailure "csv-multiple-lines-no-transaction-id.csv"
+                           MultipleRecords,
+      csvValidationFailure "csv-multiple-lines-different-tag-values.csv"
+                           MultipleRecords
     ]
+
+csvValidationFailure :: String -> CsvDecodeOptions -> TestTree
+csvValidationFailure file opt =
+  testCase file $ do
+    csv <- BS.readFile (dir ++ file)
+    let csvTransactions = decodeTransactions opt csv
+    case csvTransactions of
+       Left _ -> return ()
+       Right _ -> assertFailure
+                  $ "Csv decode of \""
+                  ++ file
+                  ++ "\" should fail."
 
 validationFailure :: String -> TestTree
 validationFailure file =
@@ -93,45 +140,21 @@ validationFailure file =
                   ++ file
                   ++ "\" should fail."
 
-{--
-validationTestTree :: TestTree
-validationTestTree =
-   testGroup "Validation"
-    [
-
-      testCase "transaction id" $ do
-         journal <- decodeFileThrow (dir ++ "validate-transaction-id-new.yaml")
-         case journalToLedger journal of
-           Left err -> assertFailure err
-           Right ledger ->
-            let Transactions = lTransaction ledger
-                nbTransactions = length Transactions
-            in if nbTransactions /= 7
-               then assertFailure
-                     $ "Wrong number of Transactions. Got "
-                     ++ show nbTransactions
-                     ++ ".\n"
-                     -- ++ show Transactions
-               else traverse validateTransactionId Transactions >> return ()
-    ]
-
-validateTransactionId :: Transfer -> IO ()
+validateTransactionId :: Transaction -> IO ()
 validateTransactionId t =
-  let tId = lookup "Transaction id" $ map tagToTuple $ tfTags t
-      tAmount = pAmount t
-  in case (tAmount, tId) of
-       (_, Nothing) -> assertFailure "No Transaction id tag"
-       (1, Just "2019-01-23-100") -> return ()
-       (2, Just "2019-01-23-1") -> return ()
-       (3, Just "2019-01-23-2") -> return ()
-       (4, Just "2019-01-23-2") -> return ()
-       (5, Just "2019-01-22-1") -> return ()
-       (6, Just "2019-01-24-1") -> return ()
-       (7, Just "2019-01-24-2") -> return ()
-       (_, Just x) -> assertFailure
+  let tId = tTransactionId t
+      amnt = fromJust $ lookup "id" $ map tagToTuple $ tTags t
+  in case (amnt, tId) of
+       (_, "") -> assertFailure "No Transaction id tag"
+       ("1", "2019-01-23-100") -> return ()
+       ("2", "2019-01-23-1") -> return ()
+       ("3", "2019-01-22-1") -> return ()
+       ("4", "2019-01-23-2") -> return ()
+       ("5", "2019-01-24-1") -> return ()
+       ("6", "2019-01-24-2") -> return ()
+       (_, x) -> assertFailure
                  $ "Incorrect transaction id \""
                  ++ T.unpack x
                  ++ "\" for amount "
-                 ++ show tAmount
+                 ++ T.unpack amnt
                  ++ "."
--}

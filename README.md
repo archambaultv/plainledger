@@ -25,9 +25,7 @@ Unless specified, all outputs are in CSV format. Most commands accept options
 to change their behavior (for example specifying the accounting period).
 
 - *Accounts* : List all accounts and their properties.
-- *Transfers* : List all transfers in a From-To style.
-- *Transactions* : List all transfers in the standard accounting
-  style (Debit-Credit). Not implemented yet.
+- *Transactions* : List all transactions in a csv file.
 - *Balance sheet* : Prints the balance sheet. Not implemented yet.
 - *Income statement* : Prints the income statement. Not implemented yet.
 - *Trial balance* : Prints the trial balance. Not implemented yet.

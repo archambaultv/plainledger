@@ -43,48 +43,65 @@ transactions:
   transaction-id: 2019-01-23-100 # <- This transaction id must be preserved
   postings:
   - account: Mastercard
-    amount: 1 # <- We use the amount to identify the transfer
+    amount: 100
   - account: Musique
+  tags:
+    - id: id
+      value: "1"
 
 - date: 2019-01-23
   # Transaction id will be generated
   postings:
   - account: Compte chèque
-    amount: 2 # <- We use the amount to identify the transfer
+    amount: 100
   - account: Compte épargne
+  tags:
+    - id: id
+      value: "2"
 
 - date: 2019-01-22
   # Transaction id will be generated
   postings:
   - account: Compte chèque
-    amount: 5 # <- We use the amount to identify the transfer
+    amount: 100
   - account: Compte épargne
+  tags:
+    - id: id
+      value: "3"
 
 - date: 2019-01-23
   # Transaction id will be generated
   postings:
   - account: Compte chèque
-    amount: 3 # <- We use the amount to identify the transfer
+    amount: 100
   - account: Compte épargne
 
   postings:
   - account: Compte chèque
-    amount: 4 # <- We use the amount to identify the transfer
+    amount: 100
   - account: Compte épargne
+  tags:
+    - id: id
+      value: "4"
 
 - date: 2019-01-24
   transaction-id: 2019-01-24-1
   postings:
   - account: Compte chèque
-    amount: 6 # <- We use the amount to identify the transfer
+    amount: 100
   - account: Compte épargne
+  tags:
+    - id: id
+      value: "5"
 
 - date: 2019-01-24
   # Transaction id will be generated
   postings:
   - account: Compte chèque
-    amount: 7 # <- We use the amount to identify the transfer
+    amount: 100
   - account: Compte épargne
-
+  tags:
+    - id: id
+      value: "6"
 # Balance assertions
 balance-assertions: []

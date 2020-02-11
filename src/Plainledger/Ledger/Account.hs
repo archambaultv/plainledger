@@ -12,7 +12,8 @@ module Plainledger.Ledger.Account (
   Account(..),
   encodeAccounts,
   decodeAccounts,
-  validateAccounts
+  validateAccounts,
+  accountsToHashMap
   )
 where
 
@@ -97,6 +98,9 @@ instance FromJSON Account where
     <*> (maybe "" id <$> (v .:? "subsubgroup"))
     <*> (maybe [] id <$> (v .:? "tags"))
   parseJSON _ = fail "Expected Object for Account value"
+
+accountsToHashMap :: [Account] -> HashMap T.Text Account
+accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
 
 validateAccounts :: (MonadError Error m) =>
                       HashMap T.Text AccountGroup ->

@@ -79,10 +79,12 @@ csvType = flag' CsvAccounts
           (  long "accounts"
           <> short 'a'
           <> help "The CSV-FILE contains records representing accounts" )
-       <|> flag' CsvTransactions
+       <|> (flag' CsvTransactions
                  (  long "transactions"
                  <> short 't'
-                 <> help "The CSV-FILE contains records representing transfers")
+                 <> help "The CSV-FILE contains records \
+                         \representing transactions")
+           <*> txnDecodeOption)
 
 fromCsvCommand :: Parser Command
 fromCsvCommand = CFromCsv
@@ -94,26 +96,37 @@ fromCsvCommand = CFromCsv
 fromCsvInfo :: ParserInfo Command
 fromCsvInfo = info (fromCsvCommand <**> helper)
               (fullDesc
-               <> progDesc "Converts the CSV file into a Yaml file")
+               <> progDesc "Converts the CSV file into a Yaml \
+                           \file readable by plainledger")
 
-transfersCommand :: Parser Command
-transfersCommand = CTransactions
+txnDecodeOption :: Parser CsvDecodeOptions
+txnDecodeOption = flag MultipleRecords SingleRecord
+   ( long "single-record"
+  <> short 's'
+  <> help "Each transaction will be encoded as a single \
+          \line in the CSV-FILE. The default \
+          \is to encode transactions on mulitple lines, one \
+          \per posting.")
+
+transactionsCommand :: Parser Command
+transactionsCommand = CTransactions
                <$> (TransactionsCommand
                    <$> journalFile
                    <*> csvFile
                    <*> startDate
-                   <*> endDate)
+                   <*> endDate
+                   <*> txnDecodeOption)
 
-transfersInfo :: ParserInfo Command
-transfersInfo = info (transfersCommand <**> helper)
+transactionsInfo :: ParserInfo Command
+transactionsInfo = info (transactionsCommand <**> helper)
               (fullDesc
-               <> progDesc "Prints all transfers in a CSV format")
+               <> progDesc "Prints all transactions in a CSV format")
 
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "accounts" accountsInfo
   <> command "fromcsv" fromCsvInfo
-  <> command "transfers" transfersInfo)
+  <> command "transactions" transactionsInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)
@@ -121,7 +134,7 @@ opts = info (parseCommand <**> helper)
          <> progDesc "Executes COMMAND. Use plainledger -h to list the \
                      \possible commands. Use plainledger COMMAND -h for help \
                      \on a specific command."
-         <> header "Plain ledger - Plain text accouting command line tool")
+         <> header "Plain ledger - Plain text accounting command line tool")
 
 
 cli :: IO ()

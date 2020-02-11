@@ -19,17 +19,22 @@ import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
 import Plainledger.Ledger
 
--- / Reads the journal file and the exports the transfers in CSV format
+-- / Reads the journal file and the exports the transactions in CSV format
 runTransactions :: TransactionsCommand -> IO ()
 runTransactions c = do
      journal <- Y.decodeFileThrow (tcYamlFile c)
      case journalToLedger journal of
        Left err -> putStrLn err
-       Right l -> BL.writeFile
-                  (tcCsvFile c)
-                  $ encodeTransactions
-                  $ filterDate (tcStartDate c) (tcEndDate c)
-                  $ lTransactions l
+       Right l ->
+        let opt = case tcEncodeFormat c of
+                     SingleRecord -> EncodeAsSingleRecord
+                     MultipleRecords -> EncodeAsMultipleRecords
+        in BL.writeFile
+          (tcCsvFile c)
+          $ encodeTransactions opt
+          $ map transactionToJTransaction
+          $ filterDate (tcStartDate c) (tcEndDate c)
+          $ lTransactions l
 
 filterDate :: Maybe Day -> Maybe Day -> [Transaction] -> [Transaction]
 filterDate Nothing Nothing ts = ts

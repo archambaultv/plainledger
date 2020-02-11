@@ -26,8 +26,6 @@ module Plainledger.Ledger (
 where
 
 import Data.Ord
-import Data.Maybe
-import Data.List
 import qualified Data.Yaml as Y
 import qualified Data.Yaml.Pretty as P
 import Data.Yaml (FromJSON(..), (.:), ToJSON(..), (.=))
@@ -40,8 +38,6 @@ import Plainledger.Ledger.Configuration
 import Plainledger.Ledger.Account
 import Plainledger.Ledger.Amount
 import Plainledger.Ledger.Tag
-import qualified Data.HashMap.Strict as HM
-import Data.HashMap.Strict (HashMap)
 import Control.Monad.Except
 import Plainledger.Error
 
@@ -97,17 +93,16 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder "id" = 0
        -- Transaction fields
        fieldOrder "date" = 1
-       fieldOrder "balance-date-from" = 2
-       fieldOrder "balance-date-to" = 3
-       fieldOrder "transactions" = 5
+       fieldOrder "transaction-id" = 2
+       fieldOrder "postings" = 5
 
        -- Balance fields
        fieldOrder "account" = 8
-       -- Transfer fields
-       fieldOrder "from" = 10
-       fieldOrder "to" = 11
+
+       -- Transaction fields
        fieldOrder "amount" = 12
        fieldOrder "commodity" = 13
+       fieldOrder "balance-date" = 14
 
        -- Top level fields
        fieldOrder "configuration" = 20

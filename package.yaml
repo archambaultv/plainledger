@@ -30,6 +30,7 @@ dependencies:
 - aeson
 - scientific
 - bytestring
+- containers
 - unordered-containers
 - utf8-string
 - hashable

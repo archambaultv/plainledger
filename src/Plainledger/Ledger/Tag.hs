@@ -67,17 +67,17 @@ valueToText (Y.Bool b) = return $ T.pack $ show b
 valueToText _ = Fail.fail "Expected String, Number or Bool for a tag value field"
 
 -- Csv instances.
-csvTransferOptions :: C.Options
-csvTransferOptions = C.defaultOptions {
+csvTagOptions :: C.Options
+csvTagOptions = C.defaultOptions {
  C.fieldLabelModifier = map toLower . drop 3 }
 instance FromRecord Tag
 instance ToRecord Tag
 instance FromNamedRecord Tag where
- parseNamedRecord = C.genericParseNamedRecord csvTransferOptions
+ parseNamedRecord = C.genericParseNamedRecord csvTagOptions
 instance ToNamedRecord Tag where
- toNamedRecord = C.genericToNamedRecord csvTransferOptions
+ toNamedRecord = C.genericToNamedRecord csvTagOptions
 instance DefaultOrdered Tag where
- headerOrder = C.genericHeaderOrder csvTransferOptions
+ headerOrder = C.genericHeaderOrder csvTagOptions
 
 tagToTuple :: Tag -> (T.Text, T.Text)
 tagToTuple (Tag k v) = (k, v)

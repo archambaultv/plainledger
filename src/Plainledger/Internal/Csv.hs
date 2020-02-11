@@ -8,7 +8,7 @@
 --
 --
 -- This module defines functions to encode and decode objects to CSV when the
--- number of columns vary from object to object. Account and Transfer objects
+-- number of columns vary from object to object. Account and TransactionF objects
 -- with their tags are examples of such objects, since each object can a
 -- different number of tags.
 
@@ -103,21 +103,15 @@ csvToData csv foo
 findColumn :: (MonadError Error m, FromField a) =>
               Field -> HashMap Field Field -> m a
 findColumn x m = findColumnM x m return
-  -- case HM.lookup x m of
-  --   Nothing -> throwError
-  --              $ "\""
-  --              ++ (show x)
-  --              ++ " is not in the CSV header."
-  --   Just v -> either throwError return $ runParser $ parseField v
 
 findColumnM :: (MonadError Error m, FromField b) =>
                Field -> HashMap Field Field -> (b -> m a) -> m a
 findColumnM x m f =
   case HM.lookup x m of
     Nothing -> throwError
-               $ "\""
+               $ "Field \""
                ++ (show x)
-               ++ " is not in the CSV header."
+               ++ "\" is not in the CSV header."
     Just v -> do
       b <- either throwError return $ runParser $ parseField v
       f b
@@ -125,9 +119,6 @@ findColumnM x m f =
 findColumnDefault :: (MonadError Error m, FromField a) =>
                      a -> Field -> HashMap Field Field -> m a
 findColumnDefault v x m = findColumnDefaultM v x m return
-  -- case HM.lookup x m of
-  --   Nothing -> return v
-  --   Just v2 -> either throwError return $ runParser $ parseField v2
 
 findColumnDefaultM :: (MonadError Error m, FromField b) =>
                      a -> Field -> HashMap Field Field -> (b -> m a) -> m a
