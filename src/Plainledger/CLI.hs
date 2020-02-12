@@ -30,17 +30,17 @@ dateparser shortOption optionStr helpStr meta = option
 
 startDate :: Parser (Maybe Day)
 startDate = dateparser
-            's'
-            "startdate"
+            'b'
+            "begin"
             "All transactions in the journal file before this date are ignored"
-            "START-DATE"
+            "BEGIN"
 
 endDate :: Parser (Maybe Day)
 endDate = dateparser
           'e'
-          "enddate"
+          "end"
           "All transactions in the journal file after this date are ignored"
-          "END-DATE"
+          "END"
 
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
