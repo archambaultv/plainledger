@@ -101,6 +101,15 @@ csvTestTree =
                             $ decodeTransactions SingleRecord encodeAcc
           lTransactions j @?= csvTransactions,
 
+     testCase "Transactions : encode decode single line" $ do
+        j <- Y.decodeFileThrow ledgerPath
+        l <- either assertFailure return $ journalToLedger j
+        let txns = map transactionToJTransaction $ lTransactions l
+        let encodeAcc = encodeTransactions EncodeAsSingleRecord txns
+        csvTransactions <- either assertFailure return
+                          $ decodeTransactions SingleRecord encodeAcc
+        txns @?= csvTransactions,
+
       testCase "JTransactions : encode decode multiple lines" $ do
          j <- Y.decodeFileThrow (dir ++ "validate-csv-multiple-lines.yaml")
          let encodeAcc = encodeTransactions EncodeAsMultipleRecords
@@ -109,6 +118,14 @@ csvTestTree =
                            $ decodeTransactions MultipleRecords encodeAcc
          (sortBy (comparing tTransactionId) (lTransactions j)) @?=
            (sortBy (comparing tTransactionId) csvTransactions),
+
+      testCase "JTransactions : no transaction single line" $ do
+         j <- Y.decodeFileThrow (dir ++ "transactions-no-line.yaml")
+         let encodeAcc = encodeTransactions EncodeAsSingleRecord
+                       $ lTransactions j
+         csvTransactions <- either assertFailure return
+                           $ decodeTransactions SingleRecord encodeAcc
+         lTransactions j @?= csvTransactions,
 
       csvValidationFailure "csv-multiple-lines-no-transaction-id.csv"
                            MultipleRecords,
