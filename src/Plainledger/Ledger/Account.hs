@@ -22,7 +22,7 @@ import Data.Aeson as A
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (Record, Field, ToField(..),toRecord)
 import Data.HashMap.Strict (HashMap)
-import Data.List
+import Data.List hiding (group, lines)
 import Data.Maybe
 import Data.Ord (comparing)
 import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
