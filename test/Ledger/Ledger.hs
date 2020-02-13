@@ -164,14 +164,14 @@ validateTransactionId t =
   in case (amnt, tId) of
        (_, "") -> assertFailure "No Transaction id tag"
        ("1", "2019-01-23-100") -> return ()
-       ("2", "2019-01-23-1") -> return ()
-       ("3", "2019-01-22-1") -> return ()
-       ("4", "2019-01-23-2") -> return ()
+       ("2", "2019-01-23-01") -> return ()
+       ("3", "2019-01-22-01") -> return ()
+       ("4", "2019-01-23-02") -> return ()
        ("5", "2019-01-24-1") -> return ()
-       ("6", "2019-01-24-2") -> return ()
+       ("6", "2019-01-24-01") -> return ()
        (_, x) -> assertFailure
                  $ "Incorrect transaction id \""
                  ++ T.unpack x
-                 ++ "\" for amount "
+                 ++ "\" for transaction "
                  ++ T.unpack amnt
                  ++ "."

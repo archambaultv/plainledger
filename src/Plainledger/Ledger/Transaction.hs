@@ -24,6 +24,7 @@ where
 import Data.Function
 import Data.List hiding (lines)
 import Data.Maybe
+import Text.Printf (printf)
 import Control.Monad.Except
 import Data.Aeson (pairs)
 import Data.ByteString.Lazy (ByteString)
@@ -125,7 +126,7 @@ validateTransactionsId ts = do
                     [Transaction]
         createId _ _ [] = []
         createId knownIds n (t:tss) =
-          let tId = T.pack $ show (tDate t) ++ "-" ++ show n
+          let tId = T.pack $ show (tDate t) ++ "-" ++ printf "%02d" n
           in if HS.member tId knownIds
              then createId knownIds (n + 1) (t:tss)
              else t{tTransactionId = tId} : createId knownIds (n + 1) tss
