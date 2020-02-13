@@ -27,5 +27,6 @@ data TransactionsCommand = TransactionsCommand {
   tcCsvFile :: String,
   tcStartDate :: Maybe Day,
   tcEndDate :: Maybe Day,
-  tcEncodeFormat :: CsvEncodeFormat
+  tcEncodeFormat :: CsvEncodeFormat,
+  tcValidation :: Bool
   }

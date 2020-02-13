@@ -23,20 +23,23 @@ import Plainledger.Ledger
 runTransactions :: TransactionsCommand -> IO ()
 runTransactions c = do
      journal <- Y.decodeFileThrow (tcYamlFile c)
-     case journalToLedger journal of
+     let txns =  if tcValidation c
+                 then (map transactionToJTransaction . lTransactions)
+                      <$> journalToLedger journal
+                 else return $ lTransactions journal
+     case txns of
        Left err -> putStrLn err
-       Right l ->
+       Right xs ->
         let opt = case tcEncodeFormat c of
                      SingleRecord -> EncodeAsSingleRecord
                      MultipleRecords -> EncodeAsMultipleRecords
         in BL.writeFile
           (tcCsvFile c)
           $ encodeTransactions opt
-          $ map transactionToJTransaction
           $ filterDate (tcStartDate c) (tcEndDate c)
-          $ lTransactions l
+          $ xs
 
-filterDate :: Maybe Day -> Maybe Day -> [Transaction] -> [Transaction]
+filterDate :: Maybe Day -> Maybe Day -> [TransactionF p] -> [TransactionF p]
 filterDate Nothing Nothing ts = ts
 filterDate (Just s) e ts =
   filterDate Nothing e $ filter (\t -> tDate t >= s) ts

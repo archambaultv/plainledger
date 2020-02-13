@@ -108,6 +108,15 @@ txnDecodeOption = flag MultipleRecords SingleRecord
           \is to encode transactions on mulitple lines, one \
           \per posting.")
 
+validationOption :: Parser Bool
+validationOption = flag True False
+   ( long "no-validation"
+  <> short 'n'
+  <> help "Does not perform any validation on the JOURNAL-FILE. \
+          \Use this option to export to CSV and keep the unspecified optional \
+          \field empty in the CSV. Othewise validation will fill in the missing \
+          \values.")
+
 transactionsCommand :: Parser Command
 transactionsCommand = CTransactions
                <$> (TransactionsCommand
@@ -115,7 +124,8 @@ transactionsCommand = CTransactions
                    <*> csvFile
                    <*> startDate
                    <*> endDate
-                   <*> txnDecodeOption)
+                   <*> txnDecodeOption
+                   <*> validationOption)
 
 transactionsInfo :: ParserInfo Command
 transactionsInfo = info (transactionsCommand <**> helper)
