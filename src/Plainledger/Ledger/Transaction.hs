@@ -201,9 +201,7 @@ multipleRecordsHeader = ["date",
 encodeTransactions :: CscEncodeOptions -> [JTransaction] -> ByteString
 encodeTransactions EncodeAsSingleRecord xs =
   let tagH = tagHeader $ concatMap tTags xs
-      maxPostings = if null xs
-                    then 2
-                    else maximum $ map (length . tPostings) xs
+      maxPostings = maximum $ 2 : map (length . tPostings) xs
       header = toRecord
              $ ["date", "transaction id"]
              ++ postingsHeader 1 maxPostings
