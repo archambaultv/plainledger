@@ -109,9 +109,9 @@ findColumnM :: (MonadError Error m, FromField b) =>
 findColumnM x m f =
   case HM.lookup x m of
     Nothing -> throwError
-               $ "Field \""
+               $ "Field " 
                ++ (show x)
-               ++ "\" is not in the CSV header."
+               ++ " is not in the CSV header."
     Just v -> do
       b <- either throwError return $ runParser $ parseField v
       f b
