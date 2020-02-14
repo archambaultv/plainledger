@@ -262,7 +262,7 @@ decodeTransactions SingleRecord bs = do
                     HM.HashMap Field Field -> m JTransaction
         fromLine notTags m = do
           date <- findColumnM "date" m parseISO8601M
-          tId <- findColumn "transaction id" m
+          tId <- findColumnDefault "" "transaction id" m
           ps <- lineToPostings m 1
           tags <- recordToTags m  notTags
           return $ Transaction date tId ps tags
