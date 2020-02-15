@@ -1,0 +1,6 @@
+- id: Compte épargne
+  name: Compte épargne de Yvon
+  number: 1025
+  group: Actif
+  tags:
+    - id: Banque

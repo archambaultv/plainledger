@@ -10,13 +10,16 @@
 
 module Plainledger.Ledger.Balance (
   Balance(..),
-  validateBalances
+  validateBalances,
+  decodeBalanceFile
   )
 where
 
 import Control.Monad.Except
 import Data.Time
 import Data.Scientific
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector as V
 import qualified Data.Csv as C
 import Data.Csv (FromRecord(..),
                  FromNamedRecord(..),
@@ -35,6 +38,7 @@ import Data.Aeson (pairs)
 import Plainledger.Ledger.Amount
 import Plainledger.Ledger.Day
 import Plainledger.Error
+import Plainledger.Internal.Utils
 import Plainledger.Ledger.Account
 
 -- | The Balance data type reprensents an assertion about the total of an
@@ -124,3 +128,12 @@ instance ToNamedRecord Balance where
 
 instance DefaultOrdered Balance where
   headerOrder _ = record ["date","account","amount","commodity"]
+
+decodeBalanceFile :: String -> IO [Balance]
+decodeBalanceFile f = do
+  fType <- either fail return $ isDecodableFile f
+  case fType of
+    YamlFile -> Y.decodeFileThrow f
+    CsvFile -> do
+        csvBS <- BL.readFile f
+        either fail (return . V.toList . snd) $ C.decodeByName csvBS

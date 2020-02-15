@@ -1,0 +1,18 @@
+- date: 2019-01-23
+  postings:
+  - account: Mastercard
+    amount: -40
+  - account: Musique
+
+- date: 2019-02-15
+  postings:
+  - account: Work
+    amount: 1450
+
+  - account: Chequing
+
+  - account: Impôt non payé
+    amount: -200
+
+  - account: Impôt fédéral
+    amount: 200

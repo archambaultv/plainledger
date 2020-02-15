@@ -18,6 +18,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 import Plainledger.CLI.Command
 import Plainledger.Ledger
+import Plainledger.Journal
 
 -- / Reads the journal file and the exports the accounts in CSV format
 runFromCsv :: FromCsvCommand -> IO ()

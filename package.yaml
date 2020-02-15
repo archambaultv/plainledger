@@ -36,6 +36,7 @@ dependencies:
 - hashable
 - mtl
 - optparse-applicative
+- filepath
 
 ghc-options:
 - -Wall

@@ -10,6 +10,7 @@ import Test.Tasty.HUnit
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
+import Plainledger.Journal
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BS
 

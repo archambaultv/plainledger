@@ -13,12 +13,14 @@ module Plainledger.Ledger.Account (
   encodeAccounts,
   decodeAccounts,
   validateAccounts,
-  accountsToHashMap
+  accountsToHashMap,
+  decodeAccountsFile
   )
 where
 
 import Control.Monad.Except
 import Data.Aeson as A
+import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (Record, Field, ToField(..),toRecord)
 import Data.HashMap.Strict (HashMap)
@@ -29,6 +31,7 @@ import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import GHC.Generics
 import Plainledger.Error
 import Plainledger.Internal.Csv
+import Plainledger.Internal.Utils
 import Plainledger.Ledger.Configuration
 import Plainledger.Ledger.Tag
 import Prelude hiding (lines)
@@ -199,3 +202,12 @@ decodeAccounts bs = do
           subsubgroup <- findColumnDefault "" "subsubgroup" m
           tags <- recordToTags m (HS.fromList coreHeader)
           return $ Account id' name number group subgroup subsubgroup tags
+
+decodeAccountsFile :: String -> IO [Account]
+decodeAccountsFile f = do
+  fType <- either fail return $ isDecodableFile f
+  case fType of
+    YamlFile -> Y.decodeFileThrow f
+    CsvFile -> do
+        csvBS <- BL.readFile f
+        either fail return $ decodeAccounts csvBS

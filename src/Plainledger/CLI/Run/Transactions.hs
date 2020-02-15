@@ -18,6 +18,7 @@ import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
 import Plainledger.Ledger
+import Plainledger.Journal
 
 -- / Reads the journal file and the exports the transactions in CSV format
 runTransactions :: TransactionsCommand -> IO ()
