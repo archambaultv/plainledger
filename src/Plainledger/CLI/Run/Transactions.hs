@@ -23,7 +23,8 @@ import Plainledger.Journal
 -- / Reads the journal file and the exports the transactions in CSV format
 runTransactions :: TransactionsCommand -> IO ()
 runTransactions c = do
-     journal <- Y.decodeFileThrow (tcYamlFile c)
+     journalFile <- Y.decodeFileThrow (tcYamlFile c)
+     journal <- journalFileToJournal (tcYamlFile c) journalFile
      let txns =  if tcValidation c
                  then (map transactionToJTransaction . lTransactions)
                       <$> journalToLedger journal
