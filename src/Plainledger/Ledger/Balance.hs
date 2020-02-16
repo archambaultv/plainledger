@@ -37,9 +37,11 @@ import Control.Monad (mzero)
 import Data.Aeson (pairs)
 import Plainledger.Ledger.Amount
 import Plainledger.Ledger.Day
+import Plainledger.Ledger.Transaction
+import qualified Data.HashSet as HS
+import Data.HashSet (HashSet)
 import Plainledger.Error
 import Plainledger.Internal.Utils
-import Plainledger.Ledger.Account
 
 -- | The Balance data type reprensents an assertion about the total of an
 -- account at a particular date.
@@ -57,15 +59,31 @@ data Balance = Balance
 --  Asserts all balance assertions are correct
 validateBalances :: (MonadError Error m) =>
                       Commodity ->
-                      [Account] ->
+                      HashSet T.Text ->
+                      [Transaction] ->
                       [Balance] ->
                       m [Balance]
-validateBalances defComm _ x =
-  let b1 = map (\c -> if T.null $ bCommodity c
-                      then c{bCommodity = defComm}
-                      else c)
-           x
-  in return b1
+validateBalances defComm accs _ bs =
+  let b1 = fillCommodity bs
+  in do
+    _ <- traverse (checkBalanceAccount accs) b1
+    return b1
+
+  where checkBalanceAccount :: (MonadError Error m) =>
+                                HashSet T.Text -> Balance -> m ()
+        checkBalanceAccount s b =
+          if HS.member (bAccount b) s
+          then return ()
+          else throwError
+               $ "Unknown account id \""
+               ++ T.unpack (bAccount b)
+               ++ "\"."
+
+        fillCommodity xs =
+               map (\c -> if T.null $ bCommodity c
+                          then c{bCommodity = defComm}
+                          else c)
+                   xs
 
 -- FromJSON instances
 instance FromJSON Balance where

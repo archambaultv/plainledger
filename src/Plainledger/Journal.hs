@@ -34,7 +34,7 @@ import Plainledger.Journal.JTransaction
 import Control.Monad.Except
 import Plainledger.Error
 import System.FilePath
-
+import qualified Data.HashSet as HS
 
 type Journal = LedgerF JTransaction
 
@@ -85,7 +85,10 @@ journalToLedger (Ledger config accounts txns bals) = do
                    (cDefaultCommodity config)
                    accounts
                    txns
-  balances' <- validateBalances (cDefaultCommodity config) accounts bals
+  balances' <- validateBalances (cDefaultCommodity config)
+               (HS.fromList $ map aId accounts)
+               transactions'
+               bals
   return $ Ledger config accounts transactions' balances'
 
 -- | The Data.Yaml.Pretty configuration object created so that the

@@ -82,7 +82,8 @@ validationTestTree =
                      ++ show nbTransactions
                      ++ ".\n"
                      -- ++ show Transactions
-               else traverse validateTransactionId transactions >> return ()
+               else traverse validateTransactionId transactions >> return (),
+      validationFailure "validate-balance-valid-account-id.yaml"
     ]
 
 csvTestTree :: TestTree

@@ -1,0 +1,26 @@
+
+configuration:
+  default-commodity: CAD
+  opening-balance-account: Compte chèque
+  earnings-account: Compte chèque
+  group-mapping:
+    asset: [Actif]
+    liability: [Passif]
+    equity: [Avoir]
+    revenue: [Revenu]
+    expense: [Dépense]
+
+
+accounts:
+- id: Compte chèque
+  number: 1005
+  group: Avoir
+
+transactions: []
+
+# Balance assertions
+balance-assertions:
+- date: 2018-11-30
+  account: Compte chèqu # Wrong account id name
+  amount: 1456
+  commodity: CAD
