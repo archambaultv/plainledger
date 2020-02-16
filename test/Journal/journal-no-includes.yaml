@@ -83,17 +83,6 @@ transactions:
     amount: -40
   - account: Musique
 
-- date: 2018-10-12
-  postings:
-  - account: Compte chèque
-    amount: 250
-    commodity: CAD
-  - account: Compte épargne
-
-  tags:
-  - id: Note
-    value: Budget film non utilisé.
-
 - date: 2019-02-15
   postings:
   - account: Work
@@ -106,6 +95,17 @@ transactions:
 
   - account: Impôt fédéral
     amount: 200
+
+- date: 2018-10-12
+  postings:
+  - account: Compte chèque
+    amount: 250
+    commodity: CAD
+  - account: Compte épargne
+
+  tags:
+  - id: Note
+    value: Budget film non utilisé.
 
 # Balance assertions
 balance-assertions:

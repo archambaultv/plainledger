@@ -33,6 +33,7 @@ import Plainledger.Journal.JPosting
 import Plainledger.Journal.JTransaction
 import Control.Monad.Except
 import Plainledger.Error
+import System.FilePath
 
 
 type Journal = LedgerF JTransaction
@@ -45,12 +46,12 @@ data JournalFile = JournalFile {
 } deriving (Show, Eq)
 
 -- Reads the include files in the journal file
-journalFileToJournal :: JournalFile -> IO Journal
-journalFileToJournal (JournalFile j ai ti bi) = do
-  -- fixme : Should verify the directory
-  acc <- fmap concat $ traverse (decodeAccountsFile) ai
-  txns <- fmap concat $ traverse (decodeJTransactionsFile) ti
-  bals <- fmap concat $ traverse (decodeBalanceFile) bi
+journalFileToJournal :: FilePath -> JournalFile -> IO Journal
+journalFileToJournal path (JournalFile j ai ti bi) = do
+  let dir = takeDirectory path
+  acc <- fmap concat $ traverse (decodeAccountsFile) (map (dir </>) ai)
+  txns <- fmap concat $ traverse (decodeJTransactionsFile) (map (dir </>) ti)
+  bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
   return j{lAccounts = lAccounts j ++ acc,
            lTransactions = lTransactions j ++ txns,
            lBalances = lBalances j ++ bals}

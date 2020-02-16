@@ -42,7 +42,10 @@ syntaxTestTree =
       after AllSucceed "Decode ledger-syntax.yaml" $
        testCase "Includes" $ do
         journalFile <- decodeFileThrow journalPath :: IO JournalFile
-        journal <- journalFileToJournal journalFile
+        journal <- journalFileToJournal journalPath journalFile
         journal2 <- decodeFileThrow (dir ++ "journal-no-includes.yaml") :: IO Journal
-        journal @?= journal2
+        (lConfiguration journal) @?= (lConfiguration journal2)
+        (lAccounts journal) @?= (lAccounts journal2)
+        (lTransactions journal) @?= (lTransactions journal2)
+        (lBalances journal) @?= (lBalances journal2)
     ]

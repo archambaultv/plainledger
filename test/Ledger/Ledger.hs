@@ -69,7 +69,7 @@ validationTestTree =
       validationFailure "validate-account-id-duplicate.yaml",
       validationFailure "validate-account-id-non-null.yaml",
       validationFailure "validate-transaction-id-dup.yaml",
-      testCase "transaction id" $ do
+      testCase "generate transaction id" $ do
          journal <- decodeFileThrow (dir ++ "validate-transaction-id-new.yaml")
          case journalToLedger journal of
            Left err -> assertFailure err

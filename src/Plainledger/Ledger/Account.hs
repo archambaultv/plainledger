@@ -203,7 +203,7 @@ decodeAccounts bs = do
           tags <- recordToTags m (HS.fromList coreHeader)
           return $ Account id' name number group subgroup subsubgroup tags
 
-decodeAccountsFile :: String -> IO [Account]
+decodeAccountsFile :: FilePath -> IO [Account]
 decodeAccountsFile f = do
   fType <- either fail return $ isDecodableFile f
   case fType of
