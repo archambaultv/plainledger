@@ -94,7 +94,7 @@ instance FromJSON Account where
   parseJSON (Y.Object v) =
     Account
     <$> v .: "id"
-    <*> (v .:? "name" >>= maybe (v .: "id") return)
+    <*> (maybe "" id <$> (v .:? "name"))
     <*> v .: "number"
     <*> v .: "group"
     <*> (maybe "" id <$> (v .:? "subgroup"))
