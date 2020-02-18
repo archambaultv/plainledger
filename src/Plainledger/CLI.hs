@@ -17,7 +17,7 @@ import Data.Semigroup ( (<>) )
 import Options.Applicative
 import Plainledger.CLI.Command
 import Plainledger.CLI.Run
-import Plainledger.Ledger.Day
+import Plainledger.Journal.Day
 
 dateparser :: Char -> String -> String -> String -> Parser (Maybe Day)
 dateparser shortOption optionStr helpStr meta = option

@@ -10,31 +10,50 @@
 
 module Plainledger.Ledger.Posting (
   PostingF(..),
-  Posting
+  Posting,
+  balancePostings,
+  postingToJPosting
   )
 where
 
-
+import Data.Maybe
+import Data.List
 import Control.Monad.Except
 import Data.Time
-import GHC.Generics hiding (to, from)
-import Plainledger.Ledger.Amount
+import Plainledger.Journal.Amount
+import Plainledger.Journal
+import Plainledger.Error
 import Prelude hiding (lines)
-import qualified Data.Text as T
 import Data.Bifunctor
 
--- | The Posting data type reprensents the change in the balance of an account.
--- Transactions are made of at least two postings.
-data PostingF d q = Posting
-  {
-    pBalanceDate :: d,
-    pAccount :: T.Text,
-    pAmount :: q,
-    pCommodity :: Commodity
-  } deriving (Eq, Show, Generic, Functor)
+type Posting = PostingF Day Day Quantity
 
-instance Bifunctor PostingF where
-  first f (Posting b a amnt c) = Posting (f b) a amnt c
-  second f (Posting b a amnt c) = Posting b a (f amnt) c
+postingToJPosting :: PostingF d1 d2 q -> PostingF () (Maybe d2) (Maybe q)
+postingToJPosting = setPostingDate () . first Just . fmap Just
 
-type Posting = PostingF Day Quantity
+-- | Asserts a zero balance
+balancePostings :: (MonadError Error m) =>
+                    [PostingF Day Day (Maybe Quantity)] ->
+                    m [Posting]
+balancePostings [] =
+  throwError "Expecting at least two postings per transaction."
+balancePostings [_] =
+  throwError "Expecting at least two postings per transaction."
+balancePostings ps =
+  let (noAmount, withAmount)  = partition (isNothing . pAmount) ps
+      withAmount' = map (\p -> p{pAmount = fromJust (pAmount p)}) withAmount
+      s :: Quantity
+      s = sum $ map pAmount withAmount'
+  in case noAmount of
+        [] -> if s == 0
+              then return withAmount'
+              else throwError
+                   $ "Unbalanced transaction. The balance is "
+                   ++ show s
+                   ++ " for commodity "
+                   ++ (show $ pCommodity $ head withAmount)
+                   ++ ". All transaction must balance to zero."
+        [x] -> let x' :: Posting
+                   x' = fromAmount (negate s) x
+               in return $ x' : withAmount'
+        _ -> throwError "Two postings without amount."

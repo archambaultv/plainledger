@@ -17,7 +17,7 @@ module Plainledger.CLI.Command.Transactions
 where
 
 import Data.Time
-import Plainledger.Journal.JTransaction (CsvDecodeOptions(..))
+import Plainledger.Journal.Transaction (CsvDecodeOptions(..))
 
 type CsvEncodeFormat = CsvDecodeOptions
 

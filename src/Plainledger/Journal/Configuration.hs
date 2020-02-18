@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Ledger.Configuration
+-- Module      :  Plainledger.Journal.Configuration
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,7 +8,7 @@
 --
 -- This module defines the Configuration object of the journal file
 
-module Plainledger.Ledger.Configuration (
+module Plainledger.Journal.Configuration (
   Configuration(..),
   AccountGroup(..),
   validateConfig
@@ -24,7 +24,7 @@ import Data.Tuple (swap)
 import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.=))
 import GHC.Generics
 import Plainledger.Error
-import Plainledger.Ledger.Amount
+import Plainledger.Journal.Amount
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 import qualified Data.Yaml as Y

@@ -2,17 +2,11 @@ module Journal.Journal (
   journalTestTree
   )where
 
-import Data.Maybe
-import Data.List
-import Data.Ord
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
-import Plainledger.Journal
-import qualified Data.Text as T
-import qualified Data.ByteString.Lazy as BS
 
 
 dir :: String
@@ -44,8 +38,8 @@ syntaxTestTree =
         journalFile <- decodeFileThrow journalPath :: IO JournalFile
         journal <- journalFileToJournal journalPath journalFile
         journal2 <- decodeFileThrow (dir ++ "journal-no-includes.yaml") :: IO Journal
-        (lConfiguration journal) @?= (lConfiguration journal2)
-        (lAccounts journal) @?= (lAccounts journal2)
-        (lTransactions journal) @?= (lTransactions journal2)
-        (lBalances journal) @?= (lBalances journal2)
+        (jConfiguration journal) @?= (jConfiguration journal2)
+        (jAccounts journal) @?= (jAccounts journal2)
+        (jTransactions journal) @?= (jTransactions journal2)
+        (jBalances journal) @?= (jBalances journal2)
     ]

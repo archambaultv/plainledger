@@ -1,3 +1,4 @@
+# Configuration options
 configuration:
   default-commodity: CAD
   opening-balance-account: Compte chèque
@@ -9,14 +10,14 @@ configuration:
     revenue: [Revenu]
     expense: [Dépense]
 
+# Chart of accounts
 accounts:
 - id: Compte chèque
   number: 1005
   group: Avoir
-- id: Compte chèque # <- Duplicate account id
-  number: 1010
-  group: Avoir
+
 
 transactions: []
 
+# Balance assertions
 balance-assertions: []

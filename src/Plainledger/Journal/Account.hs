@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Ledger.Account
+-- Module      :  Plainledger.Journal.Account
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,7 +8,7 @@
 --
 -- This module defines the account data type.
 
-module Plainledger.Ledger.Account (
+module Plainledger.Journal.Account (
   Account(..),
   encodeAccounts,
   decodeAccounts,
@@ -32,8 +32,8 @@ import GHC.Generics
 import Plainledger.Error
 import Plainledger.Internal.Csv
 import Plainledger.Internal.Utils
-import Plainledger.Ledger.Configuration
-import Plainledger.Ledger.Tag
+import Plainledger.Journal.Configuration
+import Plainledger.Journal.Tag
 import Prelude hiding (lines)
 import qualified Data.Csv as C
 import qualified Data.HashMap.Strict as HM

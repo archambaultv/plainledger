@@ -33,7 +33,7 @@ import qualified Data.HashSet as HS
 import Data.HashSet (HashSet)
 import qualified Data.Vector as V
 import qualified Data.ByteString as BS
-import Plainledger.Ledger.Tag
+import Plainledger.Journal.Tag
 import Plainledger.Error
 import Data.Csv
 import Control.Monad.Except

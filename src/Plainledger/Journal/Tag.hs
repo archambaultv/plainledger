@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Ledger.Tag
+-- Module      :  Plainledger.Journal.Tag
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -9,7 +9,7 @@
 -- This module defines the Tags that can strore user information not needed by
 -- plainledger
 
-module Plainledger.Ledger.Tag (
+module Plainledger.Journal.Tag (
   Tag(..),
   tagToHashMap,
   tagToTuple,

@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Ledger.Amount
+-- Module      :  Plainledger.Journal.Amount
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,7 +8,7 @@
 --
 -- This module defines the type alias Quantity and Commodity
 
-module Plainledger.Ledger.Amount (
+module Plainledger.Journal.Amount (
   Quantity,
   Commodity
   )

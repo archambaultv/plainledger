@@ -10,14 +10,19 @@
 -- data types and functions related to the journal file.
 
 module Plainledger.Journal (
-  LedgerF(..),
+  JournalF(..),
   Journal,
   JournalFile(..),
   journalFileToJournal,
   yamlPrettyConfig,
-  journalToLedger,
-  module Plainledger.Journal.JPosting,
-  module Plainledger.Journal.JTransaction
+  module Plainledger.Journal.Posting,
+  module Plainledger.Journal.Transaction,
+  module Plainledger.Journal.Balance,
+  module Plainledger.Journal.Configuration,
+  module Plainledger.Journal.Account,
+  module Plainledger.Journal.Amount,
+  module Plainledger.Journal.Tag,
+  module Plainledger.Journal.Day
   )
 where
 
@@ -28,21 +33,31 @@ import qualified Data.Yaml.Pretty as P
 import Data.Yaml (FromJSON(..), (.:), ToJSON(..), (.=), (.:?))
 import qualified Data.Text as T
 import Data.Aeson (pairs)
-import Plainledger.Ledger
-import Plainledger.Journal.JPosting
-import Plainledger.Journal.JTransaction
-import Control.Monad.Except
-import Plainledger.Error
+import Plainledger.Journal.Posting
+import Plainledger.Journal.Transaction
+import Plainledger.Journal.Balance
+import Plainledger.Journal.Configuration
+import Plainledger.Journal.Account
+import Plainledger.Journal.Amount
+import Plainledger.Journal.Tag
+import Plainledger.Journal.Day
 import System.FilePath
-import qualified Data.HashSet as HS
 
-type Journal = LedgerF JTransaction
+data JournalF t = Journal
+  {jConfiguration :: Configuration,
+   jAccounts   :: [Account],
+   jTransactions :: [t],
+   jBalances :: [Balance]
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
+
+type Journal = JournalF JTransaction
 
 data JournalFile = JournalFile {
-    journal :: Journal,
-    accountsInclude :: [String],
-    transactionsInclude :: [String],
-    balanceInclude :: [String]
+    jfJournal :: Journal,
+    fjAccountsInclude :: [String],
+    fjTransactionsInclude :: [String],
+    fjBalanceInclude :: [String]
 } deriving (Show, Eq)
 
 -- Reads the include files in the journal file
@@ -52,44 +67,11 @@ journalFileToJournal path (JournalFile j ai ti bi) = do
   acc <- fmap concat $ traverse (decodeAccountsFile) (map (dir </>) ai)
   txns <- fmap concat $ traverse (decodeJTransactionsFile) (map (dir </>) ti)
   bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
-  return j{lAccounts = lAccounts j ++ acc,
-           lTransactions = lTransactions j ++ txns,
-           lBalances = lBalances j ++ bals}
+  return j{jAccounts = jAccounts j ++ acc,
+           jTransactions = jTransactions j ++ txns,
+           jBalances = jBalances j ++ bals}
 
--- | Converts the journal to a ledger.
--- journalToLedger verifies a series of properties that a valid ledger should
--- satisfies :
--- Configuration :
---  Asserts all members of the group mapping are non null
---  Asserts opening balance account is non null
---  Asserts earnings account is non null
---  Asserts default commodity is non null
--- Accounts :
---  Asserts all accounts group field are in the configuration group mapping.
---  Asserts all accounts Id are unique and non null
---  Asserts configuration earning and opening balance accounts truly exists
--- Transactions :
---  Asserts all transactions have valid unique transaction id
---  Asserts all transactions have valid postings
---  Asserts all transactions have a well defined commodity
---  Asserts all transactions balance to zero for all commodities
--- Balances :
---  Asserts all balance have a valid account field
---  Asserts all balance have a well defined commodity
---  Asserts all balance assertions are correct
-journalToLedger :: (MonadError Error m) => Journal -> m Ledger
-journalToLedger (Ledger config accounts txns bals) = do
-  validateConfig config
-  validateAccounts (cGroupMapping config) accounts
-  transactions' <- validateJTransactions
-                   (cDefaultCommodity config)
-                   accounts
-                   txns
-  balances' <- validateBalances (cDefaultCommodity config)
-               (HS.fromList $ map aId accounts)
-               transactions'
-               bals
-  return $ Ledger config accounts transactions' balances'
+
 
 -- | The Data.Yaml.Pretty configuration object created so that the
 -- fields in the yaml file follow the convention of this software.
@@ -135,7 +117,7 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
 -- FromJSON instances
 instance FromJSON Journal where
   parseJSON (Y.Object v) =
-    Ledger
+    Journal
     <$> v .: "configuration"
     <*> v .: "accounts"
     <*> v .: "transactions"
@@ -145,7 +127,7 @@ instance FromJSON Journal where
 instance FromJSON JournalFile where
   parseJSON (Y.Object v) =
     JournalFile
-    <$> (Ledger
+    <$> (Journal
       <$> v .: "configuration"
       <*> v .: "accounts"
       <*> v .: "transactions"
@@ -158,14 +140,14 @@ instance FromJSON JournalFile where
 
 -- To JSON instance
 instance ToJSON Journal where
-  toJSON (Ledger config accounts txns bals) =
+  toJSON (Journal config accounts txns bals) =
     Y.object
     $ ["configuration" .= config,
        "accounts" .= accounts,
        "transactions" .= txns,
        "balance-assertions" .= bals]
 
-  toEncoding (Ledger config accounts txns bals) =
+  toEncoding (Journal config accounts txns bals) =
     pairs
     $ "configuration"   .= config
     <> "accounts"   .= accounts
@@ -174,7 +156,7 @@ instance ToJSON Journal where
 
 -- To JSON instance
 instance ToJSON JournalFile where
-  toJSON (JournalFile (Ledger config accounts txns bals)
+  toJSON (JournalFile (Journal config accounts txns bals)
           accIncl txnsIncl balsIncl) =
     Y.object
     $ ["configuration" .= config,
@@ -185,7 +167,7 @@ instance ToJSON JournalFile where
        "balance-assertions" .= bals,
        "balance-assertions-include" .= balsIncl]
 
-  toEncoding (JournalFile (Ledger config accounts txns bals)
+  toEncoding (JournalFile (Journal config accounts txns bals)
               accIncl txnsIncl balsIncl) =
     pairs
     $ "configuration"   .= config

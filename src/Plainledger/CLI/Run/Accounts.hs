@@ -17,7 +17,6 @@ import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command (AccountsCommand(..))
 import Plainledger.Ledger
-import Plainledger.Journal
 
 -- / Reads the journal file and the exports the accounts in CSV format
 runAccounts :: AccountsCommand -> IO ()
@@ -28,4 +27,4 @@ runAccounts c = do
        Left err -> putStrLn err
        Right l -> BL.writeFile
                   (acCsvFile c)
-                  (encodeAccounts $ lAccounts l)
+                  (encodeAccounts $ jAccounts $ lJournal l)

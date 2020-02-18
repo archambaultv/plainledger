@@ -10,7 +10,6 @@ import Test.Tasty.HUnit
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
-import Plainledger.Journal
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BS
 
@@ -74,7 +73,7 @@ validationTestTree =
          case journalToLedger journal of
            Left err -> assertFailure err
            Right ledger ->
-            let transactions = lTransactions ledger
+            let transactions = jTransactions $ lJournal ledger
                 nbTransactions = length transactions
             in if nbTransactions /= 6
                then assertFailure
@@ -83,7 +82,12 @@ validationTestTree =
                      ++ ".\n"
                      -- ++ show Transactions
                else traverse validateTransactionId transactions >> return (),
-      validationFailure "validate-balance-valid-account-id.yaml"
+      validationFailure "validate-balance-valid-account-id.yaml",
+      testCase "balance assertion" $ do
+         journal <- decodeFileThrow (dir ++ "balance-assertions.yaml")
+         case journalToLedger journal of
+           Left err -> assertFailure err
+           Right _ -> return ()
     ]
 
 csvTestTree :: TestTree
@@ -91,43 +95,43 @@ csvTestTree =
   testGroup "CSV"
     [ testCase "Accounts : encode decode" $ do
        l <- Y.decodeFileThrow ledgerPath :: IO Journal
-       let encodeAcc = encodeAccounts $ lAccounts l
+       let encodeAcc = encodeAccounts $ jAccounts l
        csvAccounts <- either assertFailure return $ decodeAccounts encodeAcc
-       (lAccounts l) @?= csvAccounts,
+       (jAccounts l) @?= csvAccounts,
 
        testCase "JTransactions : encode decode single line" $ do
           j <- Y.decodeFileThrow ledgerPath
           let encodeAcc = encodeTransactions EncodeAsSingleRecord
-                        $ lTransactions j
+                        $ jTransactions j
           csvTransactions <- either assertFailure return
                             $ decodeTransactions SingleRecord encodeAcc
-          lTransactions j @?= csvTransactions,
+          jTransactions j @?= csvTransactions,
 
      testCase "Transactions : encode decode single line" $ do
         j <- Y.decodeFileThrow ledgerPath
         l <- either assertFailure return $ journalToLedger j
-        let txns = map transactionToJTransaction $ lTransactions l
+        let txns = map transactionToJTransaction $ jTransactions $ lJournal l
         let encodeAcc = encodeTransactions EncodeAsSingleRecord txns
         csvTransactions <- either assertFailure return
                           $ decodeTransactions SingleRecord encodeAcc
         txns @?= csvTransactions,
 
       testCase "JTransactions : encode decode multiple lines" $ do
-         j <- Y.decodeFileThrow (dir ++ "validate-csv-multiple-lines.yaml")
+         j <- Y.decodeFileThrow (dir ++ "csv-validate-multiple-lines.yaml")
          let encodeAcc = encodeTransactions EncodeAsMultipleRecords
-                       $ lTransactions j
+                       $ jTransactions j
          csvTransactions <- either assertFailure return
                            $ decodeTransactions MultipleRecords encodeAcc
-         (sortBy (comparing tTransactionId) (lTransactions j)) @?=
+         (sortBy (comparing tTransactionId) (jTransactions j)) @?=
            (sortBy (comparing tTransactionId) csvTransactions),
 
       testCase "JTransactions : no transaction single line" $ do
-         j <- Y.decodeFileThrow (dir ++ "transactions-no-line.yaml")
+         j <- Y.decodeFileThrow (dir ++ "csv-transactions-no-line.yaml")
          let encodeAcc = encodeTransactions EncodeAsSingleRecord
-                       $ lTransactions j
+                       $ jTransactions j
          csvTransactions <- either assertFailure return
                            $ decodeTransactions SingleRecord encodeAcc
-         lTransactions j @?= csvTransactions,
+         jTransactions j @?= csvTransactions,
 
       csvValidationFailure "csv-multiple-lines-no-transaction-id.csv"
                            MultipleRecords,

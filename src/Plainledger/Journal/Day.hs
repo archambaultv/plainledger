@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Ledger.Tag
+-- Module      :  Plainledger.Journal.Tag
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,7 +8,7 @@
 --
 -- This module defines helper functions for the Day data type
 
-module Plainledger.Ledger.Day (
+module Plainledger.Journal.Day (
   toISO8601,
   parseISO8601M
   )

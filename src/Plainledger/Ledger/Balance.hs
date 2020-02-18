@@ -6,52 +6,72 @@
 -- Maintainer  :  Vincent Archambault <archambault.v@gmail.com>
 -- Stability   :  experimental
 --
--- This module defines the Balance data type representing balance assertions.
 
 module Plainledger.Ledger.Balance (
-  Balance(..),
+  BalanceMap,
+  balanceAtDate,
+  balanceDelta,
   validateBalances,
-  decodeBalanceFile
+  dateAmount,
+  balanceDateAmount,
+  module Plainledger.Journal.Balance
   )
 where
 
-import Control.Monad.Except
+import Data.Maybe
 import Data.Time
-import Data.Scientific
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Vector as V
-import qualified Data.Csv as C
-import Data.Csv (FromRecord(..),
-                 FromNamedRecord(..),
-                 ToRecord(..),
-                 ToNamedRecord(..),
-                 ToField(..),
-                 (.!),
-                 record,
-                 namedRecord,
-                 DefaultOrdered)
-import qualified Data.Yaml as Y
-import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.=), (.:?))
+import Control.Monad.Except
 import qualified Data.Text as T
-import Control.Monad (mzero)
-import Data.Aeson (pairs)
-import Plainledger.Ledger.Amount
-import Plainledger.Ledger.Day
-import Plainledger.Ledger.Transaction
+import Plainledger.Journal.Amount
+import Plainledger.Journal.Balance
 import qualified Data.HashSet as HS
 import Data.HashSet (HashSet)
 import Plainledger.Error
-import Plainledger.Internal.Utils
+import qualified Data.Map.Strict as M
+import qualified Data.HashMap.Strict as HM
+import Data.HashMap.Strict (HashMap)
 
--- | The Balance data type reprensents an assertion about the total of an
--- account at a particular date.
-data Balance = Balance
-  {bDate :: Day,
-   bAccount   :: T.Text,
-   bAmount :: Quantity,
-   bCommodity :: Commodity
-  }
-  deriving (Eq, Show)
+-- / The BalanceMap type reprensents the balance of each accounts at each day.
+-- Only the dates where the balance changes are recorded.
+type BalanceMap = HashMap
+                  T.Text
+                  (HashMap Commodity (M.Map Day (Quantity, Quantity)))
+
+dateAmount :: (Quantity, Quantity) -> Quantity
+dateAmount = fst
+
+balanceDateAmount :: (Quantity, Quantity) -> Quantity
+balanceDateAmount = snd
+
+-- | balanceAtDate m d acc returns the balance of account acc at the date d. The
+-- balance is Nothing if the date is prior than any date in the map for this account.
+-- Calls error if the account does not exists
+balanceAtDate :: BalanceMap ->
+                 T.Text ->
+                 Commodity ->
+                 Day ->
+                 Maybe (Quantity, Quantity)
+balanceAtDate m acc comm d =
+  case HM.lookup acc m of
+    Nothing -> error
+               $ "balanceAtDate : Account \""
+               ++ T.unpack acc
+               ++ "\" is not in the balance map."
+    Just m2 -> HM.lookup comm m2 >>= M.lookupLE d >>= pure . snd
+
+-- | balanceDelta m d acc returns the difference in balance of account acc at the date d. The
+-- balance is Nothing if the date is prior than any date in the map for this account.
+-- Calls error if the account does not exists
+balanceDelta :: BalanceMap ->
+                Day ->
+                Day ->
+                T.Text ->
+                Commodity ->
+                (Quantity, Quantity)
+balanceDelta m d1 d2 acc comm =
+  let (m11, m12) = fromMaybe (0,0) $ balanceAtDate m acc comm d1
+      (m21, m22) = fromMaybe (0,0) $ balanceAtDate m acc comm d2
+  in (m21 - m11, m22 - m12)
 
 -- Balances :
 --  Asserts all balance have a valid account field
@@ -60,13 +80,14 @@ data Balance = Balance
 validateBalances :: (MonadError Error m) =>
                       Commodity ->
                       HashSet T.Text ->
-                      [Transaction] ->
+                      BalanceMap ->
                       [Balance] ->
                       m [Balance]
-validateBalances defComm accs _ bs =
+validateBalances defComm accs balMap bs =
   let b1 = fillCommodity bs
   in do
     _ <- traverse (checkBalanceAccount accs) b1
+    _ <- traverse (checkBalanceAmount balMap) b1
     return b1
 
   where checkBalanceAccount :: (MonadError Error m) =>
@@ -85,73 +106,32 @@ validateBalances defComm accs _ bs =
                           else c)
                    xs
 
--- FromJSON instances
-instance FromJSON Balance where
-  parseJSON (Y.Object v) =
-    Balance
-    <$> v .: "date"
-    <*> v .: "account"
-    <*> (v .: "amount" >>= Y.withScientific "amount" (return . realToFrac))
-    <*> (maybe "" id <$> (v .:? "commodity"))
-  parseJSON _ = fail "Expected Object for Balance value"
-
-instance ToJSON Balance where
-  toJSON (Balance date acc amnt com) =
-    Y.object
-    $ ["date" .= date,
-       "account" .= acc,
-       "amount" .= (realToFrac amnt :: Scientific),
-       "commodity" .= com]
-
-  toEncoding (Balance date acc amnt com) =
-    pairs
-    $  "date"  .= date
-    <> "account"   .= acc
-    <> "amount" .= (realToFrac amnt :: Scientific)
-    <> "commodity" .= com
-
-instance FromRecord Balance where
-    parseRecord v
-        | length v == 4 = Balance
-                          <$> (v .! 0 >>= either fail return . parseISO8601M)
-                          <*> v .! 1
-                          <*> (realToFrac <$>
-                               (v .! 2 >>= C.parseField :: C.Parser Scientific))
-                          <*> v .! 3
-        | otherwise     = mzero
-
-instance FromNamedRecord Balance where
-    parseNamedRecord m =
-      Balance
-      <$> (m C..: "date" >>= either fail return . parseISO8601M)
-      <*> m C..: "account"
-      <*> (read <$> m C..: "amount")
-      <*> m C..: "commodity"
-
-instance ToRecord Balance where
-    toRecord (Balance d acc amnt com) =
-      record [
-      toField (toISO8601 d),
-      toField acc,
-      toField (realToFrac amnt :: Scientific),
-      toField com]
-
-instance ToNamedRecord Balance where
-    toNamedRecord (Balance d acc amnt com) =
-      namedRecord [
-        "date" C..= (toISO8601 d),
-        "account" C..= acc,
-        "amount" C..= (realToFrac amnt :: Scientific),
-        "commodity" C..= com]
-
-instance DefaultOrdered Balance where
-  headerOrder _ = record ["date","account","amount","commodity"]
-
-decodeBalanceFile :: String -> IO [Balance]
-decodeBalanceFile f = do
-  fType <- either fail return $ isDecodableFile f
-  case fType of
-    YamlFile -> Y.decodeFileThrow f
-    CsvFile -> do
-        csvBS <- BL.readFile f
-        either fail (return . V.toList . snd) $ C.decodeByName csvBS
+        checkBalanceAmount :: (MonadError Error m) =>
+                              BalanceMap -> Balance -> m ()
+        checkBalanceAmount m b =
+          let bAtDate = balanceDateAmount
+                      <$> balanceAtDate m (bAccount b) (bCommodity b) (bDate b)
+          in case (bAtDate, bAmount b) of
+               (Nothing, 0) -> return ()
+               (Nothing, x) ->
+                      throwError
+                      $ "Balance assertion failed for account \""
+                      ++ T.unpack (bAccount b)
+                      ++ "\" on date "
+                      ++ show (bDate b)
+                      ++ ".\nAsserted balance : "
+                      ++ show x
+                      ++ "\nComputed balance : 0 (no transaction for \
+                         \this account)"
+               (Just y, x) | y /= x ->
+                    throwError
+                     $ "Balance assertion failed for account \""
+                     ++ T.unpack (bAccount b)
+                     ++ "\" on date "
+                     ++ show (bDate b)
+                     ++ ".\nAsserted balance : "
+                     ++ show x
+                     ++ "\nComputed balance : "
+                     ++ show y
+                     ++ "."
+               _ -> return ()

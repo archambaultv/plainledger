@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.Journal.JTransaction
+-- Module      :  Plainledger.Journal.Transaction
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,12 +8,10 @@
 --
 -- This module defines the JTransaction data type.
 
-module Plainledger.Journal.JTransaction (
+module Plainledger.Journal.Transaction (
   TransactionF(..),
   JTransaction,
   decodeJTransactionsFile,
-  validateJTransactions,
-  transactionToJTransaction,
   encodeTransactions,
   decodeTransactions,
   CscEncodeOptions(..),
@@ -24,7 +22,6 @@ where
 import Data.Function
 import Data.List hiding (lines)
 import Data.Maybe
-import Text.Printf (printf)
 import Control.Monad.Except
 import Data.Aeson (pairs)
 import Data.ByteString.Lazy (ByteString)
@@ -36,9 +33,12 @@ import Data.Time
 import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import Plainledger.Error
 import Plainledger.Internal.Csv
-import Plainledger.Ledger
-import Plainledger.Journal.JPosting
+import Plainledger.Journal.Posting
 import Plainledger.Internal.Utils
+import Plainledger.Journal.Tag
+import Plainledger.Journal.Amount
+import Plainledger.Journal.Day
+import GHC.Generics hiding (to, from)
 import qualified Data.ByteString.Lazy as BL
 import Prelude hiding (lines)
 import qualified Data.Csv as C
@@ -49,81 +49,24 @@ import qualified Data.Text as T
 import qualified Data.Yaml as Y
 import qualified Data.Vector as V
 
+data TransactionF p = Transaction
+  {
+    tDate :: Day,
+    tTransactionId :: T.Text,
+    tPostings :: [p],
+    tTags :: [Tag]
+  } deriving (Show, Generic, Functor)
 
+-- / We sort the tags when comparing two TransactionF
+-- The Eq instance is mainly used in the unittests. In a validated ledger,
+-- you can rely on the aId to identify an account.
+instance (Eq p) => Eq (TransactionF p) where
+  a1 == a2 =  tDate a1 == tDate a2
+           && tTransactionId a1 == tTransactionId a2
+           && tPostings a1 == tPostings a2
+           && sortBy (comparing tagId) (tTags a1) ==
+              sortBy (comparing tagId) (tTags a2)
 type JTransaction = TransactionF JPosting
-
-transactionToJTransaction :: Transaction -> JTransaction
-transactionToJTransaction t = fmap postingToJPosting t
-
--- | Asserts all transactions have valid unique transaction id
---  Asserts all transactions have valid postings
---  Asserts all transactions have a well defined commodity
---  Asserts all transactions balance to zero for all commodities
-validateJTransactions :: (MonadError Error m) =>
-                      Commodity ->
-                      [Account] ->
-                      [JTransaction] ->
-                      m [Transaction]
-validateJTransactions defComm _ jtransactions = do
-    transactions <- traverse (jtransactionToTransaction defComm) jtransactions
-    transactions1 <- validateTransactionsId transactions
-    return transactions1
-
-
-jtransactionToTransaction :: (MonadError Error m) =>
-                             Commodity -> JTransaction -> m Transaction
-jtransactionToTransaction defComm (Transaction d tId p tags) =
-  -- First we update the balance-date and commodity field of each posting,
-  -- then group the postings by commodity
-  let ps :: [PostingF Day (Maybe Quantity)]
-      ps = map (fromCommodity defComm . fromBalanceDate d) p
-
-      psGroup = groupBy ((==) `on` pCommodity)
-                $ sortBy (comparing pCommodity) ps
-  in do
-    -- Now for each commodity we balance the postings to zero
-    ps2 <- concat <$> traverse balancePostings psGroup
-    return $ Transaction d tId ps2 tags
-
--- Create an id of the form YYYY-MM-DD-N where N is a number if the field
--- transaction id is null
-validateTransactionsId :: (MonadError Error m) =>
-                           [Transaction] -> m [Transaction]
-validateTransactionsId ts = do
-    let (noId, withId) = partition (T.null . tTransactionId) ts
-    validateTransactionsIdNoDup withId
-    let knownIds = HS.fromList (map tTransactionId withId)
-    -- Now what we have to do :
-    -- 1) Group by date
-    -- 2) Add a number to the date without clashing with the knownIds to
-    --    generate an id of the form YYYY-MM-DD-N
-    let groupDate = groupBy ((==) `on` tDate) $ sortBy (comparing tDate) noId
-    return $ concatMap (createId knownIds 1) groupDate ++ withId
-
-  where createId :: HS.HashSet T.Text ->
-                    Int ->
-                    [Transaction] ->
-                    [Transaction]
-        createId _ _ [] = []
-        createId knownIds n (t:tss) =
-          let tId = T.pack $ show (tDate t) ++ "-" ++ printf "%02d" n
-          in if HS.member tId knownIds
-             then createId knownIds (n + 1) (t:tss)
-             else t{tTransactionId = tId} : createId knownIds (n + 1) tss
-
-validateTransactionsIdNoDup :: (MonadError Error m) =>
-                               [Transaction] ->
-                               m ()
-validateTransactionsIdNoDup xs =
-  let dup = findDuplicates (map tTransactionId xs)
-  in if null dup
-     then return ()
-     else throwError
-          $ "Duplicate transaction id : "
-          ++ (intercalate " "
-             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
-             $ dup)
-          ++ "."
 
 instance ToJSON JTransaction where
   toJSON (Transaction date tId postings tags) =
@@ -287,7 +230,7 @@ decodeTransactions SingleRecord bs = do
                         (\case  {"" -> return Nothing;
                                  v -> Just <$> parseISO8601M v})
 
-                let p = Posting bal acc amnt comm
+                let p = Posting () bal acc amnt comm
                 return $ p : ps
 
 decodeTransactions MultipleRecords bs = do
@@ -317,7 +260,7 @@ decodeTransactions MultipleRecords bs = do
                   (\case  {"" -> return Nothing;
                            v -> Just <$> parseISO8601M v})
           tags <- recordToTags m  (HS.fromList multipleRecordsHeader)
-          return $ Transaction date tId [Posting bal acc amnt comm] tags
+          return $ Transaction date tId [Posting () bal acc amnt comm] tags
 
         regroupTransactions :: (MonadError Error m) =>
                                [JTransaction] -> m JTransaction
