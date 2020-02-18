@@ -30,7 +30,7 @@ import qualified Data.HashSet as HS
 
 data Ledger = Ledger {
   lJournal :: JournalF Transaction,
-  balanceMap :: BalanceMap
+  lBalanceMap :: BalanceMap
 }
 
 -- | Converts the journal to a ledger.
