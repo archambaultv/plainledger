@@ -17,9 +17,11 @@ import Plainledger.CLI.Command
 import Plainledger.CLI.Run.Accounts
 import Plainledger.CLI.Run.FromCsv
 import Plainledger.CLI.Run.Transactions
+import Plainledger.CLI.Run.TrialBalance
 
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
 runCommand (CAccounts x) = runAccounts x
 runCommand (CFromCsv x) = runFromCsv x
 runCommand (CTransactions x) = runTransactions x
+runCommand (CTrialBalance x) = runTrialBalance x
