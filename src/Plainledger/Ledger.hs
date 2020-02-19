@@ -60,10 +60,10 @@ journalToLedger :: (MonadError Error m) => Journal -> m Ledger
 journalToLedger (Journal config accounts txns bals) = do
   validateConfig config
   let gMapping = cGroupMapping config
-  validateAccounts (cGroupMapping config) accounts
+  accounts' <- validateAccounts (cGroupMapping config) accounts
   let accMap = HM.fromList
-              $ map (\a -> (aId a, (gMapping HM.! aGroup a, a))) accounts
-  let accSet = HS.fromList $ map aId accounts
+              $ map (\a -> (aId a, (gMapping HM.! aGroup a, a))) accounts'
+  let accSet = HS.fromList $ map aId accounts'
   (balanceMap, balanceAssertionMap, transactions') <- validateJTransactions
                    (cDefaultCommodity config)
                    accSet
@@ -72,6 +72,6 @@ journalToLedger (Journal config accounts txns bals) = do
                accSet
                balanceAssertionMap
                bals
-  return $ Ledger (Journal config accounts transactions' balances')
+  return $ Ledger (Journal config accounts' transactions' balances')
                   balanceMap
                   accMap

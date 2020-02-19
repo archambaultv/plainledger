@@ -108,12 +108,15 @@ accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
 validateAccounts :: (MonadError Error m) =>
                       HashMap T.Text AccountGroup ->
                       [Account] ->
-                      m ()
+                      m [Account]
 validateAccounts m accounts = do
   validateGroupField m accounts
   validateAccountIdNonNull accounts
   validateAccountIdNoDup accounts
-  return ()
+  let accWithNames = map
+                     (\a -> if T.null (aName a) then a{aName = aId a} else a)
+                     accounts
+  return accWithNames
 
 validateAccountIdNonNull :: (MonadError Error m) =>
                             [Account] ->
