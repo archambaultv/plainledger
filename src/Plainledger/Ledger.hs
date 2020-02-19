@@ -25,13 +25,15 @@ import Plainledger.Journal
 import Plainledger.Ledger.Balance
 import Plainledger.Ledger.Posting
 import Plainledger.Ledger.Transaction
+import qualified Data.Text as T
 import qualified Data.HashSet as HS
-
+import qualified Data.HashMap.Strict as HM
 
 data Ledger = Ledger {
   lJournal :: JournalF Transaction,
-  lBalanceMap :: BalanceMap
-}
+  lBalanceMap :: BalanceMap,
+  lAccounts :: HM.HashMap T.Text (AccountGroup, Account)
+} deriving (Eq, Show)
 
 -- | Converts the journal to a ledger.
 -- journalToLedger verifies a series of properties that a valid ledger should
@@ -57,14 +59,19 @@ data Ledger = Ledger {
 journalToLedger :: (MonadError Error m) => Journal -> m Ledger
 journalToLedger (Journal config accounts txns bals) = do
   validateConfig config
+  let gMapping = cGroupMapping config
   validateAccounts (cGroupMapping config) accounts
+  let accMap = HM.fromList
+              $ map (\a -> (aId a, (gMapping HM.! aGroup a, a))) accounts
   let accSet = HS.fromList $ map aId accounts
-  (balanceMap, transactions') <- validateJTransactions
+  (balanceMap, balanceAssertionMap, transactions') <- validateJTransactions
                    (cDefaultCommodity config)
                    accSet
                    txns
   balances' <- validateBalances (cDefaultCommodity config)
                accSet
-               balanceMap
+               balanceAssertionMap
                bals
-  return $ Ledger (Journal config accounts transactions' balances') balanceMap
+  return $ Ledger (Journal config accounts transactions' balances')
+                  balanceMap
+                  accMap

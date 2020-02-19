@@ -1,0 +1,90 @@
+# Configuration options
+configuration:
+  default-commodity: CAD
+  opening-balance-account: Solde d'ouverture
+  earnings-account: Bénéfice net
+  group-mapping:
+    asset: [Actif]
+    liability: [Passif]
+    equity: [Avoir]
+    revenue: [Revenu]
+    expense: [Dépense]
+
+# Chart of accounts
+accounts:
+- id: Compte chèque
+  number: 1005
+  group: Avoir
+
+- id: Mastercard
+  number: 2055
+  group: Passif
+  subgroup: Court terme
+
+- id: Solde d'ouverture
+  number: 3001
+  group: Avoir
+
+- id: Bénéfice net
+  number: 3005
+  group: Avoir
+
+- id: Travail
+  name: Compagnie XYZ
+  number: 4012
+  group: Revenu
+
+- id: Musique
+  number: 5055
+  group: Dépense
+
+# Transactions
+transactions:
+- date: 2019-01-01
+  postings:
+    - account: Compte chèque
+      amount: 200
+      commodity: CAD
+    - account: Mastercard
+      amount: -200
+      commodity: CAD
+
+- date: 2019-01-02
+  postings:
+  - account: Mastercard
+    amount: -40
+  - account: Musique
+
+- date: 2019-01-03
+  postings:
+  - account: Compte chèque
+    amount: -250
+    commodity: CAD
+  - account: Musique
+
+- date: 2019-01-04
+  postings:
+  - account: Travail
+    amount: -1450
+    balance-date: 2019-01-05
+
+  - account: Compte chèque
+
+  - account: Mastercard
+    amount: -200
+
+  - account: Musique
+    amount: 200
+
+- date: 2019-01-07
+  postings:
+    - account: Compte chèque
+      amount: -1000
+      commodity: CAD
+      balance-date: 2019-01-06
+    - account: Mastercard
+      amount: 1000
+      commodity: CAD
+
+# Balance assertions
+balance-assertions: []

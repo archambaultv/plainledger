@@ -10,13 +10,17 @@
 
 module Plainledger.Journal.Day (
   toISO8601,
-  parseISO8601M
+  parseISO8601M,
+  LDate(..)
   )
 where
 
 import Data.Time
 import Plainledger.Error
 import Control.Monad.Except
+
+data LDate = MinDate | Date Day | MaxDate
+           deriving (Eq, Show, Ord)
 
 toISO8601 :: Day -> String
 toISO8601 = formatTime defaultTimeLocale (iso8601DateFormat Nothing)

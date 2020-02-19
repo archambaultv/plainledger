@@ -46,78 +46,65 @@ validateJTransactions :: (MonadError Error m) =>
                       Commodity ->
                       HS.HashSet T.Text ->
                       [JTransaction] ->
-                      m (BalanceMap, [Transaction])
+                      m (BalanceMap,BalanceMap, [Transaction])
 validateJTransactions defComm accs jtransactions = do
     transactions <- traverse (jtransactionToTransaction defComm) jtransactions
     _ <- traverse (checkTxnAccount accs) transactions
     transactions1 <- validateTransactionsId transactions
-    let balanceMap0 = HM.fromList $ zip (HS.toList accs) (repeat HM.empty)
-    let bm = computeBalanceMap
-             balanceMap0
+    let (bm, bm2) = computeBalanceMap
+             accs
              transactions1
 
-    return (bm, transactions1)
+    return (bm, bm2, transactions1)
 
-computeBalanceMap :: BalanceMap -> [Transaction] -> BalanceMap
-computeBalanceMap m0 txns =
-  let postings = concatMap (tPostings) txns
+computeBalanceMap :: HS.HashSet T.Text ->
+                     [Transaction] ->
+                     (BalanceMap, BalanceMap)
+computeBalanceMap accs txns =
+  let m0 = HM.fromList $ zip (HS.toList accs) (repeat HM.empty)
+
+      postings = concatMap (tPostings) txns
       postingsByAccount = groupBy ((==) `on` pAccount)
                         $ sortBy (comparing pAccount) postings
-  in foldr addAccount m0 postingsByAccount
+  in foldr addAccount (m0, m0) postingsByAccount
 
-  where addAccount :: [Posting] -> BalanceMap -> BalanceMap
-        addAccount ps m =
+  where addAccount :: [Posting] ->
+                      (BalanceMap, BalanceMap) ->
+                      (BalanceMap, BalanceMap)
+        addAccount ps (m1, m2) =
           let ps' = groupBy ((==) `on` pCommodity)
                   $ sortBy (comparing pCommodity) ps
               acc = pAccount $ head ps
-          in foldr (addCommodity acc) m ps'
+          in foldr (addCommodity acc) (m1, m2) ps'
 
-        addCommodity :: T.Text -> [Posting] -> BalanceMap -> BalanceMap
-        addCommodity acc ps m =
+        addCommodity :: T.Text ->
+                        [Posting] ->
+                        (BalanceMap, BalanceMap) ->
+                        (BalanceMap, BalanceMap)
+        addCommodity acc ps (m1, m2) =
+          let comm = pCommodity $ head ps
+              m1' = addDate ps acc comm pDate m1
+              m2' = addDate ps acc comm pBalanceDate m2
+          in (m1', m2')
+
+        addDate :: [Posting] ->
+                   T.Text ->
+                   Commodity ->
+                   (Posting -> Day) ->
+                   BalanceMap ->
+                   BalanceMap
+        addDate ps acc comm f m =
           let psDate = reverse
-                  $ groupBy ((==) `on` pDate)
-                  $ sortBy (comparing pDate) ps
-              psBalanceDate = reverse
-                      $ groupBy ((==) `on` pBalanceDate)
-                      $ sortBy (comparing pBalanceDate) ps
-              comm = pCommodity $ head ps
+                  $ groupBy ((==) `on` f)
+                  $ sortBy (comparing f) ps
+
               dateTotal :: [(Day, Quantity)]
-              dateTotal = reverse $ foldr (sumDate pDate) [] psDate
-              balanceDateTotal :: [(Day, Quantity)]
-              balanceDateTotal = reverse
-                               $ foldr (sumDate pBalanceDate) [] psBalanceDate
+              dateTotal = reverse $ foldr (sumDate f) [] psDate
 
-              dateBothTotal = mergeDates dateTotal balanceDateTotal []
-              dateMap = M.fromList dateBothTotal
+              dateMap = M.fromList dateTotal
               commMap = HM.singleton comm dateMap
+
           in HM.insertWith HM.union acc commMap m
-
-        mergeDates :: [(Day, Quantity)] ->
-                      [(Day, Quantity)] ->
-                      [(Day, (Quantity, Quantity))] ->
-                      [(Day, (Quantity, Quantity))]
-        mergeDates [] xs acc =
-          let c = fst $ snd $ head acc
-          in map (\(d, a) -> (d, (c, a))) xs ++ acc
-
-        mergeDates xs [] acc =
-          let c = snd $ snd $ head acc
-          in map (\(d, a) -> (d, (a, c))) xs ++ acc
-
-        mergeDates l1@((d1, q1) : xs1) l2@((d2, q2) : xs2) acc
-          | d1 < d2 =
-            let c = if null acc
-                    then 0
-                    else snd $ snd $ head acc
-            in mergeDates xs1 l2 ((d1, (q1, c)) : acc)
-          | d1 == d2 = mergeDates xs1 xs2 ((d1, (q1, q2)) : acc)
-          | d1 > d2 =
-            let c = if null acc
-                    then 0
-                    else fst $ snd $ head acc
-            in mergeDates l1 xs2 ((d2, (c, q2)) : acc)
-
-        mergeDates _ _ _ = error "mergeDates impossible pattern"
 
         sumDate :: (Posting -> Day) ->
                    [Posting] ->

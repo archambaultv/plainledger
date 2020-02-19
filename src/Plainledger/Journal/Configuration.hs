@@ -11,7 +11,11 @@
 module Plainledger.Journal.Configuration (
   Configuration(..),
   AccountGroup(..),
-  validateConfig
+  validateConfig,
+  isBalanceSheetGroup,
+  isIncomeStatementGroup,
+  isCreditGroup,
+  isDebitGroup
   )
 where
 
@@ -61,6 +65,18 @@ data Configuration = Configuration {
    cGroupMapping :: HashMap T.Text AccountGroup
   }
   deriving (Eq, Show)
+
+isBalanceSheetGroup :: AccountGroup -> Bool
+isBalanceSheetGroup a = a `elem` [Asset, Liability, Equity]
+
+isIncomeStatementGroup :: AccountGroup -> Bool
+isIncomeStatementGroup = not . isBalanceSheetGroup
+
+isCreditGroup :: AccountGroup -> Bool
+isCreditGroup a = a `elem` [Liability, Equity, Revenue]
+
+isDebitGroup :: AccountGroup -> Bool
+isDebitGroup = not . isCreditGroup
 
 -- | validateConfig asserts
 -- - all members of the group mapping are non null
