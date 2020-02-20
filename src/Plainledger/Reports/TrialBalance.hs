@@ -52,11 +52,11 @@ data TrialBalance = TrialBalance {
 data TrialBalanceLine = TrialBalanceLine {
   tblAccount :: Account,
   tblCommodity :: Commodity,
-  tblBalance :: Quantity, -- | The balance shown in the trial balance
+  tblBalance :: Quantity, -- | The balance shown in the trial balance.
                           -- Equivalent to tblEndDateBalance for Assets, Liabilities
                           -- and Equity. Equivalent to tblEndDateBalance - tblOpeningBalance
                           -- for Revenue and Expense. The opening balance account is also
-                          -- adjusted according to the being date.
+                          -- adjusted according to the begin date.
   tblEndDateBalance :: Quantity,
   tblOpeningBalance :: Quantity,
   tblActive :: Bool,
