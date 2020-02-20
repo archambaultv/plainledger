@@ -11,107 +11,192 @@ module Plainledger.Reports.TrialBalance (
   TrialBalance(..),
   TrialBalanceLine(..),
   trialBalanceReport,
+  trialBalanceLines,
   trialBalanceToCsv,
-  trialBalanceDefaultOption,
   BalanceFormat(..),
   TrialBalanceOption(..),
   trialBalanceTotal,
-  trialBalanceTotalDrCr
+  trialBalanceTotalDrCr,
+  openingBalance,
+  earnings
   )
 where
 
-import Prelude hiding (lines)
-import Data.Maybe
-import Data.List hiding (group, lines)
-import Data.Ord
-import Data.Function
-import Data.Time
-import Prelude hiding (lines)
-import Plainledger.Ledger
-import Data.Csv (encode)
-import qualified Data.Text as T
-import qualified Data.HashMap.Strict as HM
+import Control.Monad.Except
 import Data.ByteString.Lazy (ByteString)
+import Data.Csv (encode)
+import Data.HashMap.Strict (HashMap)
+import Data.List hiding (group, lines)
+import Data.Maybe
+import Data.Ord
+import Data.Time
+import Plainledger.Error
+import Plainledger.Ledger
+import Prelude hiding (lines)
+import Prelude hiding (lines)
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Map.Strict as M
+import qualified Data.Text as T
 
 -- | The TrialBalance data type contains all the necessary informations to
 -- produce a balance sheet report. All the accounts are listed in the tbLines,
 -- even those without any transaction at all.
 data TrialBalance = TrialBalance {
-  tbBeginDate :: LDate,
-  tbEndDate :: LDate,
+  tbBeginDate :: Day,
+  tbEndDate :: Day,
   tbJournalFile :: FilePath,
   tbLines :: [TrialBalanceLine],
   tbLedger :: Ledger
 } deriving (Eq, Show)
 
 data TrialBalanceLine = TrialBalanceLine {
-  tblAccountId :: T.Text,
+  tblAccount :: Account,
   tblCommodity :: Commodity,
-  tblQuantity :: Maybe (Day, Quantity),
-  tblGroup :: AccountGroup,
-  tblAccount :: Account
+  tblBalance :: Quantity, -- | The balance shown in the trial balance
+                          -- Equivalent to tblEndDateBalance for Assets, Liabilities
+                          -- and Equity. Equivalent to tblEndDateBalance - tblOpeningBalance
+                          -- for Revenue and Expense. The opening balance account is also
+                          -- adjusted according to the being date.
+  tblEndDateBalance :: Quantity,
+  tblOpeningBalance :: Quantity,
+  tblActive :: Bool,
+  tblGroup :: AccountGroup
 } deriving (Eq, Show)
 
-trialBalanceTotal :: [TrialBalanceLine] -> [(Commodity, Quantity)]
+tblBalanceDelta :: TrialBalanceLine -> Quantity
+tblBalanceDelta l = tblEndDateBalance l - tblOpeningBalance l
+
+trialBalanceTotal :: [TrialBalanceLine] -> HM.HashMap Commodity Quantity
 trialBalanceTotal ys =
-      map (\xs -> (fst $ head xs, sum (map (snd . fromJust . snd) xs)))
-      $ groupBy ((==) `on` fst)
-      $ sortBy (comparing fst)
-      $ filter (\(_,x) -> isJust x)
-      $ map (\(TrialBalanceLine _ a b _ _) -> (a, b)) ys
+    let xs :: [(Commodity, Quantity)]
+        xs = map (\l -> (tblCommodity l, tblBalance l)) ys
+    in HM.fromListWith (+) xs
 
 trialBalanceTotalDrCr :: [TrialBalanceLine] ->
-                         [(Commodity, (Quantity, Quantity))]
+                         HM.HashMap Commodity (Quantity, Quantity)
 trialBalanceTotalDrCr ys =
-      map (\xs ->
-            let (dr, cr) = partition (> 0) $ map (snd . fromJust . snd) xs
-            in (fst $ head xs,
-                (sum dr,
-                negate $ sum cr)))
-      $ groupBy ((==) `on` fst)
-      $ sortBy (comparing fst)
-      $ filter (\(_,x) -> isJust x)
-      $ map (\(TrialBalanceLine _ a b _ _) -> (a, b)) ys
+    let xs :: [(Commodity, (Quantity, Quantity))]
+        xs = map (\(c, n) -> if n < 0 then (c, (0, negate n)) else (c, (n, 0)))
+           $ map (\l -> (tblCommodity l, tblBalance l)) ys
 
-trialBalanceReport :: FilePath -> LDate -> LDate -> Ledger -> TrialBalance
-trialBalanceReport path beginDate endDate l =
-  let accMap = lAccounts l
+    in HM.fromListWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) xs
+
+lDateToDay :: BalanceMap -> LDate -> Maybe Day
+lDateToDay m MinDate = minDate m
+lDateToDay m MaxDate = maxDate m
+lDateToDay _ (Date d) = Just d
+
+trialBalanceReport :: (MonadError Error m) =>
+                      FilePath -> LDate -> LDate -> Ledger -> m TrialBalance
+trialBalanceReport path beginDate endDate l = do
+      eDate <- maybe (throwError "Cannot infer the end date since \
+                                 \there is no transaction in the ledger")
+               return
+               $ lDateToDay (lBalanceMap l) endDate
+      bDate <- maybe (throwError "Cannot infer the begin date since \
+                                   \there is no transaction in the ledger")
+               return
+               $ lDateToDay (lBalanceMap l) beginDate
+
+      let err b e = throwError
+                     $ "Begin date ("
+                     ++ show b
+                     ++ ") greater than end date ("
+                     ++ show e
+                     ++ ")."
+
+          errMax b e = throwError
+                     $ "Begin date ("
+                     ++ show b
+                     ++ ") greater than the greatest date in the journal file ("
+                     ++ show e
+                     ++ ")."
+      when (eDate < bDate)
+           (case endDate of
+             MaxDate -> errMax bDate eDate
+             _ -> err bDate eDate)
+
+
+      let lines = trialBalanceLines bDate eDate l
+
+      return $ TrialBalance bDate eDate path lines l
+
+trialBalanceLines :: Day -> Day -> Ledger -> [TrialBalanceLine]
+trialBalanceLines bDate eDate l =
+  let m = lBalanceMap l
+      accMap = lAccounts l
       defComm = cDefaultCommodity $ jConfiguration $ lJournal l
-      bMap = lBalanceMap l
-      bAtDate = HM.filterWithKey
-                (\k _ -> isBalanceSheetGroup $ fst $ accMap HM.! k)
-                bMap
-      bDelta = HM.filterWithKey
-                (\k _ -> isIncomeStatementGroup $ fst $ accMap HM.! k)
-                bMap
+      openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal l
 
-      flatAtDate :: [(T.Text, Commodity, Maybe (Day, Quantity))]
-      flatAtDate = flattenBalanceAtDate defComm bAtDate endDate
+      m1 :: HashMap
+            T.Text
+            (HashMap Commodity (Maybe (Day, Quantity), Maybe (Day, Quantity)))
+      m1 = fmap (fmap (\m0 -> (M.lookupLT bDate m0, M.lookupLE eDate m0))) m
 
-      flatDelta :: [(T.Text, Commodity, Maybe (Day, Quantity))]
-      flatDelta =  flattenBalanceDelta defComm bDelta beginDate endDate
+      m2 :: HashMap
+            T.Text
+            [(Commodity, Maybe (Day, Quantity), Maybe (Day, Quantity))]
+      m2 = fmap (map (\(c, (q1, q2)) -> (c, q1, q2)) . HM.toList) m1
 
-      toTrialBalance (aId, c, qty) =
+      m3 :: [(T.Text, Commodity, Maybe (Day, Quantity), Maybe (Day, Quantity))]
+      m3 = concatMap (\(t, xs) -> if null xs
+                                  then [(t, defComm, Nothing, Nothing)]
+                                  else map (\(c,q1,q2) -> (t, c, q1, q2)) xs)
+         $ HM.toList m2
+
+      toTrialBalance (aId, c, q1, q2) =
         let a = accMap HM.! aId
             group = fst a
             acc = snd a
-        in TrialBalanceLine aId c qty group acc
+        in case q2 of
+             Nothing -> TrialBalanceLine acc c 0 0 0 False group
+             Just (d, q2') ->
+                let active = (d >= bDate)
+                    q1' = (maybe 0 snd q1)
+                    q = if isIncomeStatementGroup group
+                        then q2' - q1'
+                        else q2'
+                in TrialBalanceLine acc c q q2' q1' active group
 
-      lines :: [TrialBalanceLine]
-      lines = map toTrialBalance (flatAtDate ++ flatDelta)
+      lines = map toTrialBalance m3
 
-  in TrialBalance beginDate endDate path lines l
+      openBal = openingBalance lines
+
+      updateOpenBal :: TrialBalanceLine -> TrialBalanceLine
+      updateOpenBal y =
+        if aId (tblAccount y) == openBalAcc
+        then let ob = fromMaybe 0
+                    $ HM.lookup (tblCommodity y) openBal
+             in y{tblBalance = ob + tblBalance y}
+        else y
+
+  in map updateOpenBal lines
+
+-- | Computes the opening balance of a report
+openingBalance :: [TrialBalanceLine] -> HM.HashMap Commodity Quantity
+openingBalance tbl =
+  let xs :: [(Commodity, Quantity)]
+      xs = map (\l -> (tblCommodity l, tblOpeningBalance l))
+         $ filter (isIncomeStatementGroup . tblGroup) tbl
+
+  in HM.fromListWith (+) xs
+
+-- | Computes the earnings of a report
+earnings :: [TrialBalanceLine] -> HM.HashMap Commodity Quantity
+earnings tbl =
+  let xs :: [(Commodity, Quantity)]
+      xs = map (\l -> (tblCommodity l, tblBalanceDelta l))
+         $ filter (isIncomeStatementGroup . tblGroup) tbl
+
+  in HM.fromListWith (+) xs
 
 data BalanceFormat = TwoColumnDebitCredit | OneColumnSignedNumber
   deriving (Eq, Show)
 
 data TrialBalanceOption = TrialBalanceOption {
   tboBalanceFormat :: BalanceFormat,
-  showAccountsWithoutTransaction :: Bool
+  tboShowInactiveAccounts :: Bool
 } deriving (Eq, Show)
-
-trialBalanceDefaultOption :: TrialBalanceOption
-trialBalanceDefaultOption = TrialBalanceOption TwoColumnDebitCredit False
 
 amountTitle :: BalanceFormat -> [T.Text]
 amountTitle OneColumnSignedNumber = ["Balance"]
@@ -141,21 +226,17 @@ trialBalanceToCsv opt tb =
             : []
 
     serialize :: TrialBalanceLine -> [T.Text]
-    serialize (TrialBalanceLine _ _ Nothing _ _)
-      | not (showAccountsWithoutTransaction opt) = []
-    serialize (TrialBalanceLine _ _ (Just (d, 0)) _ _)
-      | not (showAccountsWithoutTransaction opt) &&
-        Date d < tbBeginDate tb = []
-    serialize (TrialBalanceLine _ comm qty group acc) =
+    serialize (TrialBalanceLine _ _ 0 _ _ False _)
+      | not (tboShowInactiveAccounts opt) = []
+    serialize (TrialBalanceLine acc comm bal _ _ _ gr) =
        let front = [T.pack $ show $ aNumber acc, aName acc]
-           amnt = case qty of
-                    Nothing -> serializeAmount (tboBalanceFormat opt) group 0
-                    Just (_, x) -> serializeAmount (tboBalanceFormat opt) group x
+           amnt = serializeAmount (tboBalanceFormat opt) gr bal
        in front ++ amnt ++ [comm]
 
-    trialBalanceLines = map serialize
-                        $ sortBy (comparing (aNumber . tblAccount))
-                        $ tbLines tb
+    trialBalLines = filter (not . null)
+                  $ map serialize
+                  $ sortBy (comparing (aNumber . tblAccount))
+                  $ tbLines tb
 
      -- Total lines
     total :: [[T.Text]]
@@ -163,18 +244,22 @@ trialBalanceToCsv opt tb =
               OneColumnSignedNumber ->
                 map (\(c, q) -> ["", "Total"]
                                 ++ [T.pack $ show q] ++ [c])
+                $ sortBy (comparing fst)
+                $ HM.toList
                 $ trialBalanceTotal
                 $ tbLines tb
               TwoColumnDebitCredit ->
                 map (\(c, (dr, cr)) -> ["", "Total"]
                                     ++ [T.pack $ show dr, T.pack $ show cr]
                                     ++ [c])
+                $ sortBy (comparing fst)
+                $ HM.toList
                 $ trialBalanceTotalDrCr
                 $ tbLines tb
 
     csvlines ::  [[T.Text]]
     csvlines =  title
-             ++ trialBalanceLines
+             ++ trialBalLines
              ++ ([] : total)
 
   in encode csvlines

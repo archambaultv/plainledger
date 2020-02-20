@@ -10,16 +10,16 @@
 module Plainledger.Ledger.Balance (
   BalanceMap,
   balanceAtDate,
-  balanceBeforeDate,
   balanceDelta,
   validateBalances,
-  flattenBalanceAtDate,
-  flattenBalanceDelta,
+  minDate,
+  maxDate,
   module Plainledger.Journal.Balance
   )
 where
 
 import Data.Time
+import Data.Maybe
 import Control.Monad.Except
 import qualified Data.Text as T
 import Plainledger.Journal.Balance
@@ -37,9 +37,40 @@ type BalanceMap = HashMap
                   T.Text
                   (HashMap Commodity (M.Map Day Quantity))
 
--- | balanceAtDate m d acc returns the balance of account acc at the date d. The
--- balance is Nothing if the date is prior than any date in the map for this account.
--- Calls error if the account does not exists
+maxDate :: BalanceMap -> Maybe Day
+maxDate m =
+  let m1 :: HashMap
+            T.Text
+            (HashMap Commodity (Maybe Day))
+      m1 = fmap (fmap (fmap fst . M.lookupMax)) m
+
+      m2 :: HashMap
+            T.Text
+            [Day]
+      m2 = fmap (catMaybes . HM.elems) m1
+
+      days :: [Day]
+      days = concat $ HM.elems m2
+
+  in if null days then Nothing else Just (maximum days)
+
+minDate :: BalanceMap -> Maybe Day
+minDate m =
+  let m1 :: HashMap
+            T.Text
+            (HashMap Commodity (Maybe Day))
+      m1 = fmap (fmap (fmap fst . M.lookupMin)) m
+
+      m2 :: HashMap
+            T.Text
+            [Day]
+      m2 = fmap (catMaybes . HM.elems) m1
+
+      days :: [Day]
+      days = concat $ HM.elems m2
+
+  in if null days then Nothing else Just (minimum days)
+
 balanceDate :: BalanceMap ->
                  T.Text ->
                  Commodity ->
@@ -53,19 +84,9 @@ balanceDate m acc comm f =
                ++ "\" is not in the balance map."
     Just m2 -> HM.lookup comm m2 >>= f
 
-balanceBeforeDate :: BalanceMap ->
-                 T.Text ->
-                 Commodity ->
-                 LDate ->
-                 Maybe (Day, Quantity)
-balanceBeforeDate m acc comm d =
-  case d of
-    MinDate -> Nothing
-    Date d2 -> balanceDate m acc comm (M.lookupLT d2)
-    MaxDate -> do
-      (d2, _) <- balanceDate m acc comm M.lookupMax
-      balanceDate m acc comm (M.lookupLT d2)
-
+-- | balanceAtDate m d acc returns the balance of account acc at the date d. The
+-- balance is Nothing if the date is prior than any date in the map for this account.
+-- Calls error if the account does not exists
 balanceAtDate :: BalanceMap ->
                  T.Text ->
                  Commodity ->
@@ -77,50 +98,14 @@ balanceAtDate m acc comm d =
     Date d2 -> balanceDate m acc comm (M.lookupLE d2)
     MaxDate -> balanceDate m acc comm M.lookupMax
 
-flattenBalanceAtDate :: Commodity ->
-                 BalanceMap ->
-                 LDate ->
-                 [(T.Text, Commodity, Maybe (Day, Quantity))]
-flattenBalanceAtDate defComm m d =
-  let defIfNull x = if null x then [defComm] else x
-
-      keys :: [(T.Text, Commodity)]
-      keys = concatMap (\(t, c) -> map (t, ) (defIfNull $ HM.keys c))
-           $ HM.toList m
-
-  in map (\(t,c) -> (t,c,) (balanceAtDate m t c d)) keys
-
-flattenBalanceDelta :: Commodity ->
-                 BalanceMap ->
-                 LDate ->
-                 LDate ->
-                 [(T.Text, Commodity, Maybe (Day, Quantity))]
-flattenBalanceDelta defComm m b e =
-  let defIfNull x = if null x then [defComm] else x
-
-      keys :: [(T.Text, Commodity)]
-      keys = concatMap (\(t, c) -> map (t, ) (defIfNull $ HM.keys c))
-           $ HM.toList m
-
-  in map (\(t,c) -> (t,c,) (balanceDelta m t c b e)) keys
-
--- | balanceDelta m d acc returns the difference in balance of account acc at the date d. The
--- balance is Nothing if the date is prior than any date in the map for this account.
--- Calls error if the account does not exists
-balanceDelta :: BalanceMap ->
-                T.Text ->
-                Commodity ->
-                LDate ->
-                LDate ->
+balanceDelta :: Maybe (Day, Quantity) ->
+                Maybe (Day, Quantity) ->
                 Maybe (Day, Quantity)
-balanceDelta m acc comm d1 d2 =
-  let md1 = balanceBeforeDate m acc comm d1
-      md2 = balanceAtDate m acc comm d2
-  in case (md1, md2) of
+balanceDelta md1 md2 =
+  case (md1, md2) of
       (_, Nothing) -> Nothing
       (Nothing, x) -> x
-      (Just (_, m1), Just (d, m2)) ->
-        Just (d, (m2 - m1))
+      (Just (_, m1), Just (d, m2)) -> Just (d, (m2 - m1))
 
 -- Balances :
 --  Asserts all balance have a valid account field

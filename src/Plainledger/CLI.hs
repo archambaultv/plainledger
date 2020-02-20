@@ -144,7 +144,7 @@ trialBalanceCommand = CTrialBalance
 trialBalanceOption :: Parser TrialBalanceOption
 trialBalanceOption = TrialBalanceOption
                    <$> balanceFormat
-                   <*> showAccountsWithoutTransaction
+                   <*> showInactiveAccounts
 
   where balanceFormat = flag TwoColumnDebitCredit OneColumnSignedNumber
            ( long "signed-balance"
@@ -153,7 +153,7 @@ trialBalanceOption = TrialBalanceOption
                   \with a signed quantity. A positive amount means debit and a \
                   \negative amount means credit.")
 
-        showAccountsWithoutTransaction = flag False True
+        showInactiveAccounts = flag False True
            ( long "show-all-accounts"
           <> short 'a'
           <> help "Show all the accounts defined in the accounts section of \

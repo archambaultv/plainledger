@@ -29,10 +29,12 @@ runTrialBalance c = do
        Right l ->
         let sd = maybe MinDate Date $ (tbcStartDate c)
             ed = maybe MaxDate Date $ (tbcEndDate c)
-            tb = trialBalanceToCsv (tbcOption c)
-               $ trialBalanceReport
-                 (tbcYamlFile c)
-                 sd
-                 ed
-                 l
-        in BL.writeFile (tbcCsvFile c) tb
+        in do
+          tb <- either fail return
+                $ trialBalanceToCsv (tbcOption c)
+               <$> trialBalanceReport
+                   (tbcYamlFile c)
+                   sd
+                   ed
+                   l
+          BL.writeFile (tbcCsvFile c) tb
