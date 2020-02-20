@@ -10,7 +10,6 @@
 module Plainledger.Ledger.Balance (
   BalanceMap,
   balanceAtDate,
-  balanceDelta,
   validateBalances,
   minDate,
   maxDate,
@@ -97,15 +96,6 @@ balanceAtDate m acc comm d =
     MinDate -> balanceDate m acc comm M.lookupMin
     Date d2 -> balanceDate m acc comm (M.lookupLE d2)
     MaxDate -> balanceDate m acc comm M.lookupMax
-
-balanceDelta :: Maybe (Day, Quantity) ->
-                Maybe (Day, Quantity) ->
-                Maybe (Day, Quantity)
-balanceDelta md1 md2 =
-  case (md1, md2) of
-      (_, Nothing) -> Nothing
-      (Nothing, x) -> x
-      (Just (_, m1), Just (d, m2)) -> Just (d, (m2 - m1))
 
 -- Balances :
 --  Asserts all balance have a valid account field
