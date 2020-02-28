@@ -63,9 +63,6 @@ data TrialBalanceLine = TrialBalanceLine {
   tblGroup :: AccountGroup
 } deriving (Eq, Show)
 
-tblBalanceDelta :: TrialBalanceLine -> Quantity
-tblBalanceDelta l = tblEndDateBalance l - tblOpeningBalance l
-
 trialBalanceTotal :: [TrialBalanceLine] -> HM.HashMap Commodity Quantity
 trialBalanceTotal ys =
     let xs :: [(Commodity, Quantity)]
@@ -172,7 +169,7 @@ trialBalanceLines bDate eDate l =
 
   in map updateOpenBal lines
 
--- | Computes the opening balance of a report
+-- | Computes the opening balance
 openingBalance :: [TrialBalanceLine] -> HM.HashMap Commodity Quantity
 openingBalance tbl =
   let xs :: [(Commodity, Quantity)]
@@ -181,11 +178,11 @@ openingBalance tbl =
 
   in HM.fromListWith (+) xs
 
--- | Computes the earnings of a report
+-- | Computes the earnings
 earnings :: [TrialBalanceLine] -> HM.HashMap Commodity Quantity
 earnings tbl =
   let xs :: [(Commodity, Quantity)]
-      xs = map (\l -> (tblCommodity l, tblBalanceDelta l))
+      xs = map (\l -> (tblCommodity l, tblBalance l))
          $ filter (isIncomeStatementGroup . tblGroup) tbl
 
   in HM.fromListWith (+) xs
