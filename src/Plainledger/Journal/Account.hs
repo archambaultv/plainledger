@@ -198,7 +198,7 @@ decodeAccounts bs = do
                     HM.HashMap Field Field -> m Account
         fromLine m = do
           id' <- findColumn "id" m
-          name <- findColumn "name" m
+          name <- findColumnDefault "" "name" m
           number <- findColumn "number" m
           group <- findColumn "group" m
           subgroup <- findColumnDefault "" "subgroup" m
