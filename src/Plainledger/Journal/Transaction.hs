@@ -165,6 +165,23 @@ encodeTransactions (EncodeAsMultipleRecords) xs =
 data CsvDecodeOptions = SingleRecord
                       | MultipleRecords
 
+-- | Test if the file has a SingleRecord header or a MultipleRecords header
+decodeHeader :: (MonadError Error m) =>
+                ByteString ->
+                m CsvDecodeOptions
+decodeHeader bs = do
+  csv <- either throwError return $ C.decode C.NoHeader bs
+  if V.null (csv :: C.Csv)
+  then throwError "Empty file"
+  else
+    let header = csv V.! 0
+    in if "account id" `V.elem` header
+       then return MultipleRecords
+       else if "account id (1)" `V.elem` header
+            then return SingleRecord
+            else throwError "Expecting \"account id\" or \"account id (1)\" \
+                            \in the CSV header"
+
 -- | The first line is the header
 decodeTransactions :: (MonadError Error m) =>
                       CsvDecodeOptions ->
@@ -303,6 +320,5 @@ decodeJTransactionsFile f = do
     YamlFile -> Y.decodeFileThrow f
     CsvFile -> do
         csvBS <- BL.readFile f
-        -- fixme : We should test the header to know if it is single record
-        -- or multiple records
-        either fail return $ decodeTransactions SingleRecord csvBS
+        h <- either fail return $ decodeHeader csvBS
+        either fail return $ decodeTransactions h csvBS

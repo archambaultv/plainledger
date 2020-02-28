@@ -41,5 +41,11 @@ syntaxTestTree =
         (jConfiguration journal) @?= (jConfiguration journal2)
         (jAccounts journal) @?= (jAccounts journal2)
         (jTransactions journal) @?= (jTransactions journal2)
-        (jBalances journal) @?= (jBalances journal2)
+        (jBalances journal) @?= (jBalances journal2),
+      testCase "decodeJTransactionsFile" $ do
+       txnsSingle <- decodeJTransactionsFile
+                     (dir ++ "transactions-single-record.csv")
+       txnsMult <- decodeJTransactionsFile
+                     (dir ++ "transactions-multiple-records.csv")
+       txnsSingle @?= txnsMult
     ]
