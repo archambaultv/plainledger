@@ -11,33 +11,29 @@ Sage 50 or QuickBooks (if your needs are simple enough).
 
 The journal file containing all financial information is written in
 [Yaml](https://yaml.org/), a popular format easy to read and modify by hand or
-with any programming language.
-
-Plainledger sees accounting as isomorphic to a directed graph, where accounts
-are nodes and transactions edges. This means that, like
-[Transity](https://github.com/feramhq/transity) transactions are entered by
-specifying that an amount was transferred from account A to account B instead of
-the confusing debit and credit style. But plainledger can export financial
-reports in a debit and credit format that your accountant will love.
+with any programming language. You can also write your financial information in a
+[Csv](https://en.wikipedia.org/wiki/Comma-separated_values) file and link to
+those files in your journal file.
 
 ## Available commands
-Unless specified, all outputs are in CSV format. Most commands accept options
+Most commands accept options
 to change their behavior (for example specifying the accounting period).
 
-- *Accounts* : List all accounts and their properties.
-- *Transactions* : List all transactions in a csv file.
-- *Balance sheet* : Prints the balance sheet. Not implemented yet.
-- *Income statement* : Prints the income statement. Not implemented yet.
-- *Trial balance* : Prints the trial balance. Not implemented yet.
-- *From CSV* : Convert a CSV file into a Yaml file readable by plainledger.
-  Use this command to batch modify (or import) transactions, accounts or balance assertions
-  in Calc or Excel and then propagate back those changes to the Yaml journal file.
+- *accounts* : List all accounts and their properties.
+- *transactions* : List all transactions in a csv file.
+- *trialbalance* : Prints the trial balance.
+- *convert* : Convert between the various formats (CSV, Yaml) understood by plainledger.
+
+## Multiple currencies and commodities
+Plainledger provides very basic support for working with multiple currencies.
+You can enter transactions with any commodity you like and plainledger will not
+mix them up. For example, earnings in balance sheet report are computed by
+commodity. But plainledger does automatically convert amounts in a foreign
+currency to your local currency or compute realized and unrealized foreign
+exchange gain. Feel free to open an issue if you need such things.
 
 ## ToDo
-- [ ] Implement the above commands.
-- [ ] Better documentation on the accounting and directed graph isomorphism.
-- [ ] Better documentation on how to use the software with multiple currencies.
-- [ ] Better documentation on how to use the convert command to import transactions.
+- [ ] Improve documentation
 
 ## License
 Plainledger is licensed under the [0BSD](https://opensource.org/licenses/0BSD)
