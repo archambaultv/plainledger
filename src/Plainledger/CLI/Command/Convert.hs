@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.CLI.Command.FromCsv
+-- Module      :  Plainledger.CLI.Command.Convert
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,19 +8,19 @@
 --
 -- This module defines the fromcsv command
 
-module Plainledger.CLI.Command.FromCsv
+module Plainledger.CLI.Command.Convert
   (
   CsvType(..),
-  FromCsvCommand(..),
+  ConvertCommand(..),
   )
 where
 
 import Plainledger.CLI.Command.Transactions
 
-data CsvType = CsvAccounts | CsvTransactions CsvEncodeFormat
+data CsvType = CsvAccounts | CsvTransactions CsvRecordOptions
 
-data FromCsvCommand = FromCsvCommand {
-  fcsvCsvFile :: String,
-  fcsvYamlFile :: String,
-  fcsvCsvType :: CsvType
+data ConvertCommand = ConvertCommand {
+  ccFromFile :: String,
+  ccToFile :: String,
+  ccFromDataType :: CsvType
   }

@@ -12,14 +12,14 @@ module Plainledger.CLI.Command.Transactions
   (
   TransactionsCommand(..),
   CsvEncodeFormat,
-  CsvDecodeOptions(..)
+  CsvRecordOptions(..)
   )
 where
 
 import Data.Time
-import Plainledger.Journal.Transaction (CsvDecodeOptions(..))
+import Plainledger.Journal.Transaction (CsvRecordOptions(..))
 
-type CsvEncodeFormat = CsvDecodeOptions
+type CsvEncodeFormat = CsvRecordOptions
 
 
 data TransactionsCommand = TransactionsCommand {

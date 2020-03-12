@@ -15,7 +15,7 @@ module Plainledger.CLI.Run
 
 import Plainledger.CLI.Command
 import Plainledger.CLI.Run.Accounts
-import Plainledger.CLI.Run.FromCsv
+import Plainledger.CLI.Run.Convert
 import Plainledger.CLI.Run.Transactions
 import Plainledger.CLI.Run.TrialBalance
 

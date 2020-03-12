@@ -14,8 +14,7 @@ module Plainledger.Journal.Transaction (
   decodeJTransactionsFile,
   encodeTransactions,
   decodeTransactions,
-  CscEncodeOptions(..),
-  CsvDecodeOptions(..)
+  CsvRecordOptions(..)
   )
 where
 
@@ -92,12 +91,6 @@ instance FromJSON JTransaction where
     <*> (fromMaybe [] <$> v .:? "tags")
   parseJSON _ = fail "Expected Object for Transaction value"
 
--- CSV functions
-data CscEncodeOptions
-  = EncodeAsSingleRecord
-  | EncodeAsMultipleRecords
-
-
 postingToLine :: JPosting -> [Field]
 postingToLine p = [toField $ pAccount p,
                    toField $ (realToFrac <$> pAmount p :: Maybe Scientific),
@@ -122,8 +115,8 @@ multipleRecordsHeader = ["date",
                          "balance date"]
 
 -- / Encode a list of transaction as a Csv. The first line is the header
-encodeTransactions :: CscEncodeOptions -> [JTransaction] -> ByteString
-encodeTransactions EncodeAsSingleRecord xs =
+encodeTransactions :: CsvRecordOptions -> [JTransaction] -> ByteString
+encodeTransactions SingleRecord xs =
   let tagH = tagHeader $ concatMap tTags xs
       maxPostings = maximum $ 2 : map (length . tPostings) xs
       header = toRecord
@@ -146,7 +139,7 @@ encodeTransactions EncodeAsSingleRecord xs =
 
           in toRecord $ txLine  ++ tagLine (tTags t) tagH
 
-encodeTransactions (EncodeAsMultipleRecords) xs =
+encodeTransactions MultipleRecords xs =
   let tagH = tagHeader $ concatMap tTags xs
       header = toRecord $ multipleRecordsHeader  ++ tagH
       lines = header : concatMap (toMultiLine tagH) xs
@@ -162,13 +155,13 @@ encodeTransactions (EncodeAsMultipleRecords) xs =
                     txLines = map (\x -> front ++ x ++ tags) ps
                 in map toRecord txLines
 
-data CsvDecodeOptions = SingleRecord
+data CsvRecordOptions = SingleRecord
                       | MultipleRecords
 
 -- | Test if the file has a SingleRecord header or a MultipleRecords header
 decodeHeader :: (MonadError Error m) =>
                 ByteString ->
-                m CsvDecodeOptions
+                m CsvRecordOptions
 decodeHeader bs = do
   csv <- either throwError return $ C.decode C.NoHeader bs
   if V.null (csv :: C.Csv)
@@ -184,7 +177,7 @@ decodeHeader bs = do
 
 -- | The first line is the header
 decodeTransactions :: (MonadError Error m) =>
-                      CsvDecodeOptions ->
+                      CsvRecordOptions ->
                       ByteString ->
                       m [JTransaction]
 decodeTransactions SingleRecord bs = do
@@ -315,7 +308,7 @@ decodeTransactions MultipleRecords bs = do
 
 decodeJTransactionsFile :: String -> IO [JTransaction]
 decodeJTransactionsFile f = do
-  fType <- either fail return $ isDecodableFile f
+  fType <- either fail return $ isSupportedExtension f
   case fType of
     YamlFile -> Y.decodeFileThrow f
     CsvFile -> do

@@ -208,7 +208,7 @@ decodeAccounts bs = do
 
 decodeAccountsFile :: FilePath -> IO [Account]
 decodeAccountsFile f = do
-  fType <- either fail return $ isDecodableFile f
+  fType <- either fail return $ isSupportedExtension f
   case fType of
     YamlFile -> Y.decodeFileThrow f
     CsvFile -> do

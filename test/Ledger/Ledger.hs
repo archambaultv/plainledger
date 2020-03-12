@@ -101,7 +101,7 @@ csvTestTree =
 
        testCase "JTransactions : encode decode single line" $ do
           j <- Y.decodeFileThrow ledgerPath
-          let encodeAcc = encodeTransactions EncodeAsSingleRecord
+          let encodeAcc = encodeTransactions SingleRecord
                         $ jTransactions j
           csvTransactions <- either assertFailure return
                             $ decodeTransactions SingleRecord encodeAcc
@@ -111,14 +111,14 @@ csvTestTree =
         j <- Y.decodeFileThrow ledgerPath
         l <- either assertFailure return $ journalToLedger j
         let txns = map transactionToJTransaction $ jTransactions $ lJournal l
-        let encodeAcc = encodeTransactions EncodeAsSingleRecord txns
+        let encodeAcc = encodeTransactions SingleRecord txns
         csvTransactions <- either assertFailure return
                           $ decodeTransactions SingleRecord encodeAcc
         txns @?= csvTransactions,
 
       testCase "JTransactions : encode decode multiple lines" $ do
          j <- Y.decodeFileThrow (dir ++ "csv-validate-multiple-lines.yaml")
-         let encodeAcc = encodeTransactions EncodeAsMultipleRecords
+         let encodeAcc = encodeTransactions MultipleRecords
                        $ jTransactions j
          csvTransactions <- either assertFailure return
                            $ decodeTransactions MultipleRecords encodeAcc
@@ -127,7 +127,7 @@ csvTestTree =
 
       testCase "JTransactions : no transaction single line" $ do
          j <- Y.decodeFileThrow (dir ++ "csv-transactions-no-line.yaml")
-         let encodeAcc = encodeTransactions EncodeAsSingleRecord
+         let encodeAcc = encodeTransactions SingleRecord
                        $ jTransactions j
          csvTransactions <- either assertFailure return
                            $ decodeTransactions SingleRecord encodeAcc
@@ -139,7 +139,7 @@ csvTestTree =
                            MultipleRecords
     ]
 
-csvValidationFailure :: String -> CsvDecodeOptions -> TestTree
+csvValidationFailure :: String -> CsvRecordOptions -> TestTree
 csvValidationFailure file opt =
   testCase file $ do
     csv <- BS.readFile (dir ++ file)

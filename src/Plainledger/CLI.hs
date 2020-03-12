@@ -48,9 +48,6 @@ journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
 csvFile :: Parser String
 csvFile = argument str (metavar "CSV-FILE" <> help "The csv file")
 
-yamlFile :: Parser String
-yamlFile = argument str (metavar "YAML-FILE" <> help "The yaml file")
-
 -- outputArg :: Parser String
 -- outputArg = argument str (metavar "OUTPUT-FILE" <> help "The ouptut file")
 --
@@ -86,20 +83,20 @@ csvType = flag' CsvAccounts
                          \representing transactions")
            <*> txnDecodeOption)
 
-fromCsvCommand :: Parser Command
-fromCsvCommand = CFromCsv
-               <$> (FromCsvCommand
-                   <$> csvFile
-                   <*> yamlFile
+convertCommand :: Parser Command
+convertCommand = CFromCsv
+               <$> (ConvertCommand
+                   <$> argument str (metavar "INPUT-FILE" <> help "The input file")
+                   <*> argument str (metavar "OUTPUT-FILE" <> help "The output file")
                    <*> csvType)
 
-fromCsvInfo :: ParserInfo Command
-fromCsvInfo = info (fromCsvCommand <**> helper)
+convertInfo :: ParserInfo Command
+convertInfo = info (convertCommand <**> helper)
               (fullDesc
-               <> progDesc "Converts the CSV file into a Yaml \
+               <> progDesc "Converts between a CSV file and a Yaml \
                            \file readable by plainledger")
 
-txnDecodeOption :: Parser CsvDecodeOptions
+txnDecodeOption :: Parser CsvRecordOptions
 txnDecodeOption = flag MultipleRecords SingleRecord
    ( long "single-record"
   <> short 's'
@@ -168,7 +165,7 @@ trialBalanceInfo = info (trialBalanceCommand <**> helper)
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "accounts" accountsInfo
-  <> command "fromcsv" fromCsvInfo
+  <> command "convert" convertInfo
   <> command "transactions" transactionsInfo
   <> command "trialbalance" trialBalanceInfo)
 

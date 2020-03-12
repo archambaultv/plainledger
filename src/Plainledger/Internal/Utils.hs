@@ -12,7 +12,7 @@ module Plainledger.Internal.Utils
 (
   findDuplicates,
   DecodableFile(..),
-  isDecodableFile
+  isSupportedExtension
 ) where
 
 import Data.Hashable (Hashable)
@@ -32,10 +32,10 @@ findDuplicates xs = HM.keys
 data DecodableFile = YamlFile | CsvFile
 
 -- | Tells if the file is decodable or not
-isDecodableFile :: (MonadError Error m) =>
+isSupportedExtension :: (MonadError Error m) =>
                    String ->
                    m DecodableFile
-isDecodableFile f =
+isSupportedExtension f =
   let ext = takeExtension f
   in case map toLower ext of
        ".yaml" -> pure YamlFile

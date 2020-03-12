@@ -31,9 +31,7 @@ runTransactions c = do
      case txns of
        Left err -> putStrLn err
        Right xs ->
-        let opt = case tcEncodeFormat c of
-                     SingleRecord -> EncodeAsSingleRecord
-                     MultipleRecords -> EncodeAsMultipleRecords
+        let opt = tcEncodeFormat c
         in BL.writeFile
           (tcCsvFile c)
           $ encodeTransactions opt
