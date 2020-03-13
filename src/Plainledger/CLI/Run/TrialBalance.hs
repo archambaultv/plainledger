@@ -31,8 +31,8 @@ runTrialBalance c = do
             ed = maybe MaxDate Date $ (tbcEndDate c)
         in do
           tb <- either fail return
-                $ trialBalanceToCsv (tbcOption c)
-               <$> trialBalanceReport
+                $ reportToTrialBalance (tbcOption c)
+               <$> report
                    (tbcYamlFile c)
                    sd
                    ed

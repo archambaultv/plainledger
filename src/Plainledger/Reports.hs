@@ -10,8 +10,10 @@
 -- data types and functions related to the journal file.
 
 module Plainledger.Reports (
+  module Plainledger.Reports.Report,
   module Plainledger.Reports.TrialBalance
   )
 where
 
+import Plainledger.Reports.Report
 import Plainledger.Reports.TrialBalance
