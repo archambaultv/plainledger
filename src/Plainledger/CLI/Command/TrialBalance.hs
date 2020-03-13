@@ -17,7 +17,7 @@ module Plainledger.CLI.Command.TrialBalance
 where
 
 import Data.Time
-import Plainledger.Reports.TrialBalance
+import Plainledger.Reports
 
 data TrialBalanceCommand = TrialBalanceCommand {
   tbcYamlFile :: String,

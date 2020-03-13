@@ -10,11 +10,14 @@
 module Plainledger.Reports.Report (
   Report(..),
   ReportLine(..),
+  BalanceFormat(..),
   report,
   reportLines,
   cashFlow,
   openingBalance,
-  earnings
+  earnings,
+  amountTitle,
+  serializeAmount
   )
 where
 
@@ -51,6 +54,21 @@ data ReportLine = ReportLine {
   rlActive :: Bool,
   rlGroup :: AccountGroup
 } deriving (Eq, Show)
+
+data BalanceFormat = TwoColumnDebitCredit | OneColumnSignedNumber
+  deriving (Eq, Show)
+
+amountTitle :: BalanceFormat -> [T.Text]
+amountTitle OneColumnSignedNumber = ["Balance"]
+amountTitle TwoColumnDebitCredit = ["Debit", "Credit"]
+
+serializeAmount :: BalanceFormat -> AccountGroup -> Quantity -> [T.Text]
+serializeAmount OneColumnSignedNumber _ x = [T.pack $ show x]
+serializeAmount TwoColumnDebitCredit g x
+  | x == 0 && isDebitGroup g = ["0",""]
+  | x == 0 && isCreditGroup g = ["","0"]
+  | x < 0 = ["",T.pack $ show $ negate x]
+  | otherwise = [T.pack $ show x, ""]
 
 cashFlow :: ReportLine -> Quantity
 cashFlow r = rlEndDateBalance r - rlOpeningBalance r

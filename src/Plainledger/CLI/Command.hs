@@ -14,7 +14,8 @@ module Plainledger.CLI.Command
   module Plainledger.CLI.Command.Accounts,
   module Plainledger.CLI.Command.Convert,
   module Plainledger.CLI.Command.Transactions,
-  module Plainledger.CLI.Command.TrialBalance
+  module Plainledger.CLI.Command.TrialBalance,
+  module Plainledger.CLI.Command.Cashflow,
   )
 where
 
@@ -22,9 +23,11 @@ import Plainledger.CLI.Command.Accounts
 import Plainledger.CLI.Command.Convert
 import Plainledger.CLI.Command.Transactions
 import Plainledger.CLI.Command.TrialBalance
+import Plainledger.CLI.Command.Cashflow
 
 data Command
   = CAccounts AccountsCommand
   | CFromCsv ConvertCommand
   | CTransactions TransactionsCommand
   | CTrialBalance TrialBalanceCommand
+  | CCashFlow CashFlowCommand

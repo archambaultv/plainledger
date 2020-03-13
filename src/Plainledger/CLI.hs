@@ -162,12 +162,46 @@ trialBalanceInfo = info (trialBalanceCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the trial balance in a CSV format")
 
+cashFlowCommand :: Parser Command
+cashFlowCommand = CCashFlow
+               <$> (CashFlowCommand
+                   <$> journalFile
+                   <*> csvFile
+                   <*> startDate
+                   <*> endDate
+                   <*> cashFlowOption)
+
+cashFlowOption :: Parser CashFlowOption
+cashFlowOption = CashFlowOption
+                   <$> balanceFormat
+                   <*> showInactiveAccounts
+
+  where balanceFormat = flag TwoColumnDebitCredit OneColumnSignedNumber
+           ( long "signed-balance"
+          <> short 's'
+          <> help "Does not report the balance with debit credit columns, but only \
+                  \with a signed quantity. A positive amount means debit and a \
+                  \negative amount means credit.")
+
+        showInactiveAccounts = flag False True
+           ( long "show-all-accounts"
+          <> short 'a'
+          <> help "Show all the accounts defined in the accounts section of \
+                  \the JOURNAL-FILE in the report, including accounts \
+                  \without transactions.")
+
+cashFlowInfo :: ParserInfo Command
+cashFlowInfo = info (cashFlowCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints the cash flow report in a CSV format")
+
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "accounts" accountsInfo
   <> command "convert" convertInfo
   <> command "transactions" transactionsInfo
-  <> command "trialbalance" trialBalanceInfo)
+  <> command "trialbalance" trialBalanceInfo
+  <> command "cashflow" cashFlowInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)
