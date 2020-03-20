@@ -32,19 +32,11 @@ tbBalance l =
   else rlEndDateBalance l
 
 trialBalanceTotal :: [ReportLine] -> HM.HashMap Commodity Quantity
-trialBalanceTotal ys =
-    let xs :: [(Commodity, Quantity)]
-        xs = map (\l -> (rlCommodity l, tbBalance l)) ys
-    in HM.fromListWith (+) xs
+trialBalanceTotal = reportTotal tbBalance
 
 trialBalanceTotalDrCr :: [ReportLine] ->
-                         HM.HashMap Commodity (Quantity, Quantity)
-trialBalanceTotalDrCr ys =
-    let xs :: [(Commodity, (Quantity, Quantity))]
-        xs = map (\(c, n) -> if n < 0 then (c, (0, negate n)) else (c, (n, 0)))
-           $ map (\l -> (rlCommodity l, tbBalance l)) ys
-
-    in HM.fromListWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) xs
+                     HM.HashMap Commodity (Quantity, Quantity)
+trialBalanceTotalDrCr = reportTotalDrCr tbBalance
 
 data TrialBalanceOption = TrialBalanceOption {
   tboBalanceFormat :: BalanceFormat,
@@ -72,6 +64,7 @@ reportToTrialBalance opt tb =
     serialize :: ReportLine -> [T.Text]
     serialize l
       | rlActive l == False
+        && aId (rlAccount l) /= openBalAcc
         && tbBalance l == 0
         && not (tboShowInactiveAccounts opt) = []
     serialize l@(ReportLine acc comm _ _ _ gr) =
@@ -96,7 +89,7 @@ reportToTrialBalance opt tb =
      -- Total lines
     total :: [[T.Text]]
     total = case (tboBalanceFormat opt) of
-              OneColumnSignedNumber ->
+              InflowOutflow ->
                 map (\(c, q) -> ["", "Total"]
                                 ++ [T.pack $ show q] ++ [c])
                 $ sortBy (comparing fst)
@@ -111,6 +104,7 @@ reportToTrialBalance opt tb =
                 $ HM.toList
                 $ trialBalanceTotalDrCr
                 $ rLines tb
+              NormallyPositive -> []
 
     csvlines ::  [[T.Text]]
     csvlines =  title

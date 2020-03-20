@@ -143,7 +143,7 @@ trialBalanceOption = TrialBalanceOption
                    <$> balanceFormat
                    <*> showInactiveAccounts
 
-  where balanceFormat = flag TwoColumnDebitCredit OneColumnSignedNumber
+  where balanceFormat = flag TwoColumnDebitCredit InflowOutflow
            ( long "signed-balance"
           <> short 's'
           <> help "Does not report the balance with debit credit columns, but only \
@@ -176,7 +176,7 @@ cashFlowOption = CashFlowOption
                    <$> balanceFormat
                    <*> showInactiveAccounts
 
-  where balanceFormat = flag TwoColumnDebitCredit OneColumnSignedNumber
+  where balanceFormat = flag TwoColumnDebitCredit InflowOutflow
            ( long "signed-balance"
           <> short 's'
           <> help "Does not report the balance with debit credit columns, but only \
@@ -195,13 +195,39 @@ cashFlowInfo = info (cashFlowCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the cash flow report in a CSV format")
 
+balanceSheetCommand :: Parser Command
+balanceSheetCommand = CBalanceSheet
+               <$> (BalanceSheetCommand
+                   <$> journalFile
+                   <*> csvFile
+                   <*> startDate
+                   <*> endDate
+                   <*> balanceSheetOption)
+
+balanceSheetOption :: Parser BalanceSheetOption
+balanceSheetOption = BalanceSheetOption
+                   <$> showInactiveAccounts
+
+  where showInactiveAccounts = flag False True
+           ( long "show-all-accounts"
+          <> short 'a'
+          <> help "Show all the accounts defined in the accounts section of \
+                  \the JOURNAL-FILE in the trial balance, including accounts \
+                  \without transactions.")
+
+balanceSheetInfo :: ParserInfo Command
+balanceSheetInfo = info (balanceSheetCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints the balance sheet in a CSV format")
+
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "accounts" accountsInfo
   <> command "convert" convertInfo
   <> command "transactions" transactionsInfo
   <> command "trialbalance" trialBalanceInfo
-  <> command "cashflow" cashFlowInfo)
+  <> command "cashflow" cashFlowInfo
+  <> command "balancesheet" balanceSheetInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

@@ -26,19 +26,11 @@ import qualified Data.Text as T
 
 
 cashFlowTotal :: [ReportLine] -> HM.HashMap Commodity Quantity
-cashFlowTotal ys =
-    let xs :: [(Commodity, Quantity)]
-        xs = map (\l -> (rlCommodity l, cashFlow l)) ys
-    in HM.fromListWith (+) xs
+cashFlowTotal = reportTotal cashFlow
 
 cashFlowTotalDrCr :: [ReportLine] ->
-                         HM.HashMap Commodity (Quantity, Quantity)
-cashFlowTotalDrCr ys =
-    let xs :: [(Commodity, (Quantity, Quantity))]
-        xs = map (\(c, n) -> if n < 0 then (c, (0, negate n)) else (c, (n, 0)))
-           $ map (\l -> (rlCommodity l, cashFlow l)) ys
-
-    in HM.fromListWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) xs
+                     HM.HashMap Commodity (Quantity, Quantity)
+cashFlowTotalDrCr = reportTotalDrCr cashFlow
 
 data CashFlowOption = CashFlowOption {
   cfBalanceFormat :: BalanceFormat,
@@ -80,7 +72,7 @@ reportToCashFlow opt tb =
      -- Total lines
     total :: [[T.Text]]
     total = case (cfBalanceFormat opt) of
-              OneColumnSignedNumber ->
+              InflowOutflow ->
                 map (\(c, q) -> ["", "Total"]
                                 ++ [T.pack $ show q] ++ [c])
                 $ sortBy (comparing fst)
@@ -95,6 +87,7 @@ reportToCashFlow opt tb =
                 $ HM.toList
                 $ cashFlowTotalDrCr
                 $ rLines tb
+              NormallyPositive -> []
 
     csvlines ::  [[T.Text]]
     csvlines =  title

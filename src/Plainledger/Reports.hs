@@ -12,10 +12,12 @@
 module Plainledger.Reports (
   module Plainledger.Reports.Report,
   module Plainledger.Reports.TrialBalance,
-  module Plainledger.Reports.Cashflow
+  module Plainledger.Reports.Cashflow,
+  module Plainledger.Reports.BalanceSheet
   )
 where
 
 import Plainledger.Reports.Report
 import Plainledger.Reports.TrialBalance
 import Plainledger.Reports.Cashflow
+import Plainledger.Reports.BalanceSheet

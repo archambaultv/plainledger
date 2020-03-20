@@ -13,6 +13,8 @@ module Plainledger.Reports.Report (
   BalanceFormat(..),
   report,
   reportLines,
+  reportTotal,
+  reportTotalDrCr,
   cashFlow,
   openingBalance,
   earnings,
@@ -55,15 +57,39 @@ data ReportLine = ReportLine {
   rlGroup :: AccountGroup
 } deriving (Eq, Show)
 
-data BalanceFormat = TwoColumnDebitCredit | OneColumnSignedNumber
+data BalanceFormat
+  = TwoColumnDebitCredit
+  | NormallyPositive
+  | InflowOutflow
   deriving (Eq, Show)
 
 amountTitle :: BalanceFormat -> [T.Text]
-amountTitle OneColumnSignedNumber = ["Balance"]
 amountTitle TwoColumnDebitCredit = ["Debit", "Credit"]
+amountTitle _ = ["Balance"]
+
+reportTotal :: (ReportLine -> Quantity) ->
+               [ReportLine] ->
+               HM.HashMap Commodity Quantity
+reportTotal f ys =
+    let xs :: [(Commodity, Quantity)]
+        xs = map (\l -> (rlCommodity l, f l)) ys
+    in HM.fromListWith (+) xs
+
+reportTotalDrCr :: (ReportLine -> Quantity) ->
+                   [ReportLine] ->
+                   HM.HashMap Commodity (Quantity, Quantity)
+reportTotalDrCr f ys =
+    let xs :: [(Commodity, (Quantity, Quantity))]
+        xs = map (\(c, n) -> if n < 0 then (c, (0, negate n)) else (c, (n, 0)))
+           $ map (\l -> (rlCommodity l, f l)) ys
+
+    in HM.fromListWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) xs
 
 serializeAmount :: BalanceFormat -> AccountGroup -> Quantity -> [T.Text]
-serializeAmount OneColumnSignedNumber _ x = [T.pack $ show x]
+serializeAmount NormallyPositive g x
+  | g `elem` [Asset, Expense] = [T.pack $ show x]
+  | otherwise = [T.pack $ show $ negate x]
+serializeAmount InflowOutflow _ x = [T.pack $ show x]
 serializeAmount TwoColumnDebitCredit g x
   | x == 0 && isDebitGroup g = ["0",""]
   | x == 0 && isCreditGroup g = ["","0"]
