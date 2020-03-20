@@ -13,6 +13,7 @@ module Plainledger.Reports.BalanceSheet (
   )
 where
 
+import Data.Function
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (encode)
 import Data.List hiding (group, lines)
@@ -33,6 +34,7 @@ reportToBalanceSheet :: BalanceSheetOption -> Report -> ByteString
 reportToBalanceSheet opt rep =
   let
     bsLines = filter (isBalanceSheetGroup . rlGroup) $ rLines rep
+    groups = groupBy ((==) `on` rlGroup) $ sortBy (comparing rlGroup) bsLines
 
     -- Header lines
     title :: [[T.Text]]
@@ -46,6 +48,37 @@ reportToBalanceSheet opt rep =
     openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal $ rLedger rep
     earningsAmnt = earnings $ rLines rep
     earningsAcc = cEarningsAccount $ jConfiguration $ lJournal $ rLedger rep
+
+    -- serializeGroup :: [ReportLine] -> [[T.Text]]
+    -- serializeGroup [] = []
+    -- serializeGroup xs =
+    --   let header = [T.pack $ show $ rlGroup $ head xs]
+    --       xs' = sortBy (comparing (aNumber . rlAccount)) xs
+    --       ls = map serialize xs'
+    --   in header : ls
+
+    serializeGroup :: [ReportLine -> T.Text] -> [ReportLine] -> [[T.Text]]
+    serializeGroup _ [] = []
+    serializeGroup [] xs = map serialize
+                         $ sortBy (comparing (aNumber . rlAccount)) xs
+    serializeGroup (g:gs) xs =
+      let h = g $ head xs
+          header = if T.null h then [] else [h]
+          gr = rlGroup $ head xs
+          xs' = case gs of
+                 [] -> [xs]
+                 (g2:_) -> groupBy ((==) `on` g2) $ sortBy (comparing g2) xs
+          children = concatMap (serializeGroup gs) xs'
+          total :: [[T.Text]]
+          total = map (\(c, q) ->
+                    [T.append "Total " h,
+                     head $ serializeAmount NormallyPositive gr q,
+                     c])
+                $ sortBy (comparing fst)
+                $ HM.toList
+                $ reportTotal computeBalance xs
+          totalHeader = if T.null h then [] else total
+      in header : children ++ totalHeader
 
     serialize :: ReportLine -> [T.Text]
     serialize l
@@ -74,9 +107,11 @@ reportToBalanceSheet opt rep =
            else rlEndDateBalance y
 
     balanceSheetLines = filter (not . null)
-                  $ map serialize
-                  $ sortBy (comparing (aNumber . rlAccount))
-                  $ bsLines
+                      $ concatMap
+                        (serializeGroup [aGroup . rlAccount,
+                                        aSubgroup . rlAccount,
+                                        aSubsubgroup . rlAccount])
+                        groups
 
     csvlines ::  [[T.Text]]
     csvlines =  title
