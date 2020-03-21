@@ -84,7 +84,7 @@ csvType = flag' CsvAccounts
            <*> txnDecodeOption)
 
 convertCommand :: Parser Command
-convertCommand = CFromCsv
+convertCommand = CConvert
                <$> (ConvertCommand
                    <$> argument str (metavar "INPUT-FILE" <> help "The input file")
                    <*> argument str (metavar "OUTPUT-FILE" <> help "The output file")
@@ -212,13 +212,27 @@ balanceSheetOption = BalanceSheetOption
            ( long "show-all-accounts"
           <> short 'a'
           <> help "Show all the accounts defined in the accounts section of \
-                  \the JOURNAL-FILE in the trial balance, including accounts \
+                  \the JOURNAL-FILE, including accounts \
                   \without transactions.")
 
 balanceSheetInfo :: ParserInfo Command
 balanceSheetInfo = info (balanceSheetCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the balance sheet in a CSV format")
+
+incomeStatementCommand :: Parser Command
+incomeStatementCommand = CIncomeStatement
+               <$> (IncomeStatementCommand
+                   <$> journalFile
+                   <*> csvFile
+                   <*> startDate
+                   <*> endDate
+                   <*> balanceSheetOption)
+
+incomeStatementInfo :: ParserInfo Command
+incomeStatementInfo = info (incomeStatementCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints the income statement in a CSV format")
 
 parseCommand :: Parser Command
 parseCommand = subparser
@@ -227,7 +241,8 @@ parseCommand = subparser
   <> command "transactions" transactionsInfo
   <> command "trialbalance" trialBalanceInfo
   <> command "cashflow" cashFlowInfo
-  <> command "balancesheet" balanceSheetInfo)
+  <> command "balancesheet" balanceSheetInfo
+  <> command "incomestatement" incomeStatementInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

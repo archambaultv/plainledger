@@ -13,7 +13,8 @@ module Plainledger.Reports (
   module Plainledger.Reports.Report,
   module Plainledger.Reports.TrialBalance,
   module Plainledger.Reports.Cashflow,
-  module Plainledger.Reports.BalanceSheet
+  module Plainledger.Reports.BalanceSheet,
+  module Plainledger.Reports.IncomeStatement
   )
 where
 
@@ -21,3 +22,4 @@ import Plainledger.Reports.Report
 import Plainledger.Reports.TrialBalance
 import Plainledger.Reports.Cashflow
 import Plainledger.Reports.BalanceSheet
+import Plainledger.Reports.IncomeStatement
