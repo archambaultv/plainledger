@@ -47,7 +47,7 @@ reportToIncomeStatement opt rep =
 
     -- Header lines
     title :: [[T.Text]]
-    title = ["Balance Sheet"]
+    title = ["Income statement"]
             : ["Journal file", T.pack $ rJournalFile rep]
             : ["Start date", T.pack $ show $ rBeginDate rep]
             : ["End date", T.pack $ show $ rEndDate rep]
