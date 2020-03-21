@@ -65,9 +65,14 @@ reportToBalanceSheet opt rep =
       let h = g $ head xs
           header = if T.null h then [] else [h]
           gr = rlGroup $ head xs
+          minNumber :: [ReportLine] -> Int
+          minNumber [] = 0
+          minNumber ys = minimum $ map (aNumber . rlAccount) ys
           xs' = case gs of
                  [] -> [xs]
-                 (g2:_) -> groupBy ((==) `on` g2) $ sortBy (comparing g2) xs
+                 (g2:_) -> sortBy (comparing minNumber)
+                           $ groupBy ((==) `on` g2)
+                           $ sortBy (comparing g2) xs
           children = concatMap (serializeGroup gs) xs'
           total :: [[T.Text]]
           total = map (\(c, q) ->
