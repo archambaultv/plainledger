@@ -22,13 +22,16 @@ to change their behavior (for example specifying the accounting period).
 - *accounts* : List all accounts and their properties.
 - *transactions* : List all transactions in a csv file.
 - *trialbalance* : Prints the trial balance.
+- *cashflow* : Prints the cash flow report.
+- *balancesheet* : Prints the balance sheet.
+- *incomestatement* : Prints the income statement.
 - *convert* : Convert between the various formats (CSV, Yaml) understood by plainledger.
 
 ## Multiple currencies and commodities
 Plainledger provides very basic support for working with multiple currencies.
 You can enter transactions with any commodity you like and plainledger will not
-mix them up. For example, earnings in balance sheet report are computed by
-commodity. But plainledger does automatically convert amounts in a foreign
+mix them up. For example, earnings in the balance sheet report are computed by
+commodity. But plainledger does not automatically convert amounts in a foreign
 currency to your local currency or compute realized and unrealized foreign
 exchange gain. Feel free to open an issue if you need such things.
 
