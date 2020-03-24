@@ -11,6 +11,7 @@ module Plainledger.Reports.Report (
   Report(..),
   ReportLine(..),
   BalanceFormat(..),
+  ReportNode(..),
   report,
   reportLines,
   reportTotal,
@@ -19,16 +20,24 @@ module Plainledger.Reports.Report (
   openingBalance,
   earnings,
   amountTitle,
-  serializeAmount
+  serializeAmount,
+  reportLinesToForest,
+  nodeNumber,
+  nodeName,
+  treeToReportLines,
+  forestToReportLines,
+  nodeGroup
   )
 where
 
+import Data.Function
 import Control.Monad.Except
 import Data.HashMap.Strict (HashMap)
 import Data.List hiding (group, lines)
 import Data.Maybe
 import Data.Ord
 import Data.Time
+import Data.Tree
 import Plainledger.Error
 import Plainledger.Ledger
 import Prelude hiding (lines)
@@ -56,6 +65,99 @@ data ReportLine = ReportLine {
   rlActive :: Bool,
   rlGroup :: AccountGroup
 } deriving (Eq, Show)
+
+data ReportNode
+  = RNGroup Int T.Text AccountGroup
+  | RNSubGroup Int T.Text AccountGroup
+  | RNSubSubGroup Int T.Text AccountGroup
+  | RNReportLine ReportLine
+
+nodeNumber :: ReportNode -> Int
+nodeNumber (RNGroup n _  _) = n
+nodeNumber (RNReportLine l) = aNumber $ rlAccount l
+nodeNumber (RNSubGroup n _ _) = n
+nodeNumber (RNSubSubGroup n _ _) = n
+
+nodeName :: ReportNode -> T.Text
+nodeName (RNGroup _ n  _) = n
+nodeName (RNReportLine l) = aName $ rlAccount l
+nodeName (RNSubGroup _ n _) = n
+nodeName (RNSubSubGroup _ n _) = n
+
+nodeGroup :: ReportNode -> AccountGroup
+nodeGroup (RNGroup _ _ n) = n
+nodeGroup (RNReportLine l) = rlGroup l
+nodeGroup (RNSubGroup _ _ n) = n
+nodeGroup (RNSubSubGroup _ _ n) = n
+
+forestToReportLines :: Forest ReportNode -> [ReportLine]
+forestToReportLines = concatMap treeToReportLines
+
+treeToReportLines :: Tree ReportNode -> [ReportLine]
+treeToReportLines (Node (RNReportLine l) _) = [l]
+treeToReportLines (Node _ xs) = forestToReportLines xs
+
+reportLinesToForest :: [ReportLine] -> Forest ReportNode
+reportLinesToForest ls =
+  let groups = groupBy ((==) `on` rlGroup) $ sortBy (comparing rlGroup) ls
+      groupNodes = sortBy (comparing (nodeNumber . rootLabel))
+                 $ map mkGroupTree groups
+  in groupNodes
+
+mkGroupTree :: [ReportLine] -> Tree ReportNode
+mkGroupTree xs =
+  let accGroup = rlGroup $ head xs
+      groupName = aGroup $ rlAccount $ head xs
+      number = minimum $ map (aNumber . rlAccount) xs
+      children = mkSubGroupForest accGroup xs
+  in Node (RNGroup number groupName accGroup) children
+
+mkForest :: (Account -> T.Text) ->
+            ([ReportLine] -> Tree ReportNode) ->
+            [ReportLine] ->
+            Forest ReportNode
+mkForest _ _ [] = []
+mkForest gr mkTree ls =
+  let (noGroups, groups') = partition (T.null . gr . rlAccount) ls
+      groups :: [[ReportLine]]
+      groups = groupBy ((==) `on` (gr . rlAccount))
+             $ sortBy (comparing (gr . rlAccount)) groups'
+      nodes :: Forest ReportNode
+      nodes = sortBy (comparing (nodeNumber . rootLabel))
+            $ map mkTree groups
+  in insertNoGroups
+     (sortBy (comparing (aNumber . rlAccount)) noGroups)
+     nodes
+
+mkSubGroupForest :: AccountGroup -> [ReportLine] -> Forest ReportNode
+mkSubGroupForest accGroup = mkForest aSubgroup (mkSubGroupTree accGroup)
+
+mkSubGroupTree :: AccountGroup -> [ReportLine] -> Tree ReportNode
+mkSubGroupTree accGroup xs =
+  let groupName = aSubgroup $ rlAccount $ head xs
+      number = minimum $ map (aNumber . rlAccount) xs
+      children = mkSubSubGroupForest accGroup xs
+  in Node (RNSubGroup number groupName accGroup) children
+
+mkSubSubGroupForest :: AccountGroup -> [ReportLine] -> Forest ReportNode
+mkSubSubGroupForest accGroup = mkForest aSubsubgroup (mkSubSubGroupTree accGroup)
+
+mkSubSubGroupTree :: AccountGroup -> [ReportLine] -> Tree ReportNode
+mkSubSubGroupTree accGroup xs =
+  let groupName = aSubsubgroup $ rlAccount $ head xs
+      number = minimum $ map (aNumber . rlAccount) xs
+      children :: Forest ReportNode
+      children = sortBy (comparing (nodeNumber . rootLabel))
+               $ map (flip Node [] . RNReportLine) xs
+  in Node (RNSubSubGroup number groupName accGroup) children
+
+insertNoGroups :: [ReportLine] -> Forest ReportNode -> Forest ReportNode
+insertNoGroups xs [] = map (flip Node [] . RNReportLine) xs
+insertNoGroups [] xs = xs
+insertNoGroups (x : xs) (t:ts) =
+  if (aNumber $ rlAccount x) <= (nodeNumber $ rootLabel t)
+  then (Node (RNReportLine x) []) : insertNoGroups xs (t:ts)
+  else t : insertNoGroups (x : xs) ts
 
 data BalanceFormat
   = TwoColumnDebitCredit

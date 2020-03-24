@@ -16,14 +16,15 @@ where
 import Data.Function
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (encode)
-import Data.List hiding (group, lines)
 import Data.Ord
+import Data.List hiding (group, lines)
 import Plainledger.Ledger
 import Plainledger.Reports.Report
 import Plainledger.Reports.BalanceSheet
 import Prelude hiding (lines)
 import Prelude hiding (lines)
 import qualified Data.Text as T
+import qualified Data.HashMap.Strict as HM
 
 type IncomeStatementOption = BalanceSheetOption
 
@@ -31,7 +32,7 @@ reportToIncomeStatement :: IncomeStatementOption -> Report -> ByteString
 reportToIncomeStatement opt rep =
   let
     isLines = filter (isIncomeStatementGroup . rlGroup) $ rLines rep
-    groups = groupBy ((==) `on` rlGroup) $ sortBy (comparing rlGroup) isLines
+    forest = reportLinesToForest isLines
 
     serialize :: ReportLine -> [T.Text]
     serialize l
@@ -43,29 +44,34 @@ reportToIncomeStatement opt rep =
                  $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
            bal = cashFlow l
            amnt = serializeAmount NormallyPositive gr bal
-       in front : amnt ++ [comm]
+       in "" : front : amnt ++ [comm]
 
     -- Header lines
     title :: [[T.Text]]
     title = ["Income statement"]
-            : ["Journal file", T.pack $ rJournalFile rep]
-            : ["Start date", T.pack $ show $ rBeginDate rep]
-            : ["End date", T.pack $ show $ rEndDate rep]
+            : ["","Journal file", T.pack $ rJournalFile rep]
+            : ["","Start date", T.pack $ show $ rBeginDate rep]
+            : ["","End date", T.pack $ show $ rEndDate rep]
             : []
 
-    incomeStatementLines = filter (not . null)
-                      $ concatMap
-                        (serializeGroup
-                         cashFlow
-                         serialize
-                         [aGroup . rlAccount,
-                          aSubgroup . rlAccount,
-                          aSubsubgroup . rlAccount])
-                        groups
+    incomeStatementLines = serializeForest cashFlow serialize forest
+
+    earningsAmnt = earnings $ rLines rep
+    earningsLines =
+      map (\(c, q) ->
+            ["",
+             "Earnings ",
+             head $ serializeAmount NormallyPositive Liability q,
+             c])
+      $ sortBy (comparing fst)
+      $ HM.toList
+      earningsAmnt
 
     csvlines ::  [[T.Text]]
     csvlines =  title
              ++ [[]]
              ++ incomeStatementLines
+             ++ [[]]
+             ++ earningsLines
 
   in encode csvlines

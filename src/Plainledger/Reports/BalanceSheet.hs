@@ -10,11 +10,12 @@
 module Plainledger.Reports.BalanceSheet (
   reportToBalanceSheet,
   BalanceSheetOption(..),
-  serializeGroup
+  serializeForest
   )
 where
 
 import Data.Function
+import Data.Tree
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (encode)
 import Data.List hiding (group, lines)
@@ -31,43 +32,62 @@ data BalanceSheetOption = BalanceSheetOption {
   bsShowInactiveAccounts :: Bool
 } deriving (Eq, Show)
 
-serializeGroup :: (ReportLine -> Quantity) ->
-                  (ReportLine -> [T.Text]) ->
-                  [ReportLine -> T.Text] ->
-                  [ReportLine] ->
-                  [[T.Text]]
-serializeGroup _ _ _ [] = []
-serializeGroup _ serialize [] xs =
-  map serialize $ sortBy (comparing (aNumber . rlAccount)) xs
-serializeGroup computeBalance serialize (g:gs) xs =
-  let h = g $ head xs
-      header = if T.null h then [] else [h]
-      gr = rlGroup $ head xs
-      minNumber :: [ReportLine] -> Int
-      minNumber [] = 0
-      minNumber ys = minimum $ map (aNumber . rlAccount) ys
-      xs' = case gs of
-             [] -> [xs]
-             (g2:_) -> sortBy (comparing minNumber)
-                       $ groupBy ((==) `on` g2)
-                       $ sortBy (comparing g2) xs
-      children = concatMap (serializeGroup computeBalance serialize gs) xs'
+serializeForest :: (ReportLine -> Quantity) ->
+                   (ReportLine -> [T.Text]) ->
+                   Forest ReportNode ->
+                   [[T.Text]]
+serializeForest computeBalance serialize xs =
+  let ys = map (serializeTree computeBalance serialize) xs
+  in adjustWhiteSpace (zip xs ys)
+
+serializeTree :: (ReportLine -> Quantity) ->
+                 (ReportLine -> [T.Text]) ->
+                 Tree ReportNode ->
+                 [[T.Text]]
+serializeTree _ serialize (Node (RNReportLine l) _) = [serialize l]
+serializeTree computeBalance serialize (Node n xs) =
+  let children = serializeForest computeBalance serialize xs
+      header :: [T.Text]
+      header = [nodeName n]
+      gr = nodeGroup n
       total :: [[T.Text]]
       total = map (\(c, q) ->
-                [T.append "Total " h,
+                ["",
+                 T.append "Total " (nodeName n),
                  head $ serializeAmount NormallyPositive gr q,
                  c])
             $ sortBy (comparing fst)
             $ HM.toList
-            $ reportTotal computeBalance xs
-      totalHeader = if T.null h then [] else total
-  in header : children ++ totalHeader
+            $ reportTotal computeBalance
+            $ forestToReportLines xs
+      totalLines = if all
+                      (\case {RNReportLine _ -> True; _ -> False}
+                       . rootLabel)
+                      xs
+                   then total
+                   else [] : total
+  in header : children ++ totalLines
+
+adjustWhiteSpace :: [(Tree ReportNode, [[T.Text]])] -> [[T.Text]]
+adjustWhiteSpace [] = []
+adjustWhiteSpace ((_,[[]]):xs) = adjustWhiteSpace xs
+adjustWhiteSpace (x:(_,[[]]):xs) = adjustWhiteSpace (x:xs)
+adjustWhiteSpace [(_,x)] = x
+adjustWhiteSpace ((Node (RNReportLine _ ) _, x):
+                  n@(Node (RNReportLine _) _,_):
+                  xss) = x ++ adjustWhiteSpace (n : xss)
+adjustWhiteSpace ((_, x) : xs) = x ++ [[]] ++ adjustWhiteSpace xs
 
 reportToBalanceSheet :: BalanceSheetOption -> Report -> ByteString
 reportToBalanceSheet opt rep =
   let
     bsLines = filter (isBalanceSheetGroup . rlGroup) $ rLines rep
-    groups = groupBy ((==) `on` rlGroup) $ sortBy (comparing rlGroup) bsLines
+    forest = reportLinesToForest bsLines
+
+    openBal = openingBalance $ rLines rep
+    openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal $ rLedger rep
+    earningsAmnt = earnings $ rLines rep
+    earningsAcc = cEarningsAccount $ jConfiguration $ lJournal $ rLedger rep
 
     computeBalance :: ReportLine -> Quantity
     computeBalance y =
@@ -93,30 +113,17 @@ reportToBalanceSheet opt rep =
                  $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
            bal = computeBalance l
            amnt = serializeAmount NormallyPositive gr bal
-       in front : amnt ++ [comm]
+       in "" : front : amnt ++ [comm]
 
     -- Header lines
     title :: [[T.Text]]
     title = ["Balance Sheet"]
-            : ["Journal file", T.pack $ rJournalFile rep]
-            : ["Start date", T.pack $ show $ rBeginDate rep]
-            : ["End date", T.pack $ show $ rEndDate rep]
+            : ["","Journal file", T.pack $ rJournalFile rep]
+            : ["","Start date", T.pack $ show $ rBeginDate rep]
+            : ["","End date", T.pack $ show $ rEndDate rep]
             : []
 
-    openBal = openingBalance $ rLines rep
-    openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal $ rLedger rep
-    earningsAmnt = earnings $ rLines rep
-    earningsAcc = cEarningsAccount $ jConfiguration $ lJournal $ rLedger rep
-
-    balanceSheetLines = filter (not . null)
-                      $ concatMap
-                        (serializeGroup
-                         computeBalance
-                         serialize
-                         [aGroup . rlAccount,
-                          aSubgroup . rlAccount,
-                          aSubsubgroup . rlAccount])
-                        groups
+    balanceSheetLines = serializeForest computeBalance serialize forest
 
     csvlines ::  [[T.Text]]
     csvlines =  title
