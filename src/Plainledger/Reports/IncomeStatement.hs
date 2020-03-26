@@ -44,14 +44,14 @@ reportToIncomeStatement opt rep =
                  $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
            bal = cashFlow l
            amnt = serializeAmount NormallyPositive gr bal
-       in "" : front : amnt ++ [comm]
+       in front : amnt ++ [comm]
 
     -- Header lines
     title :: [[T.Text]]
-    title = ["Income statement"]
-            : ["","Journal file", T.pack $ rJournalFile rep]
-            : ["","Start date", T.pack $ show $ rBeginDate rep]
-            : ["","End date", T.pack $ show $ rEndDate rep]
+    title = ["Income Statement"]
+            : ["Journal file", T.pack $ rJournalFile rep]
+            : ["Start date", T.pack $ show $ rBeginDate rep]
+            : ["End date", T.pack $ show $ rEndDate rep]
             : []
 
     incomeStatementLines = serializeForest cashFlow serialize forest
@@ -59,8 +59,7 @@ reportToIncomeStatement opt rep =
     earningsAmnt = earnings $ rLines rep
     earningsLines =
       map (\(c, q) ->
-            ["",
-             "Earnings ",
+            ["Earnings",
              head $ serializeAmount NormallyPositive Liability q,
              c])
       $ sortBy (comparing fst)

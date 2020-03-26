@@ -52,8 +52,7 @@ serializeTree computeBalance serialize (Node n xs) =
       gr = nodeGroup n
       total :: [[T.Text]]
       total = map (\(c, q) ->
-                ["",
-                 T.append "Total " (nodeName n),
+                [T.append "Total " (nodeName n),
                  head $ serializeAmount NormallyPositive gr q,
                  c])
             $ sortBy (comparing fst)
@@ -113,14 +112,14 @@ reportToBalanceSheet opt rep =
                  $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
            bal = computeBalance l
            amnt = serializeAmount NormallyPositive gr bal
-       in "" : front : amnt ++ [comm]
+       in front : amnt ++ [comm]
 
     -- Header lines
     title :: [[T.Text]]
     title = ["Balance Sheet"]
-            : ["","Journal file", T.pack $ rJournalFile rep]
-            : ["","Start date", T.pack $ show $ rBeginDate rep]
-            : ["","End date", T.pack $ show $ rEndDate rep]
+            : ["Journal file", T.pack $ rJournalFile rep]
+            : ["Start date", T.pack $ show $ rBeginDate rep]
+            : ["End date", T.pack $ show $ rEndDate rep]
             : []
 
     balanceSheetLines = serializeForest computeBalance serialize forest
