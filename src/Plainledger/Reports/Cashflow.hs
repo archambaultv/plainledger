@@ -43,7 +43,7 @@ reportToCashFlow opt tb =
   let
     -- Header lines
     title :: [[T.Text]]
-    title = ["cashFlow"]
+    title = ["Cashflow"]
             : ["Journal file", T.pack $ rJournalFile tb]
             : ["Start date", T.pack $ show $ rBeginDate tb]
             : ["End date", T.pack $ show $ rEndDate tb]
