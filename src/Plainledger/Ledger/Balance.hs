@@ -159,4 +159,6 @@ validateBalances defComm accs balMap bs =
                      ++ "\nComputed balance : "
                      ++ show y
                      ++ "."
+                     ++ "\nDifference       : "
+                     ++ show (x - y)
                _ -> return ()
