@@ -31,13 +31,6 @@ tbBalance l =
   then cashFlow l
   else rlEndDateBalance l
 
-trialBalanceTotal :: [ReportLine] -> HM.HashMap Commodity Quantity
-trialBalanceTotal = reportTotal tbBalance
-
-trialBalanceTotalDrCr :: [ReportLine] ->
-                     HM.HashMap Commodity (Quantity, Quantity)
-trialBalanceTotalDrCr = reportTotalDrCr tbBalance
-
 data TrialBalanceOption = TrialBalanceOption {
   tboBalanceFormat :: BalanceFormat,
   tboShowInactiveAccounts :: Bool
@@ -94,7 +87,7 @@ reportToTrialBalance opt tb =
                                 ++ [T.pack $ show q] ++ [c])
                 $ sortBy (comparing fst)
                 $ HM.toList
-                $ trialBalanceTotal
+                $ reportTotal computeBalance
                 $ rLines tb
               TwoColumnDebitCredit ->
                 map (\(c, (dr, cr)) -> ["", "Total"]
@@ -102,7 +95,7 @@ reportToTrialBalance opt tb =
                                     ++ [c])
                 $ sortBy (comparing fst)
                 $ HM.toList
-                $ trialBalanceTotalDrCr
+                $ reportTotalDrCr computeBalance
                 $ rLines tb
               NormallyPositive -> []
 
