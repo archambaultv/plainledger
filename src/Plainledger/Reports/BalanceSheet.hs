@@ -65,7 +65,10 @@ serializeTree computeBalance serialize (Node n xs) =
                       xs
                    then total
                    else [] : total
-  in header : children ++ totalLines
+  in -- If all children are null (ex: inactive) we don't report this group
+     if  all null children
+     then [[]]
+     else header : children ++ totalLines
 
 adjustWhiteSpace :: [(Tree ReportNode, [[T.Text]])] -> [[T.Text]]
 adjustWhiteSpace [] = []
