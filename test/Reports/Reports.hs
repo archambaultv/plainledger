@@ -19,7 +19,7 @@ reportsTestTree = testGroup "Report tests"
 
 trialBalanceTestTree :: TestTree
 trialBalanceTestTree =
-   testGroup "Trial balance"
+   testGroup "Report"
     [ testCase "Reports.yaml" $ do
        journal <- decodeFileThrow ledgerPath
        case journalToLedger journal of
