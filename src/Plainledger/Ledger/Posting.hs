@@ -25,6 +25,7 @@ import Plainledger.Journal
 import Plainledger.Error
 import Prelude hiding (lines)
 import Data.Bifunctor
+import qualified Data.Text as T
 
 type Posting = PostingF Day Day Quantity
 
@@ -44,6 +45,10 @@ balancePostings ps =
       withAmount' = map (\p -> p{pAmount = fromJust (pAmount p)}) withAmount
       s :: Quantity
       s = sum $ map pAmount withAmount'
+      withAmountDesc :: String
+      withAmountDesc = intercalate "\n  " $ map buildDesc withAmount
+      buildDesc :: PostingF Day Day (Maybe Quantity) -> String
+      buildDesc p = T.unpack (pAccount p) ++ " " ++ show (fromJust (pAmount p))
   in case noAmount of
         [] -> if s == 0
               then return withAmount'
@@ -52,7 +57,7 @@ balancePostings ps =
                    ++ show s
                    ++ " for commodity "
                    ++ (show $ pCommodity $ head withAmount)
-                   ++ ". All transaction must balance to zero."
+                   ++ ".\n  " ++ withAmountDesc
         [x] -> let x' :: Posting
                    x' = fromAmount (negate s) x
                in return $ x' : withAmount'
