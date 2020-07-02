@@ -9,11 +9,12 @@ data in a format easy for you to analyse in Calc or Excel. It aims to be a free,
 plain text, version control friendly replacement for accounting software like
 Sage 50 or QuickBooks (if your needs are simple enough).
 
-The journal file containing all financial information is written in
+The journal file is written in
 [Yaml](https://yaml.org/), a popular format easy to read and modify by hand or
-with any programming language. You can also write your financial information in a
-[Csv](https://en.wikipedia.org/wiki/Comma-separated_values) file and link to
-those files in your journal file.
+with any programming language. You write your financial information in
+[Csv](https://en.wikipedia.org/wiki/Comma-separated_values) files and link to
+those files in your journal file. This way you can always edit your financial
+transactions in the spreadsheet program of your choice.
 
 ## Available commands
 Most commands accept options
@@ -25,15 +26,12 @@ to change their behavior (for example specifying the accounting period).
 - *cashflow* : Prints the cash flow report.
 - *balancesheet* : Prints the balance sheet.
 - *incomestatement* : Prints the income statement.
-- *convert* : Convert between the various formats (CSV, Yaml) understood by plainledger.
 
 ## Multiple currencies and commodities
-Plainledger provides very basic support for working with multiple currencies.
-You can enter transactions with any commodity you like and plainledger will not
-mix them up. For example, earnings in the balance sheet report are computed by
-commodity. But plainledger does not automatically convert amounts in a foreign
-currency to your local currency or compute realized and unrealized foreign
-exchange gain. Feel free to open an issue if you need such things.
+Plainledger does *not* provide support for working with multiple currencies.
+This is a design choice, it is a [KISS](https://en.wikipedia.org/wiki/KISS_principle)
+program that aims to be robust and simple to use. Plus most people keep our
+accounting data in our local currency anyway.
 
 ## ToDo
 - [ ] Improve documentation
