@@ -23,8 +23,8 @@ import Control.Monad.Except
 -- / Reads the journal file and the exports the transactions in CSV format
 runIncomeStatement :: IncomeStatementCommand -> IO ()
 runIncomeStatement c = do
-     journalFile <- Y.decodeFileThrow (isYamlFile c)
-     journal <- runExceptT $ journalFileToJournal (isYamlFile c) journalFile
+     journalFile <- Y.decodeFileThrow (isJournalFile c)
+     journal <- runExceptT $ journalFileToJournal (isJournalFile c) journalFile
      case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l ->
@@ -34,7 +34,7 @@ runIncomeStatement c = do
           tb <- either fail return
                 $ reportToIncomeStatement (isOption c)
                <$> report
-                   (isYamlFile c)
+                   (isJournalFile c)
                    sd
                    ed
                    l

@@ -23,7 +23,7 @@ type CsvEncodeFormat = CsvRecordOptions
 
 
 data TransactionsCommand = TransactionsCommand {
-  tcYamlFile :: String,
+  tcJournalFile :: String,
   tcCsvFile :: String,
   tcStartDate :: Maybe Day,
   tcEndDate :: Maybe Day,

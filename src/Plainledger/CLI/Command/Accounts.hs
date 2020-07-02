@@ -15,7 +15,7 @@ module Plainledger.CLI.Command.Accounts
 where
 
 data AccountsCommand = AccountsCommand {
-  acYamlFile :: String,
+  acJournalFile :: String,
   acCsvFile :: String
   --acUsed :: Used
   }

@@ -20,7 +20,7 @@ import Data.Time
 import Plainledger.Reports
 
 data TrialBalanceCommand = TrialBalanceCommand {
-  tbcYamlFile :: String,
+  tbcJournalFile :: String,
   tbcCsvFile :: String,
   tbcStartDate :: Maybe Day,
   tbcEndDate :: Maybe Day,

@@ -23,8 +23,8 @@ import Control.Monad.Except
 -- / Reads the journal file and the exports the transactions in CSV format
 runTrialBalance :: TrialBalanceCommand -> IO ()
 runTrialBalance c = do
-     journalFile <- Y.decodeFileThrow (tbcYamlFile c)
-     journal <- runExceptT $ journalFileToJournal (tbcYamlFile c) journalFile
+     journalFile <- Y.decodeFileThrow (tbcJournalFile c)
+     journal <- runExceptT $ journalFileToJournal (tbcJournalFile c) journalFile
      case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l ->
@@ -34,7 +34,7 @@ runTrialBalance c = do
           tb <- either fail return
                 $ reportToTrialBalance (tbcOption c)
                <$> report
-                   (tbcYamlFile c)
+                   (tbcJournalFile c)
                    sd
                    ed
                    l

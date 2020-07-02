@@ -19,7 +19,7 @@ import Data.Time
 import Plainledger.Reports
 
 data IncomeStatementCommand = IncomeStatementCommand {
-  isYamlFile :: String,
+  isJournalFile :: String,
   isCsvFile :: String,
   isStartDate :: Maybe Day,
   isEndDate :: Maybe Day,

@@ -23,8 +23,8 @@ import Control.Monad.Except
 -- / Reads the journal file and the exports the transactions in CSV format
 runBalanceSheet :: BalanceSheetCommand -> IO ()
 runBalanceSheet c = do
-     journalFile <- Y.decodeFileThrow (bsYamlFile c)
-     journal <- runExceptT $ journalFileToJournal (bsYamlFile c) journalFile
+     journalFile <- Y.decodeFileThrow (bsJournalFile c)
+     journal <- runExceptT $ journalFileToJournal (bsJournalFile c) journalFile
      case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l ->
@@ -34,7 +34,7 @@ runBalanceSheet c = do
           tb <- either fail return
                 $ reportToBalanceSheet (bsOption c)
                <$> report
-                   (bsYamlFile c)
+                   (bsJournalFile c)
                    sd
                    ed
                    l

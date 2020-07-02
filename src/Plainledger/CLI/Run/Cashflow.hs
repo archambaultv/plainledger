@@ -23,8 +23,8 @@ import Control.Monad.Except
 -- / Reads the journal file and the exports the transactions in CSV format
 runCashFlow :: CashFlowCommand -> IO ()
 runCashFlow c = do
-     journalFile <- Y.decodeFileThrow (cfYamlFile c)
-     journal <- runExceptT $ journalFileToJournal (cfYamlFile c) journalFile
+     journalFile <- Y.decodeFileThrow (cfJournalFile c)
+     journal <- runExceptT $ journalFileToJournal (cfJournalFile c) journalFile
      case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l ->
@@ -34,7 +34,7 @@ runCashFlow c = do
           tb <- either fail return
                 $ reportToCashFlow (cfOption c)
                <$> report
-                   (cfYamlFile c)
+                   (cfJournalFile c)
                    sd
                    ed
                    l

@@ -20,7 +20,7 @@ import Data.Time
 import Plainledger.Reports
 
 data CashFlowCommand = CashFlowCommand {
-  cfYamlFile :: String,
+  cfJournalFile :: String,
   cfCsvFile :: String,
   cfStartDate :: Maybe Day,
   cfEndDate :: Maybe Day,

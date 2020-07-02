@@ -23,8 +23,8 @@ import Control.Monad.Except
 -- / Reads the journal file and the exports the transactions in CSV format
 runTransactions :: TransactionsCommand -> IO ()
 runTransactions c = do
-     journalFile <- Y.decodeFileThrow (tcYamlFile c)
-     journal <- runExceptT $ journalFileToJournal (tcYamlFile c) journalFile
+     journalFile <- Y.decodeFileThrow (tcJournalFile c)
+     journal <- runExceptT $ journalFileToJournal (tcJournalFile c) journalFile
      let txns =  if tcValidation c
                  then (map transactionToJTransaction . jTransactions . lJournal)
                       <$> (journal >>= journalToLedger)
