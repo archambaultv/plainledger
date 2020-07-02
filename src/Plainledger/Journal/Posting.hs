@@ -12,8 +12,7 @@ module Plainledger.Journal.Posting (
   PostingF(..),
   JPosting,
   fromAmount,
-  fromBalanceDate,
-  setPostingDate
+  fromBalanceDate
   )
 where
 
@@ -28,32 +27,27 @@ import Data.Bifunctor
 
 -- | The Posting data type reprensents the change in the balance of an account.
 -- Transactions are made of at least two postings.
-data PostingF d1 d2 q = Posting
+data PostingF d2 q = Posting
   {
-    pDate :: d1,
     pBalanceDate :: d2,
     pAccount :: T.Text,
     pAmount :: q
   } deriving (Eq, Show, Generic, Functor)
 
-instance Bifunctor (PostingF x) where
-  first f (Posting d1 b a amnt) = Posting d1 (f b) a amnt
-  second f (Posting d1 b a amnt) = Posting d1 b a (f amnt)
+instance Bifunctor PostingF where
+  first f (Posting b a amnt) = Posting (f b) a amnt
+  second f (Posting b a amnt) = Posting b a (f amnt)
 
-type JPosting = PostingF () (Maybe Day) (Maybe Quantity)
-
-
-setPostingDate :: d1' -> PostingF d1 d2 q -> PostingF d1' d2 q
-setPostingDate d (Posting _ balDate acc amnt) = Posting d balDate acc amnt
+type JPosting = PostingF (Maybe Day) (Maybe Quantity)
 
 -- | Updates the balance date if it is Nothing
-fromBalanceDate :: Day -> PostingF d1 (Maybe Day) q -> PostingF d1 Day q
-fromBalanceDate txDate (Posting date balDate acc amnt) =
+fromBalanceDate :: Day -> PostingF (Maybe Day) q -> PostingF Day q
+fromBalanceDate txDate (Posting balDate acc amnt) =
   let d = fromMaybe txDate balDate
-  in Posting date d acc amnt
+  in Posting d acc amnt
 
 -- | Updates the amount if it is Nothing
-fromAmount :: Quantity -> PostingF d1 d2 (Maybe Quantity) -> PostingF d1 d2 Quantity
-fromAmount txAmount (Posting date balDate acc amnt) =
+fromAmount :: Quantity -> PostingF d2 (Maybe Quantity) -> PostingF d2 Quantity
+fromAmount txAmount (Posting balDate acc amnt) =
   let a = fromMaybe txAmount amnt
-  in Posting date balDate acc a
+  in Posting balDate acc a

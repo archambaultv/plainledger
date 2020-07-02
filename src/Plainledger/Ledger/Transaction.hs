@@ -32,6 +32,7 @@ import Text.Printf (printf)
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import Control.Monad.Except
+import Data.Bifunctor
 
 type Transaction = TransactionF Posting
 
@@ -49,63 +50,53 @@ validateJTransactions accs jtransactions = do
     transactions <- traverse jtransactionToTransaction jtransactions
     _ <- traverse (checkTxnAccount accs) transactions
     transactions1 <- validateTransactionsId transactions
-    let (bm, bm2) = computeBalanceMap
-             accs
-             transactions1
+    let (bm, bm2) = computeBalanceTx transactions1
 
     return (bm, bm2, transactions1)
 
-computeBalanceMap :: HS.HashSet T.Text ->
-                     [Transaction] ->
-                     (BalanceMap, BalanceMap)
-computeBalanceMap accs txns =
-  let m0 :: BalanceMap
-      m0 = HM.fromList $ zip (HS.toList accs) (repeat M.empty)
+-- Compute the balance from postings, assuming they are all from the same
+-- accounts
+computeBalance :: [PostingF Day Quantity] -> M.Map Day Quantity
+computeBalance ps =
+  let
+    deltaMap :: M.Map Day Quantity
+    deltaMap = M.fromListWith (+) $
+               map (\p -> (pBalanceDate p, pAmount p)) ps
 
-      postings = concatMap (tPostings) txns
-      postingsByAccount = groupBy ((==) `on` pAccount)
-                        $ sortBy (comparing pAccount) postings
-  in foldr addAccount (m0, m0) postingsByAccount
+    deltaList :: [(Day, Quantity)]
+    deltaList = M.toAscList deltaMap
 
-  where addAccount :: [Posting] ->
-                      (BalanceMap, BalanceMap) ->
-                      (BalanceMap, BalanceMap)
-        addAccount ps (m1, m2) =
-          let acc = pAccount $ head ps
-              m1' = addDate ps acc pDate m1
-              m2' = addDate ps acc pBalanceDate m2
-          in (m1', m2')
+    balanceList :: [Quantity]
+    balanceList = scanl1 (+)
+                $ map snd deltaList
 
-        addDate :: [Posting] ->
-                   T.Text ->
-                   (Posting -> Day) ->
-                   BalanceMap ->
-                   BalanceMap
-        addDate ps acc f m =
-          let psDate = reverse
-                  $ groupBy ((==) `on` f)
-                  $ sortBy (comparing f) ps
+  in M.fromList $ zip (map fst deltaList) balanceList
 
-              dateTotal :: [(Day, Quantity)]
-              dateTotal = reverse $ foldr (sumDate f) [] psDate
+-- Sorts the postings by accounts and compute the balance map
+computeBalancePs :: [PostingF Day Quantity] -> BalanceMap
+computeBalancePs ps =
+  let byId :: [[PostingF Day Quantity]]
+      byId = groupBy ((==) `on` pAccount)
+           $ sortOn pAccount ps
 
-              dateMap = M.fromList dateTotal
+      accounts :: [T.Text]
+      accounts = map (pAccount . head) byId
 
-          in HM.insertWith M.union acc dateMap m
+      balance :: [M.Map Day Quantity]
+      balance = map computeBalance byId
 
-        sumDate :: (Posting -> Day) ->
-                   [Posting] ->
-                   [(Day, Quantity)] ->
-                   [(Day, Quantity)]
-        sumDate _ [] acc = acc
-        sumDate getDate ps acc =
-          let d = getDate $ head ps
-              a = sum $ map pAmount ps
-              previousBalance = if null acc
-                                then 0
-                                else snd (head acc)
-          in (d, a + previousBalance) : acc
+  in HM.fromList $ zip accounts balance
 
+-- Computes a balanceMap from the transaction date and the balance date
+computeBalanceTx :: [Transaction] -> (BalanceMap, BalanceMap)
+computeBalanceTx txns =
+  let psTx = concatMap
+             (\t -> map (first (const (tDate t))) (tPostings t))
+             txns
+
+      psBal = concatMap tPostings txns
+
+  in (computeBalancePs psTx, computeBalancePs psBal)
 
 checkTxnAccount :: (MonadError Error m) =>
                     HS.HashSet T.Text -> Transaction -> m ()
@@ -121,10 +112,9 @@ checkTxnAccount s t = traverse foo (tPostings t) >> return ()
 jtransactionToTransaction :: (MonadError Error m) =>
                              JTransaction -> m Transaction
 jtransactionToTransaction (Transaction d tId p tags) =
-  -- First we update the balance-date and commodity field of each posting,
-  -- then group the postings by commodity
-  let ps :: [PostingF Day Day (Maybe Quantity)]
-      ps = map (setPostingDate d . fromBalanceDate d) p
+  -- We update the balance-date if it is null
+  let ps :: [PostingF Day (Maybe Quantity)]
+      ps = map (fromBalanceDate d) p
   in do
     -- We balance the postings to zero
     ps2 <- balancePostings ps

@@ -27,15 +27,15 @@ import Prelude hiding (lines)
 import Data.Bifunctor
 import qualified Data.Text as T
 
-type Posting = PostingF Day Day Quantity
+type Posting = PostingF Day Quantity
 
-postingToJPosting :: PostingF d1 d2 q -> PostingF () (Maybe d2) (Maybe q)
-postingToJPosting = setPostingDate () . first Just . fmap Just
+postingToJPosting :: PostingF d2 q -> PostingF (Maybe d2) (Maybe q)
+postingToJPosting = first Just . second Just
 
 -- | Asserts a zero balance
 balancePostings :: (MonadError Error m) =>
-                    [PostingF Day Day (Maybe Quantity)] ->
-                    m [Posting]
+                    [PostingF d (Maybe Quantity)] ->
+                    m [PostingF d Quantity]
 balancePostings [] =
   throwError "Expecting at least two postings per transaction."
 balancePostings [_] =
@@ -47,7 +47,7 @@ balancePostings ps =
       s = sum $ map pAmount withAmount'
       withAmountDesc :: String
       withAmountDesc = intercalate "\n  " $ map buildDesc withAmount
-      buildDesc :: PostingF Day Day (Maybe Quantity) -> String
+      buildDesc :: PostingF d (Maybe Quantity) -> String
       buildDesc p = T.unpack (pAccount p) ++ " " ++ show (fromJust (pAmount p))
   in case noAmount of
         [] -> if s == 0
@@ -55,7 +55,6 @@ balancePostings ps =
               else throwError
                    $ "Unbalanced transaction. The balance is "
                    ++ show s ++".\n  " ++ withAmountDesc
-        [x] -> let x' :: Posting
-                   x' = fromAmount (negate s) x
+        [x] -> let x' = fromAmount (negate s) x
                in return $ x' : withAmount'
         _ -> throwError "Two postings without amount."

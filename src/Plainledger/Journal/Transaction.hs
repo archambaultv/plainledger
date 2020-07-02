@@ -206,7 +206,7 @@ decodeTransactions SingleRecord bs = do
                         (\case  {"" -> return Nothing;
                                  v -> Just <$> parseISO8601M v})
 
-                let p = Posting () bal acc amnt
+                let p = Posting bal acc amnt
                 return $ p : ps
 
 decodeTransactions MultipleRecords bs = do
@@ -235,7 +235,7 @@ decodeTransactions MultipleRecords bs = do
                   (\case  {"" -> return Nothing;
                            v -> Just <$> parseISO8601M v})
           tags <- recordToTags m  (HS.fromList multipleRecordsHeader)
-          return $ Transaction date tId [Posting () bal acc amnt] tags
+          return $ Transaction date tId [Posting bal acc amnt] tags
 
         regroupTransactions :: (MonadError Error m) =>
                                [JTransaction] -> m JTransaction
