@@ -38,4 +38,4 @@ runBalanceSheet c = do
                    sd
                    ed
                    l
-          BL.writeFile (bsCsvFile c) tb
+          BL.writeFile (bsOuputFile c) tb

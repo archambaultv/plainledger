@@ -34,7 +34,7 @@ runTransactions c = do
        Right xs ->
         let opt = tcEncodeFormat c
         in BL.writeFile
-          (tcCsvFile c)
+          (tcOuputFile c)
           $ encodeTransactions opt
           $ filterDate (tcStartDate c) (tcEndDate c)
           $ xs

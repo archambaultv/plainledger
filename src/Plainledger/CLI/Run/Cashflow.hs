@@ -38,4 +38,4 @@ runCashFlow c = do
                    sd
                    ed
                    l
-          BL.writeFile (cfCsvFile c) tb
+          BL.writeFile (cfOuputFile c) tb

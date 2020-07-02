@@ -20,7 +20,7 @@ import Plainledger.Reports
 
 data IncomeStatementCommand = IncomeStatementCommand {
   isJournalFile :: String,
-  isCsvFile :: String,
+  isOuputFile :: String,
   isStartDate :: Maybe Day,
   isEndDate :: Maybe Day,
   isOption :: IncomeStatementOption

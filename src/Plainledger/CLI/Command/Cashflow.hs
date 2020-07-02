@@ -21,7 +21,7 @@ import Plainledger.Reports
 
 data CashFlowCommand = CashFlowCommand {
   cfJournalFile :: String,
-  cfCsvFile :: String,
+  cfOuputFile :: String,
   cfStartDate :: Maybe Day,
   cfEndDate :: Maybe Day,
   cfOption :: CashFlowOption

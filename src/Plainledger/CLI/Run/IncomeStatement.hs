@@ -38,4 +38,4 @@ runIncomeStatement c = do
                    sd
                    ed
                    l
-          BL.writeFile (isCsvFile c) tb
+          BL.writeFile (isOuputFile c) tb

@@ -16,7 +16,7 @@ where
 
 data AccountsCommand = AccountsCommand {
   acJournalFile :: String,
-  acCsvFile :: String
+  acOuputFile :: String
   --acUsed :: Used
   }
 

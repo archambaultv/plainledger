@@ -27,5 +27,5 @@ runAccounts c = do
      case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l -> BL.writeFile
-                  (acCsvFile c)
+                  (acOuputFile c)
                   (encodeAccounts $ jAccounts $ lJournal l)

@@ -38,4 +38,4 @@ runTrialBalance c = do
                    sd
                    ed
                    l
-          BL.writeFile (tbcCsvFile c) tb
+          BL.writeFile (tbcOuputFile c) tb

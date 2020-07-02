@@ -24,7 +24,7 @@ type CsvEncodeFormat = CsvRecordOptions
 
 data TransactionsCommand = TransactionsCommand {
   tcJournalFile :: String,
-  tcCsvFile :: String,
+  tcOuputFile :: String,
   tcStartDate :: Maybe Day,
   tcEndDate :: Maybe Day,
   tcEncodeFormat :: CsvEncodeFormat,
