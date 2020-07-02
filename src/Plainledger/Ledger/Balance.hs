@@ -34,85 +34,59 @@ import Data.HashMap.Strict (HashMap)
 -- Only the dates where the balance changes are recorded.
 type BalanceMap = HashMap
                   T.Text
-                  (HashMap Commodity (M.Map Day Quantity))
+                  (M.Map Day Quantity)
 
+-- The maximum date in the balance map
 maxDate :: BalanceMap -> Maybe Day
 maxDate m =
-  let m1 :: HashMap
-            T.Text
-            (HashMap Commodity (Maybe Day))
-      m1 = fmap (fmap (fmap fst . M.lookupMax)) m
+  case map fst $ mapMaybe M.lookupMax $ HM.elems m of
+    [] -> Nothing
+    days -> Just (maximum days)
 
-      m2 :: HashMap
-            T.Text
-            [Day]
-      m2 = fmap (catMaybes . HM.elems) m1
-
-      days :: [Day]
-      days = concat $ HM.elems m2
-
-  in if null days then Nothing else Just (maximum days)
-
+-- The minimum date in the balance map
 minDate :: BalanceMap -> Maybe Day
 minDate m =
-  let m1 :: HashMap
-            T.Text
-            (HashMap Commodity (Maybe Day))
-      m1 = fmap (fmap (fmap fst . M.lookupMin)) m
-
-      m2 :: HashMap
-            T.Text
-            [Day]
-      m2 = fmap (catMaybes . HM.elems) m1
-
-      days :: [Day]
-      days = concat $ HM.elems m2
-
-  in if null days then Nothing else Just (minimum days)
+  case map fst $ mapMaybe M.lookupMax $ HM.elems m of
+    [] -> Nothing
+    days -> Just (minimum days)
 
 balanceDate :: BalanceMap ->
                  T.Text ->
-                 Commodity ->
                  (M.Map Day Quantity -> Maybe (Day, Quantity)) ->
                  Maybe (Day, Quantity)
-balanceDate m acc comm f =
+balanceDate m acc f =
   case HM.lookup acc m of
     Nothing -> error
                $ "balanceAtDate : Account \""
                ++ T.unpack acc
                ++ "\" is not in the balance map."
-    Just m2 -> HM.lookup comm m2 >>= f
+    Just m2 -> f m2
 
 -- | balanceAtDate m d acc returns the balance of account acc at the date d. The
 -- balance is Nothing if the date is prior than any date in the map for this account.
 -- Calls error if the account does not exists
 balanceAtDate :: BalanceMap ->
                  T.Text ->
-                 Commodity ->
                  LDate ->
                  Maybe (Day, Quantity)
-balanceAtDate m acc comm d =
+balanceAtDate m acc d =
   case d of
-    MinDate -> balanceDate m acc comm M.lookupMin
-    Date d2 -> balanceDate m acc comm (M.lookupLE d2)
-    MaxDate -> balanceDate m acc comm M.lookupMax
+    MinDate -> balanceDate m acc M.lookupMin
+    Date d2 -> balanceDate m acc (M.lookupLE d2)
+    MaxDate -> balanceDate m acc M.lookupMax
 
 -- Balances :
 --  Asserts all balance have a valid account field
---  Asserts all balance have a well defined commodity
 --  Asserts all balance assertions are correct
 validateBalances :: (MonadError Error m) =>
-                      Commodity ->
                       HashSet T.Text ->
                       BalanceMap ->
                       [Balance] ->
                       m [Balance]
-validateBalances defComm accs balMap bs =
-  let b1 = fillCommodity bs
-  in do
-    _ <- traverse (checkBalanceAccount accs) b1
-    _ <- traverse (checkBalanceAmount balMap) b1
-    return b1
+validateBalances accs balMap bs = do
+    _ <- traverse (checkBalanceAccount accs) bs
+    _ <- traverse (checkBalanceAmount balMap) bs
+    return bs
 
   where checkBalanceAccount :: (MonadError Error m) =>
                                 HashSet T.Text -> Balance -> m ()
@@ -124,18 +98,11 @@ validateBalances defComm accs balMap bs =
                ++ T.unpack (bAccount b)
                ++ "\"."
 
-        fillCommodity xs =
-               map (\c -> if T.null $ bCommodity c
-                          then c{bCommodity = defComm}
-                          else c)
-                   xs
-
         checkBalanceAmount :: (MonadError Error m) =>
                               BalanceMap -> Balance -> m ()
         checkBalanceAmount m b =
           let bAtDate = snd
-                      <$> balanceAtDate m (bAccount b) (bCommodity b)
-                          (Date $ bDate b)
+                      <$> balanceAtDate m (bAccount b) (Date $ bDate b)
           in case (bAtDate, bAmount b) of
                (Nothing, 0) -> return ()
                (Nothing, x) ->

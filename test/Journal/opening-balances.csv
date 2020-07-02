@@ -1,0 +1,5 @@
+date,account id (1),amount (1),account id (2),amount (2)
+2017-12-31,Chequing,3234,Opening Balance,
+2017-12-31,Line of credit,-5440,Opening Balance,5440
+2017-12-31,Credit card,-235,Opening Balance,235
+2017-12-31,Mortgage,-164875,Opening Balance,

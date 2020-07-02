@@ -15,15 +15,16 @@ module Plainledger.CLI.Run.Accounts
 
 import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
-import Plainledger.CLI.Command (AccountsCommand(..))
+import Plainledger.CLI.Command
+import Control.Monad.Except
 import Plainledger.Ledger
 
 -- / Reads the journal file and the exports the accounts in CSV format
 runAccounts :: AccountsCommand -> IO ()
 runAccounts c = do
      journalFile <- Y.decodeFileThrow (acYamlFile c)
-     journal <- journalFileToJournal (acYamlFile c) journalFile
-     case journalToLedger journal of
+     journal <- runExceptT $ journalFileToJournal (acYamlFile c) journalFile
+     case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l -> BL.writeFile
                   (acCsvFile c)

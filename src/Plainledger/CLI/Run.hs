@@ -15,7 +15,6 @@ module Plainledger.CLI.Run
 
 import Plainledger.CLI.Command
 import Plainledger.CLI.Run.Accounts
-import Plainledger.CLI.Run.Convert
 import Plainledger.CLI.Run.Transactions
 import Plainledger.CLI.Run.TrialBalance
 import Plainledger.CLI.Run.Cashflow
@@ -25,7 +24,6 @@ import Plainledger.CLI.Run.IncomeStatement
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
 runCommand (CAccounts x) = runAccounts x
-runCommand (CConvert x) = runFromCsv x
 runCommand (CTransactions x) = runTransactions x
 runCommand (CTrialBalance x) = runTrialBalance x
 runCommand (CCashFlow x) = runCashFlow x

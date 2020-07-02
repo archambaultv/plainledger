@@ -21,15 +21,13 @@ import Plainledger.Ledger
 import Plainledger.Reports.Report
 import Prelude hiding (lines)
 import Prelude hiding (lines)
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 
 
-cashFlowTotal :: [ReportLine] -> HM.HashMap Commodity Quantity
+cashFlowTotal :: [ReportLine] -> Quantity
 cashFlowTotal = reportTotal cashFlow
 
-cashFlowTotalDrCr :: [ReportLine] ->
-                     HM.HashMap Commodity (Quantity, Quantity)
+cashFlowTotalDrCr :: [ReportLine] -> (Quantity, Quantity)
 cashFlowTotalDrCr = reportTotalDrCr cashFlow
 
 data CashFlowOption = CashFlowOption {
@@ -58,11 +56,12 @@ reportToCashFlow opt tb =
       | rlActive l == False
         && cashFlow l == 0
         && not (cfShowInactiveAccounts opt) = []
-    serialize l@(ReportLine acc comm _ _ _ gr) =
+    serialize l@(ReportLine acc _ _ _) =
        let front = [T.pack $ show $ aNumber acc, aName acc]
            bal = cashFlow l
+           gr = aGroup acc
            amnt = serializeAmount (cfBalanceFormat opt) gr bal
-       in front ++ amnt ++ [comm]
+       in front ++ amnt
 
     cashFlowLines = filter (not . null)
                   $ map serialize
@@ -70,21 +69,16 @@ reportToCashFlow opt tb =
                   $ rLines tb
 
      -- Total lines
-    total :: [[T.Text]]
+    total :: [T.Text]
     total = case (cfBalanceFormat opt) of
               InflowOutflow ->
-                map (\(c, q) -> ["", "Total"]
-                                ++ [T.pack $ show q] ++ [c])
-                $ sortBy (comparing fst)
-                $ HM.toList
+                (\q -> ["", "Total"]
+                                ++ [T.pack $ show q])
                 $ cashFlowTotal
                 $ rLines tb
               TwoColumnDebitCredit ->
-                map (\(c, (dr, cr)) -> ["", "Total"]
-                                    ++ [T.pack $ show dr, T.pack $ show cr]
-                                    ++ [c])
-                $ sortBy (comparing fst)
-                $ HM.toList
+                (\(dr, cr) -> ["", "Total"]
+                                    ++ [T.pack $ show dr, T.pack $ show cr])
                 $ cashFlowTotalDrCr
                 $ rLines tb
               NormallyPositive -> []
@@ -92,6 +86,6 @@ reportToCashFlow opt tb =
     csvlines ::  [[T.Text]]
     csvlines =  title
              ++ cashFlowLines
-             ++ ([] : total)
+             ++ ([] : [total])
 
   in encode csvlines

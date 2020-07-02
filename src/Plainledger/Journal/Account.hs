@@ -14,24 +14,28 @@ module Plainledger.Journal.Account (
   decodeAccounts,
   validateAccounts,
   accountsToHashMap,
-  decodeAccountsFile
+  decodeAccountsFile,
+  AccountGroup(..),
+  validateConfig,
+  isBalanceSheetGroup,
+  isIncomeStatementGroup,
+  isCreditGroup,
+  isDebitGroup
   )
 where
 
+import Data.Char (toLower)
+import Data.Hashable (Hashable)
 import Control.Monad.Except
-import Data.Aeson as A
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy (ByteString)
-import Data.Csv (Record, Field, ToField(..),toRecord)
+import Data.Csv (Record, Field, ToField(..),toRecord, FromField(..))
 import Data.HashMap.Strict (HashMap)
 import Data.List hiding (group, lines)
-import Data.Maybe
 import Data.Ord (comparing)
-import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import GHC.Generics
 import Plainledger.Error
 import Plainledger.Internal.Csv
-import Plainledger.Internal.Utils
 import Plainledger.Journal.Configuration
 import Plainledger.Journal.Tag
 import Prelude hiding (lines)
@@ -39,15 +43,59 @@ import qualified Data.Csv as C
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
-import qualified Data.Yaml as Y
+
+-- | The top level grouping of an account. Must be Asset, Liability,
+-- Equity, Revenue or Expense.
+data AccountGroup = Asset
+                  | Liability
+                  | Equity
+                  | Revenue
+                  | Expense
+                  deriving (Show, Eq, Ord, Generic)
+
+instance Hashable AccountGroup
+instance ToField AccountGroup where
+  toField Asset = toField ("Asset" :: String)
+  toField Liability = toField ("Liability" :: String)
+  toField Equity = toField ("Equity" :: String)
+  toField Revenue = toField ("Revenue" :: String)
+  toField Expense = toField ("Expense" :: String)
+
+instance FromField AccountGroup where
+  parseField x = do
+    s <- parseField x
+    case (map toLower s) of
+         "asset" -> return Asset
+         "liability" -> return Liability
+         "equity" -> return Equity
+         "revenue" -> return Revenue
+         "expense" -> return Expense
+         _ -> fail $ "Unknown account group \"" ++ s ++ "\". Must be one of the following\n" ++
+                   " Asset\n" ++
+                   " Liability\n" ++
+                   " Equity\n" ++
+                   " Revenue\n" ++
+                   " Expense"
+
+isBalanceSheetGroup :: AccountGroup -> Bool
+isBalanceSheetGroup a = a `elem` [Asset, Liability, Equity]
+
+isIncomeStatementGroup :: AccountGroup -> Bool
+isIncomeStatementGroup = not . isBalanceSheetGroup
+
+isCreditGroup :: AccountGroup -> Bool
+isCreditGroup a = a `elem` [Liability, Equity, Revenue]
+
+isDebitGroup :: AccountGroup -> Bool
+isDebitGroup = not . isCreditGroup
 
 -- | The Account data type serves as aggregation point for commodities
 -- relating to a particuliar purpose.
 data Account = Account
   {aId :: T.Text,
    aName :: T.Text,
-   aNumber   :: Int,
-   aGroup :: T.Text,
+   aNumber :: Int,
+   aGroup :: AccountGroup,
    aSubgroup :: T.Text, -- | Empty means no subgoup
    aSubsubgroup :: T.Text, -- | Empty means no subsubgroup
    aTags :: [Tag]
@@ -67,50 +115,13 @@ instance Eq Account where
            && sortBy (comparing tagId) (aTags a1) ==
               sortBy (comparing tagId) (aTags a2)
 
--- JSON instances
-instance ToJSON Account where
-  toJSON (Account aId name number group subgroup subsubgroup tags) =
-    Y.object
-    $ ["id" .= aId,
-      "number" .= number,
-      "group" .= group]
-
-   ++ (if T.null name then [] else ["name" .= name])
-   ++ (if T.null subgroup then [] else ["subgroup" .= subgroup])
-   ++ (if T.null subsubgroup then [] else ["subsubgroup" .= subsubgroup])
-   ++ (if null tags then [] else ["tags" .= tags])
-
-  toEncoding (Account aId name number group subgroup subsubgroup tags) =
-    pairs
-    $ "id" .= aId
-    <> (if T.null name then mempty else "name" .= name)
-    <> "number" .= number
-    <> "group" .= group
-    <> (if T.null subgroup then mempty else "subgroup" .= subgroup)
-    <> (if T.null subsubgroup then mempty else "subsubgroup" .= subsubgroup)
-    <> (if null tags then mempty else "tags" .= tags)
-
-instance FromJSON Account where
-  parseJSON (Y.Object v) =
-    Account
-    <$> v .: "id"
-    <*> (maybe "" id <$> (v .:? "name"))
-    <*> v .: "number"
-    <*> v .: "group"
-    <*> (maybe "" id <$> (v .:? "subgroup"))
-    <*> (maybe "" id <$> (v .:? "subsubgroup"))
-    <*> (maybe [] id <$> (v .:? "tags"))
-  parseJSON _ = fail "Expected Object for Account value"
-
 accountsToHashMap :: [Account] -> HashMap T.Text Account
 accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
 
 validateAccounts :: (MonadError Error m) =>
-                      HashMap T.Text AccountGroup ->
                       [Account] ->
                       m [Account]
-validateAccounts m accounts = do
-  validateGroupField m accounts
+validateAccounts accounts = do
   validateAccountIdNonNull accounts
   validateAccountIdNoDup accounts
   let accWithNames = map
@@ -149,22 +160,6 @@ validateAccountIdNoDup accounts =
              $ HM.keys dup)
           ++ "."
      else return ()
-
--- | Asserts all accounts group field are in the configuration group mapping.
-validateGroupField :: (MonadError Error m) =>
-                      HashMap T.Text AccountGroup ->
-                      [Account] ->
-                      m ()
-validateGroupField m accounts =
-  let wrong = filter (\a -> isNothing $ HM.lookup (aGroup a) m) accounts
-  in case wrong of
-      [] -> return ()
-      (a:_) -> throwError
-               $ "Group \""
-               ++ (T.unpack $ aGroup a)
-               ++ "\" of account \""
-               ++ (T.unpack $ aId a)
-               ++ "\" is not in the configuration group-mapping."
 
 -- CSV functions
 coreHeader :: [Field]
@@ -206,11 +201,7 @@ decodeAccounts bs = do
           tags <- recordToTags m (HS.fromList coreHeader)
           return $ Account id' name number group subgroup subsubgroup tags
 
-decodeAccountsFile :: FilePath -> IO [Account]
+decodeAccountsFile :: FilePath -> ExceptT Error IO  [Account]
 decodeAccountsFile f = do
-  fType <- either fail return $ isSupportedExtension f
-  case fType of
-    YamlFile -> Y.decodeFileThrow f
-    CsvFile -> do
-        csvBS <- BL.readFile f
-        either fail return $ decodeAccounts csvBS
+        csvBS <- liftIO $ BL.readFile f
+        decodeAccounts csvBS

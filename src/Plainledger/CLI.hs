@@ -13,7 +13,6 @@ module Plainledger.CLI (
 ) where
 
 import Data.Time
-import Data.Semigroup ( (<>) )
 import Options.Applicative
 import Plainledger.CLI.Command
 import Plainledger.CLI.Run
@@ -70,31 +69,6 @@ accountsInfo = info (accountsCommand <**> helper)
               (fullDesc
                <> progDesc "Prints all accounts and their properties\
                             \ in a CSV format")
-
-csvType :: Parser CsvType
-csvType = flag' CsvAccounts
-          (  long "accounts"
-          <> short 'a'
-          <> help "The CSV-FILE contains records representing accounts" )
-       <|> (flag' CsvTransactions
-                 (  long "transactions"
-                 <> short 't'
-                 <> help "The CSV-FILE contains records \
-                         \representing transactions")
-           <*> txnDecodeOption)
-
-convertCommand :: Parser Command
-convertCommand = CConvert
-               <$> (ConvertCommand
-                   <$> argument str (metavar "INPUT-FILE" <> help "The input file")
-                   <*> argument str (metavar "OUTPUT-FILE" <> help "The output file")
-                   <*> csvType)
-
-convertInfo :: ParserInfo Command
-convertInfo = info (convertCommand <**> helper)
-              (fullDesc
-               <> progDesc "Converts between a CSV file and a Yaml \
-                           \file readable by plainledger")
 
 txnDecodeOption :: Parser CsvRecordOptions
 txnDecodeOption = flag MultipleRecords SingleRecord
@@ -237,7 +211,6 @@ incomeStatementInfo = info (incomeStatementCommand <**> helper)
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "accounts" accountsInfo
-  <> command "convert" convertInfo
   <> command "transactions" transactionsInfo
   <> command "trialbalance" trialBalanceInfo
   <> command "cashflow" cashFlowInfo

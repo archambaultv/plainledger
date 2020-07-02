@@ -54,10 +54,7 @@ balancePostings ps =
               then return withAmount'
               else throwError
                    $ "Unbalanced transaction. The balance is "
-                   ++ show s
-                   ++ " for commodity "
-                   ++ (show $ pCommodity $ head withAmount)
-                   ++ ".\n  " ++ withAmountDesc
+                   ++ show s ++".\n  " ++ withAmountDesc
         [x] -> let x' :: Posting
                    x' = fromAmount (negate s) x
                in return $ x' : withAmount'

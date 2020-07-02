@@ -18,13 +18,14 @@ import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
 import Plainledger.Ledger
 import Plainledger.Reports
+import Control.Monad.Except
 
 -- / Reads the journal file and the exports the transactions in CSV format
 runIncomeStatement :: IncomeStatementCommand -> IO ()
 runIncomeStatement c = do
      journalFile <- Y.decodeFileThrow (isYamlFile c)
-     journal <- journalFileToJournal (isYamlFile c) journalFile
-     case journalToLedger journal of
+     journal <- runExceptT $ journalFileToJournal (isYamlFile c) journalFile
+     case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l ->
         let sd = maybe MinDate Date $ (isStartDate c)

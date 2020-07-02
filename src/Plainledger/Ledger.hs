@@ -32,7 +32,7 @@ import qualified Data.HashMap.Strict as HM
 data Ledger = Ledger {
   lJournal :: JournalF Transaction,
   lBalanceMap :: BalanceMap,
-  lAccounts :: HM.HashMap T.Text (AccountGroup, Account)
+  lAccounts :: HM.HashMap T.Text Account
 } deriving (Eq, Show)
 
 -- | Converts the journal to a ledger.
@@ -59,16 +59,14 @@ data Ledger = Ledger {
 journalToLedger :: (MonadError Error m) => Journal -> m Ledger
 journalToLedger (Journal config accounts txns bals) = do
   validateConfig config
-  let gMapping = cGroupMapping config
-  accounts' <- validateAccounts (cGroupMapping config) accounts
+  accounts' <- validateAccounts accounts
   let accMap = HM.fromList
-              $ map (\a -> (aId a, (gMapping HM.! aGroup a, a))) accounts'
+              $ map (\a -> (aId a, a)) accounts'
   let accSet = HS.fromList $ map aId accounts'
   (balanceMap, balanceAssertionMap, transactions') <- validateJTransactions
-                   (cDefaultCommodity config)
                    accSet
                    txns
-  balances' <- validateBalances (cDefaultCommodity config)
+  balances' <- validateBalances
                accSet
                balanceAssertionMap
                bals

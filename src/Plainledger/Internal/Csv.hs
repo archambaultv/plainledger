@@ -58,9 +58,7 @@ tagLine ts tagHeader' =
         $ map tagToField ts
   in map (\k -> fromMaybe "" $ HM.lookup k m) tagHeader'
 
-        -- Tag without value are given the tagId as value in the CSV file
-  where tagToField (Tag k "") = (toField k, toField k)
-        tagToField (Tag k v) = (toField k, toField v)
+  where tagToField (Tag k v) = (toField k, toField v)
 
 -- / Returns the list of Tag made from all the fields that are not in the
 -- HashSet.
@@ -109,7 +107,7 @@ findColumnM :: (MonadError Error m, FromField b) =>
 findColumnM x m f =
   case HM.lookup x m of
     Nothing -> throwError
-               $ "Field " 
+               $ "Field "
                ++ (show x)
                ++ " is not in the CSV header."
     Just v -> do

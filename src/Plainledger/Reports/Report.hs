@@ -26,7 +26,8 @@ module Plainledger.Reports.Report (
   nodeName,
   treeToReportLines,
   forestToReportLines,
-  nodeGroup
+  nodeGroup,
+  rlGroup
   )
 where
 
@@ -59,12 +60,13 @@ data Report = Report {
 
 data ReportLine = ReportLine {
   rlAccount :: Account,
-  rlCommodity :: Commodity,
   rlEndDateBalance :: Quantity,
   rlOpeningBalance :: Quantity,
-  rlActive :: Bool,
-  rlGroup :: AccountGroup
+  rlActive :: Bool
 } deriving (Eq, Show)
+
+rlGroup :: ReportLine -> AccountGroup
+rlGroup = aGroup . rlAccount
 
 data ReportNode
   = RNGroup Int T.Text AccountGroup
@@ -86,7 +88,7 @@ nodeName (RNSubSubGroup _ n _) = n
 
 nodeGroup :: ReportNode -> AccountGroup
 nodeGroup (RNGroup _ _ n) = n
-nodeGroup (RNReportLine l) = rlGroup l
+nodeGroup (RNReportLine l) = aGroup $ rlAccount l
 nodeGroup (RNSubGroup _ _ n) = n
 nodeGroup (RNSubSubGroup _ _ n) = n
 
@@ -107,7 +109,7 @@ reportLinesToForest ls =
 mkGroupTree :: [ReportLine] -> Tree ReportNode
 mkGroupTree xs =
   let accGroup = rlGroup $ head xs
-      groupName = aGroup $ rlAccount $ head xs
+      groupName = T.pack $ show accGroup
       number = minimum $ map (aNumber . rlAccount) xs
       children = mkSubGroupForest accGroup xs
   in Node (RNGroup number groupName accGroup) children
@@ -171,21 +173,17 @@ amountTitle _ = ["Balance"]
 
 reportTotal :: (ReportLine -> Quantity) ->
                [ReportLine] ->
-               HM.HashMap Commodity Quantity
-reportTotal f ys =
-    let xs :: [(Commodity, Quantity)]
-        xs = map (\l -> (rlCommodity l, f l)) ys
-    in HM.fromListWith (+) xs
+               Quantity
+reportTotal f ys = sum $ map f ys
 
 reportTotalDrCr :: (ReportLine -> Quantity) ->
                    [ReportLine] ->
-                   HM.HashMap Commodity (Quantity, Quantity)
+                   (Quantity, Quantity)
 reportTotalDrCr f ys =
-    let xs :: [(Commodity, (Quantity, Quantity))]
-        xs = map (\(c, n) -> if n < 0 then (c, (0, negate n)) else (c, (n, 0)))
-           $ map (\l -> (rlCommodity l, f l)) ys
-
-    in HM.fromListWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) xs
+    let xs :: [(Quantity, Quantity)]
+        xs = map (\n -> if n < 0 then (0, negate n) else (n, 0))
+           $ map f ys
+    in (sum $ map fst xs, sum $ map snd xs)
 
 serializeAmount :: BalanceFormat -> AccountGroup -> Quantity -> [T.Text]
 serializeAmount NormallyPositive g x
@@ -245,51 +243,37 @@ reportLines :: Day -> Day -> Ledger -> [ReportLine]
 reportLines bDate eDate l =
   let m = lBalanceMap l
       accMap = lAccounts l
-      defComm = cDefaultCommodity $ jConfiguration $ lJournal l
 
       m1 :: HashMap
             T.Text
-            (HashMap Commodity (Maybe (Day, Quantity), Maybe (Day, Quantity)))
-      m1 = fmap (fmap (\m0 -> (M.lookupLT bDate m0, M.lookupLE eDate m0))) m
+            (Maybe (Day, Quantity), Maybe (Day, Quantity))
+      m1 = fmap (\m0 -> (M.lookupLT bDate m0, M.lookupLE eDate m0)) m
 
-      m2 :: HashMap
-            T.Text
-            [(Commodity, Maybe (Day, Quantity), Maybe (Day, Quantity))]
-      m2 = fmap (map (\(c, (q1, q2)) -> (c, q1, q2)) . HM.toList) m1
+      m3 :: [(T.Text, Maybe (Day, Quantity), Maybe (Day, Quantity))]
+      m3 = map (\(t, (q1,q2)) ->  (t, q1, q2))
+         $ HM.toList m1
 
-      m3 :: [(T.Text, Commodity, Maybe (Day, Quantity), Maybe (Day, Quantity))]
-      m3 = concatMap (\(t, xs) -> if null xs
-                                  then [(t, defComm, Nothing, Nothing)]
-                                  else map (\(c,q1,q2) -> (t, c, q1, q2)) xs)
-         $ HM.toList m2
-
-      toReport (aId, c, q1, q2) =
+      toReport (aId, q1, q2) =
         let a = accMap HM.! aId
-            group = fst a
-            acc = snd a
         in case q2 of
-             Nothing -> ReportLine acc c 0 0 False group
+             Nothing -> ReportLine a 0 0 False
              Just (d, q2') ->
                 let active = (d >= bDate)
                     q1' = (maybe 0 snd q1)
-                in ReportLine acc c q2' q1' active group
+                in ReportLine a q2' q1' active
 
   in map toReport m3
 
 -- | Computes the opening balance
-openingBalance :: [ReportLine] -> HM.HashMap Commodity Quantity
-openingBalance rl =
-  let xs :: [(Commodity, Quantity)]
-      xs = map (\l -> (rlCommodity l, rlOpeningBalance l))
-         $ filter (isIncomeStatementGroup . rlGroup) rl
-
-  in HM.fromListWith (+) xs
+openingBalance :: [ReportLine] -> Quantity
+openingBalance rl
+      = sum
+      $ map rlOpeningBalance
+      $ filter (isIncomeStatementGroup . aGroup . rlAccount) rl
 
 -- | Computes the earnings
-earnings :: [ReportLine] -> HM.HashMap Commodity Quantity
-earnings rl =
-  let xs :: [(Commodity, Quantity)]
-      xs = map (\l -> (rlCommodity l, cashFlow l))
-         $ filter (isIncomeStatementGroup . rlGroup) rl
-
-  in HM.fromListWith (+) xs
+earnings :: [ReportLine] -> Quantity
+earnings rl
+  = sum
+  $ map cashFlow
+  $ filter (isIncomeStatementGroup . aGroup . rlAccount) rl

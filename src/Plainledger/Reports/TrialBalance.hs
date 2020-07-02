@@ -16,13 +16,11 @@ where
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (encode)
 import Data.List hiding (group, lines)
-import Data.Maybe
 import Data.Ord
 import Plainledger.Ledger
 import Plainledger.Reports.Report
 import Prelude hiding (lines)
 import Prelude hiding (lines)
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 
 tbBalance :: ReportLine -> Quantity
@@ -60,18 +58,17 @@ reportToTrialBalance opt tb =
         && aId (rlAccount l) /= openBalAcc
         && tbBalance l == 0
         && not (tboShowInactiveAccounts opt) = []
-    serialize l@(ReportLine acc comm _ _ _ gr) =
+    serialize l@(ReportLine acc _ _ _) =
        let front = [T.pack $ show $ aNumber acc, aName acc]
            bal = computeBalance l
+           gr = aGroup acc
            amnt = serializeAmount (tboBalanceFormat opt) gr bal
-       in front ++ amnt ++ [comm]
+       in front ++ amnt
 
     computeBalance :: ReportLine -> Quantity
     computeBalance y =
       if aId (rlAccount y) == openBalAcc
-      then let ob = fromMaybe 0
-                  $ HM.lookup (rlCommodity y) openBal
-           in ob + tbBalance y
+      then openBal + tbBalance y
       else tbBalance y
 
     trialBalLines = filter (not . null)
@@ -80,21 +77,16 @@ reportToTrialBalance opt tb =
                   $ rLines tb
 
      -- Total lines
-    total :: [[T.Text]]
+    total :: [T.Text]
     total = case (tboBalanceFormat opt) of
               InflowOutflow ->
-                map (\(c, q) -> ["", "Total"]
-                                ++ [T.pack $ show q] ++ [c])
-                $ sortBy (comparing fst)
-                $ HM.toList
+                (\q -> ["", "Total"]
+                                ++ [T.pack $ show q])
                 $ reportTotal computeBalance
                 $ rLines tb
               TwoColumnDebitCredit ->
-                map (\(c, (dr, cr)) -> ["", "Total"]
-                                    ++ [T.pack $ show dr, T.pack $ show cr]
-                                    ++ [c])
-                $ sortBy (comparing fst)
-                $ HM.toList
+                (\(dr, cr) -> ["", "Total"]
+                                    ++ [T.pack $ show dr, T.pack $ show cr])
                 $ reportTotalDrCr computeBalance
                 $ rLines tb
               NormallyPositive -> []
@@ -102,6 +94,6 @@ reportToTrialBalance opt tb =
     csvlines ::  [[T.Text]]
     csvlines =  title
              ++ trialBalLines
-             ++ ([] : total)
+             ++ ([] : [total])
 
   in encode csvlines

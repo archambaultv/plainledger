@@ -16,7 +16,6 @@ where
 import Data.Function
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (encode)
-import Data.Ord
 import Data.List hiding (group, lines)
 import Plainledger.Ledger
 import Plainledger.Reports.Report
@@ -24,7 +23,6 @@ import Plainledger.Reports.BalanceSheet
 import Prelude hiding (lines)
 import Prelude hiding (lines)
 import qualified Data.Text as T
-import qualified Data.HashMap.Strict as HM
 
 type IncomeStatementOption = BalanceSheetOption
 
@@ -39,12 +37,13 @@ reportToIncomeStatement opt rep =
       | rlActive l == False
         && cashFlow l == 0
         && not (bsShowInactiveAccounts opt) = []
-    serialize l@(ReportLine acc comm _ _ _ gr) =
+    serialize l@(ReportLine acc _ _ _) =
        let front = T.append (aName acc)
                  $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
            bal = cashFlow l
+           gr = aGroup  acc
            amnt = serializeAmount NormallyPositive gr bal
-       in front : amnt ++ [comm]
+       in front : amnt
 
     -- Header lines
     title :: [[T.Text]]
@@ -58,12 +57,9 @@ reportToIncomeStatement opt rep =
 
     earningsAmnt = earnings $ rLines rep
     earningsLines =
-      map (\(c, q) ->
+      (\(q) ->
             ["Earnings",
-             head $ serializeAmount NormallyPositive Liability q,
-             c])
-      $ sortBy (comparing fst)
-      $ HM.toList
+             head $ serializeAmount NormallyPositive Liability q])
       earningsAmnt
 
     csvlines ::  [[T.Text]]
@@ -71,6 +67,6 @@ reportToIncomeStatement opt rep =
              ++ [[]]
              ++ incomeStatementLines
              ++ [[]]
-             ++ earningsLines
+             ++ [earningsLines]
 
   in encode csvlines

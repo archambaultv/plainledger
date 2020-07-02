@@ -22,18 +22,14 @@ import Data.Function
 import Data.List hiding (lines)
 import Data.Maybe
 import Control.Monad.Except
-import Data.Aeson (pairs)
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (Record, Field, ToField(..),toRecord)
-import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Scientific
 import Data.Time
-import Data.Yaml (FromJSON(..), ToJSON(..), (.:), (.:?), (.=))
 import Plainledger.Error
 import Plainledger.Internal.Csv
 import Plainledger.Journal.Posting
-import Plainledger.Internal.Utils
 import Plainledger.Journal.Tag
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
@@ -45,7 +41,6 @@ import qualified Data.Set as S
 import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
-import qualified Data.Yaml as Y
 import qualified Data.Vector as V
 
 data TransactionF p = Transaction
@@ -67,34 +62,9 @@ instance (Eq p) => Eq (TransactionF p) where
               sortBy (comparing tagId) (tTags a2)
 type JTransaction = TransactionF JPosting
 
-instance ToJSON JTransaction where
-  toJSON (Transaction date tId postings tags) =
-    Y.object
-    $ ["date" .= date,
-       "postings" .= postings]
-   ++ (if T.null tId then [] else ["transaction-id" .= tId])
-   ++ (if null tags then [] else ["tags" .= tags])
-
-  toEncoding (Transaction date tId postings tags) =
-    pairs
-    $ "date" .= date
-    <> (if T.null tId then mempty else "transaction-id" .= tId)
-    <> "postings" .= postings
-    <> (if null tags then mempty else "tags" .= tags)
-
-instance FromJSON JTransaction where
-  parseJSON (Y.Object v) =
-    Transaction
-    <$> (v .: "date")
-    <*> (fromMaybe "" <$> v .:? "transaction-id")
-    <*> v .: "postings"
-    <*> (fromMaybe [] <$> v .:? "tags")
-  parseJSON _ = fail "Expected Object for Transaction value"
-
 postingToLine :: JPosting -> [Field]
 postingToLine p = [toField $ pAccount p,
                    toField $ (realToFrac <$> pAmount p :: Maybe Scientific),
-                   toField $ pCommodity p,
                    toField $ toISO8601 <$> pBalanceDate p]
 
 postingsHeader :: Int -> Int -> [Field]
@@ -102,7 +72,6 @@ postingsHeader n maxN | n > maxN = []
 postingsHeader n maxN =
     [toField $ "account id (" ++ show n ++ ")",
      toField $ "amount (" ++ show n ++ ")",
-     toField $ "commodity (" ++ show n ++ ")",
      toField $ "balance date ("++ show n ++ ")"]
     ++ postingsHeader (n + 1) maxN
 
@@ -111,7 +80,6 @@ multipleRecordsHeader = ["date",
                          "transaction id",
                          "account id",
                          "amount",
-                         "commodity",
                          "balance date"]
 
 -- / Encode a list of transaction as a Csv. The first line is the header
@@ -221,7 +189,6 @@ decodeTransactions SingleRecord bs = do
         lineToPostings m n =
           let accountKey =  toField $ "account id (" ++ show n ++ ")"
               amountKey =  toField $ "amount (" ++ show n ++ ")"
-              commodityKey =  toField $ "commodity (" ++ show n ++ ")"
               balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
           in
             case findColumn accountKey m of
@@ -235,12 +202,11 @@ decodeTransactions SingleRecord bs = do
                                             $ Just
                                             $ (realToFrac :: Scientific -> Quantity)
                                              v})
-                comm <- findColumn commodityKey m
                 bal <- findColumnDefaultM Nothing balanceDateKey m
                         (\case  {"" -> return Nothing;
                                  v -> Just <$> parseISO8601M v})
 
-                let p = Posting () bal acc amnt comm
+                let p = Posting () bal acc amnt
                 return $ p : ps
 
 decodeTransactions MultipleRecords bs = do
@@ -265,12 +231,11 @@ decodeTransactions MultipleRecords bs = do
                                       $ Just
                                       $ (realToFrac :: Scientific -> Quantity)
                                        v})
-          comm <- findColumn "commodity" m
           bal <- findColumnDefaultM Nothing "balance date" m
                   (\case  {"" -> return Nothing;
                            v -> Just <$> parseISO8601M v})
           tags <- recordToTags m  (HS.fromList multipleRecordsHeader)
-          return $ Transaction date tId [Posting () bal acc amnt comm] tags
+          return $ Transaction date tId [Posting () bal acc amnt] tags
 
         regroupTransactions :: (MonadError Error m) =>
                                [JTransaction] -> m JTransaction
@@ -306,12 +271,8 @@ decodeTransactions MultipleRecords bs = do
                  (head xs)
                  (tail xs)
 
-decodeJTransactionsFile :: String -> IO [JTransaction]
+decodeJTransactionsFile :: String -> ExceptT Error IO [JTransaction]
 decodeJTransactionsFile f = do
-  fType <- either fail return $ isSupportedExtension f
-  case fType of
-    YamlFile -> Y.decodeFileThrow f
-    CsvFile -> do
-        csvBS <- BL.readFile f
-        h <- either fail return $ decodeHeader csvBS
-        either fail return $ decodeTransactions h csvBS
+        csvBS <- liftIO $ BL.readFile f
+        h <- decodeHeader csvBS
+        decodeTransactions h csvBS

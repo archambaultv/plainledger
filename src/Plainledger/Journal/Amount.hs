@@ -9,17 +9,12 @@
 -- This module defines the type alias Quantity and Commodity
 
 module Plainledger.Journal.Amount (
-  Quantity,
-  Commodity
+  Quantity
   )
 where
 
 import Data.Decimal
-import qualified Data.Text as T
 
 -- | A quantity is any decimal number. The decimal package ensures
 -- that no rounding error can occur.
 type Quantity = Decimal
-
--- | A commodity is represented as Text
-type Commodity = T.Text

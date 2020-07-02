@@ -1,0 +1,17 @@
+# Configuration options
+configuration:
+  opening-balance-account: Solde d'ouverture
+  earnings-account: Bénéfice net
+
+# Accounts
+accounts:
+  - accounts.csv
+
+# Transactions
+transactions:
+  - opening-balances.csv
+  - transactions.csv
+
+# Balance assertions
+balance-assertions:
+  - balance-assertions.csv

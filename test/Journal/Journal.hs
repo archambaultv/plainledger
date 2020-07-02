@@ -7,45 +7,78 @@ import Test.Tasty.HUnit
 import Data.Yaml as Y
 import Data.Yaml.Pretty as YP
 import Plainledger.Ledger
-
-
-dir :: String
-dir = "test/Journal/"
+import Control.Monad.Except
 
 journalPath :: String
-journalPath = "test/Journal/journal-syntax.yaml"
+journalPath = "test/Journal/Journal.yaml"
 
 journalTestTree :: TestTree
 journalTestTree = testGroup "Journal tests"
-              [syntaxTestTree]
+              [syntaxTestTree, validationTestTree]
 
 syntaxTestTree :: TestTree
 syntaxTestTree =
   testGroup "Journal syntax"
-    [ testCase "Decode ledger-syntax.yaml" $ do
+    [ testCase "Decode Journal.yaml" $ do
        journal <- decodeFileEither journalPath :: IO (Either ParseException JournalFile)
        case journal of
          Left err -> assertFailure $ prettyPrintParseException err
          Right _ -> return (),
-      after AllSucceed "Decode ledger-syntax.yaml" $
+      after AllSucceed "Decode Journal.yaml" $
        testCase "Decode encode decode" $ do
         journal <- decodeFileThrow journalPath :: IO JournalFile
         let x = YP.encodePretty yamlPrettyConfig journal
         journal2 <- decodeThrow x
         journal @?= journal2,
-      after AllSucceed "Decode ledger-syntax.yaml" $
-       testCase "Includes" $ do
+      after AllSucceed "Decode Journal.yaml" $
+       testCase "journalFileToJournal" $ do
         journalFile <- decodeFileThrow journalPath :: IO JournalFile
-        journal <- journalFileToJournal journalPath journalFile
-        journal2 <- decodeFileThrow (dir ++ "journal-no-includes.yaml") :: IO Journal
-        (jConfiguration journal) @?= (jConfiguration journal2)
-        (jAccounts journal) @?= (jAccounts journal2)
-        (jTransactions journal) @?= (jTransactions journal2)
-        (jBalances journal) @?= (jBalances journal2),
-      testCase "decodeJTransactionsFile" $ do
-       txnsSingle <- decodeJTransactionsFile
-                     (dir ++ "transactions-single-record.csv")
-       txnsMult <- decodeJTransactionsFile
-                     (dir ++ "transactions-multiple-records.csv")
-       txnsSingle @?= txnsMult
+        j <- runExceptT $ journalFileToJournal journalPath journalFile
+        case j of
+          Left err -> assertFailure err
+          Right _ -> return ()
     ]
+
+validationTestTree :: TestTree
+validationTestTree =
+   testGroup "Validation"
+    [ validationOk,
+      validationFailure "transaction-no-date.csv" VTransaction,
+      validationFailure "group-field.csv" VAccount,
+      validationFailure "group-field-non-null.csv" VAccount,
+      validationFailure "earnings-account-non-null.yaml" VConfig,
+      validationFailure "opening-balance-non-null.yaml" VConfig,
+      validationFailure "account-id-duplicate.csv" VAccount,
+      validationFailure "account-id-non-null.csv" VAccount,
+      validationFailure "balance-valid-account-id.csv" VAccount
+    ]
+
+data JournalCsv = VTransaction | VBalance | VAccount | VConfig
+  deriving (Eq, Show)
+
+validationFailure :: String -> JournalCsv -> TestTree
+validationFailure file opt = testCase file $ do
+  journalFile <- decodeFileThrow journalPath :: IO JournalFile
+  let f = "KO/" ++ file
+  jf <- case opt of
+         VTransaction -> pure journalFile{jfTransactions = ["opening-balances.csv", f]}
+         VBalance -> pure journalFile{jfBalances=[f]}
+         VAccount -> pure journalFile{jfAccounts=[f]}
+         VConfig -> do
+                c <- decodeFileThrow ("test/Journal/" ++ f) :: IO Configuration
+                pure $ journalFile{jfConfiguration=c}
+  journal <- runExceptT $ journalFileToJournal journalPath jf
+  case journal >>= journalToLedger of
+    Left _ -> return ()
+    Right _ -> assertFailure
+               $ "Validation of \""
+               ++ file
+               ++ "\" should fail."
+
+validationOk :: TestTree
+validationOk = testCase "Journal.yaml is a valid ledger" $ do
+  journalFile <- decodeFileThrow journalPath :: IO JournalFile
+  journal <- runExceptT $ journalFileToJournal journalPath journalFile
+  case journal >>= journalToLedger of
+     Left err -> assertFailure err
+     Right _ -> return ()

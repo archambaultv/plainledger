@@ -19,13 +19,10 @@ import Data.Tree
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (encode)
 import Data.List hiding (group, lines)
-import Data.Maybe
-import Data.Ord
 import Plainledger.Ledger
 import Plainledger.Reports.Report
 import Prelude hiding (lines)
 import Prelude hiding (lines)
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 
 data BalanceSheetOption = BalanceSheetOption {
@@ -50,21 +47,18 @@ serializeTree computeBalance serialize (Node n xs) =
       header :: [T.Text]
       header = [nodeName n]
       gr = nodeGroup n
-      total :: [[T.Text]]
-      total = map (\(c, q) ->
+      total :: [T.Text]
+      total = (\q ->
                 [T.append "Total " (nodeName n),
-                 head $ serializeAmount NormallyPositive gr q,
-                 c])
-            $ sortBy (comparing fst)
-            $ HM.toList
+                 head $ serializeAmount NormallyPositive gr q])
             $ reportTotal computeBalance
             $ forestToReportLines xs
       totalLines = if all
                       (\case {RNReportLine _ -> True; _ -> False}
                        . rootLabel)
                       xs
-                   then total
-                   else [] : total
+                   then [total]
+                   else [] : [total]
   in -- If all children are null (ex: inactive) we don't report this group
      if  all null children
      then [[]]
@@ -94,13 +88,9 @@ reportToBalanceSheet opt rep =
     computeBalance :: ReportLine -> Quantity
     computeBalance y =
       if aId (rlAccount y) == openBalAcc
-      then let ob = fromMaybe 0
-                  $ HM.lookup (rlCommodity y) openBal
-           in ob + rlEndDateBalance y
+      then openBal + rlEndDateBalance y
       else if aId (rlAccount y) == earningsAcc
-           then let earn = fromMaybe 0
-                       $ HM.lookup (rlCommodity y) earningsAmnt
-                in earn + rlEndDateBalance y
+           then earningsAmnt + rlEndDateBalance y
            else rlEndDateBalance y
 
     serialize :: ReportLine -> [T.Text]
@@ -110,12 +100,13 @@ reportToBalanceSheet opt rep =
         && aId (rlAccount l) /= earningsAcc
         && rlEndDateBalance l == 0
         && not (bsShowInactiveAccounts opt) = []
-    serialize l@(ReportLine acc comm _ _ _ gr) =
+    serialize l@(ReportLine acc _ _ _) =
        let front = T.append (aName acc)
                  $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
            bal = computeBalance l
+           gr = aGroup acc
            amnt = serializeAmount NormallyPositive gr bal
-       in front : amnt ++ [comm]
+       in front : amnt
 
     -- Header lines
     title :: [[T.Text]]

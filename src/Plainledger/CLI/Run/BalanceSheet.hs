@@ -18,13 +18,14 @@ import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
 import Plainledger.Ledger
 import Plainledger.Reports
+import Control.Monad.Except
 
 -- / Reads the journal file and the exports the transactions in CSV format
 runBalanceSheet :: BalanceSheetCommand -> IO ()
 runBalanceSheet c = do
      journalFile <- Y.decodeFileThrow (bsYamlFile c)
-     journal <- journalFileToJournal (bsYamlFile c) journalFile
-     case journalToLedger journal of
+     journal <- runExceptT $ journalFileToJournal (bsYamlFile c) journalFile
+     case journal >>= journalToLedger of
        Left err -> putStrLn err
        Right l ->
         let sd = maybe MinDate Date $ (bsStartDate c)

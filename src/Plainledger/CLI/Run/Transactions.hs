@@ -18,16 +18,17 @@ import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
 import Plainledger.Ledger
+import Control.Monad.Except
 
 -- / Reads the journal file and the exports the transactions in CSV format
 runTransactions :: TransactionsCommand -> IO ()
 runTransactions c = do
      journalFile <- Y.decodeFileThrow (tcYamlFile c)
-     journal <- journalFileToJournal (tcYamlFile c) journalFile
+     journal <- runExceptT $ journalFileToJournal (tcYamlFile c) journalFile
      let txns =  if tcValidation c
                  then (map transactionToJTransaction . jTransactions . lJournal)
-                      <$> journalToLedger journal
-                 else return $ jTransactions journal
+                      <$> (journal >>= journalToLedger)
+                 else fmap jTransactions journal
      case txns of
        Left err -> putStrLn err
        Right xs ->

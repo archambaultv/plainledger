@@ -40,15 +40,13 @@ transactionToJTransaction t = fmap postingToJPosting t
 
 -- | Asserts all transactions have valid unique transaction id
 --  Asserts all transactions have valid postings
---  Asserts all transactions have a well defined commodity
 --  Asserts all transactions balance to zero for all commodities
 validateJTransactions :: (MonadError Error m) =>
-                      Commodity ->
                       HS.HashSet T.Text ->
                       [JTransaction] ->
                       m (BalanceMap,BalanceMap, [Transaction])
-validateJTransactions defComm accs jtransactions = do
-    transactions <- traverse (jtransactionToTransaction defComm) jtransactions
+validateJTransactions accs jtransactions = do
+    transactions <- traverse jtransactionToTransaction jtransactions
     _ <- traverse (checkTxnAccount accs) transactions
     transactions1 <- validateTransactionsId transactions
     let (bm, bm2) = computeBalanceMap
@@ -61,7 +59,8 @@ computeBalanceMap :: HS.HashSet T.Text ->
                      [Transaction] ->
                      (BalanceMap, BalanceMap)
 computeBalanceMap accs txns =
-  let m0 = HM.fromList $ zip (HS.toList accs) (repeat HM.empty)
+  let m0 :: BalanceMap
+      m0 = HM.fromList $ zip (HS.toList accs) (repeat M.empty)
 
       postings = concatMap (tPostings) txns
       postingsByAccount = groupBy ((==) `on` pAccount)
@@ -72,28 +71,17 @@ computeBalanceMap accs txns =
                       (BalanceMap, BalanceMap) ->
                       (BalanceMap, BalanceMap)
         addAccount ps (m1, m2) =
-          let ps' = groupBy ((==) `on` pCommodity)
-                  $ sortBy (comparing pCommodity) ps
-              acc = pAccount $ head ps
-          in foldr (addCommodity acc) (m1, m2) ps'
-
-        addCommodity :: T.Text ->
-                        [Posting] ->
-                        (BalanceMap, BalanceMap) ->
-                        (BalanceMap, BalanceMap)
-        addCommodity acc ps (m1, m2) =
-          let comm = pCommodity $ head ps
-              m1' = addDate ps acc comm pDate m1
-              m2' = addDate ps acc comm pBalanceDate m2
+          let acc = pAccount $ head ps
+              m1' = addDate ps acc pDate m1
+              m2' = addDate ps acc pBalanceDate m2
           in (m1', m2')
 
         addDate :: [Posting] ->
                    T.Text ->
-                   Commodity ->
                    (Posting -> Day) ->
                    BalanceMap ->
                    BalanceMap
-        addDate ps acc comm f m =
+        addDate ps acc f m =
           let psDate = reverse
                   $ groupBy ((==) `on` f)
                   $ sortBy (comparing f) ps
@@ -102,9 +90,8 @@ computeBalanceMap accs txns =
               dateTotal = reverse $ foldr (sumDate f) [] psDate
 
               dateMap = M.fromList dateTotal
-              commMap = HM.singleton comm dateMap
 
-          in HM.insertWith HM.union acc commMap m
+          in HM.insertWith M.union acc dateMap m
 
         sumDate :: (Posting -> Day) ->
                    [Posting] ->
@@ -130,20 +117,17 @@ checkTxnAccount s t = traverse foo (tPostings t) >> return ()
                      ++ T.unpack (pAccount p)
                      ++ "\"."
 
--- Balance postings, fill default commodity and balance date
+-- Balance postings, fill balance date
 jtransactionToTransaction :: (MonadError Error m) =>
-                             Commodity -> JTransaction -> m Transaction
-jtransactionToTransaction defComm (Transaction d tId p tags) =
+                             JTransaction -> m Transaction
+jtransactionToTransaction (Transaction d tId p tags) =
   -- First we update the balance-date and commodity field of each posting,
   -- then group the postings by commodity
   let ps :: [PostingF Day Day (Maybe Quantity)]
-      ps = map (setPostingDate d . fromCommodity defComm . fromBalanceDate d) p
-
-      psGroup = groupBy ((==) `on` pCommodity)
-                $ sortBy (comparing pCommodity) ps
+      ps = map (setPostingDate d . fromBalanceDate d) p
   in do
-    -- Now for each commodity we balance the postings to zero
-    ps2 <- concat <$> traverse balancePostings psGroup
+    -- We balance the postings to zero
+    ps2 <- balancePostings ps
     return $ Transaction d tId ps2 tags
 
 -- Create an id of the form YYYY-MM-DD-N where N is a number if the field
