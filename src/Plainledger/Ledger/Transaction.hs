@@ -91,6 +91,7 @@ computeBalancePs ps =
 computeBalanceTx :: [Transaction] -> (BalanceMap, BalanceMap)
 computeBalanceTx txns =
   let psTx = concatMap
+             -- Overwrite balance date by the transaction date
              (\t -> map (first (const (tDate t))) (tPostings t))
              txns
 
