@@ -11,11 +11,10 @@
 module Plainledger.CLI.Command.BalanceSheet
   (
   BalanceSheetCommand(..),
-  BalanceSheetOption(..)
+  BalanceSheetOption
   )
 where
 
-import Data.Time
 import Plainledger.Reports
 
 data BalanceSheetCommand = BalanceSheetCommand {
