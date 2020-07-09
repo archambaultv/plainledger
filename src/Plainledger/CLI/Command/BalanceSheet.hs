@@ -21,7 +21,6 @@ import Plainledger.Reports
 data BalanceSheetCommand = BalanceSheetCommand {
   bsJournalFile :: String,
   bsOuputFile :: String,
-  bsStartDate :: Maybe Day,
-  bsEndDate :: Maybe Day,
+  bsPeriod :: Period,
   bsOption :: BalanceSheetOption
   }

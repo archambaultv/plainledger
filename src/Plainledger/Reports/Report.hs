@@ -9,157 +9,71 @@
 
 module Plainledger.Reports.Report (
   Report(..),
-  ReportLine(..),
+  Period(..),
   BalanceFormat(..),
-  ReportNode(..),
-  report,
-  reportLines,
-  reportTotal,
-  reportTotalDrCr,
+  computeTotal,
+  computeTotalDrCr,
+  isActive,
+  isReportActive,
   cashFlow,
+  reportCashFlow,
+  balance,
+  reportBalance,
   openingBalance,
-  earnings,
   amountTitle,
   serializeAmount,
-  reportLinesToForest,
-  nodeNumber,
-  nodeName,
-  treeToReportLines,
-  forestToReportLines,
-  nodeGroup,
-  rlGroup
+  periodToText,
+  addList,
+  reportLedgerOpeningBalance,
+  reportEarnings,
+  totalText,
+  cataAccounts,
+  maxSpan,
+  flatReport,
+  FlatReportOption(..),
+  GroupReportOption(..),
+  groupReport
   )
 where
 
-import Data.Function
-import Control.Monad.Except
-import Data.HashMap.Strict (HashMap)
-import Data.List hiding (group, lines)
-import Data.Maybe
-import Data.Ord
 import Data.Time
 import Data.Tree
-import Plainledger.Error
+import Data.List
 import Plainledger.Ledger
-import Prelude hiding (lines)
-import Prelude hiding (lines)
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Map.Strict as M
+import Data.Functor.Foldable
 import qualified Data.Text as T
+
+data Period
+  = Span LDate LDate -- | One period from start date to end date (both included)
+  | MultiYear Day Int -- | MultiYear D X means yearly for X years, counting
+                        --  backwards from D date (included)
+  deriving (Eq, Show)
+
+-- Returns the list of Begin and Enddate for each period
+periodToSpan :: Period -> [(LDate, LDate)]
+periodToSpan (Span b e) = [(b, e)]
+periodToSpan (MultiYear _ n) | n <= 0 = []
+periodToSpan (MultiYear d n) =
+  let dNext = addGregorianYearsClip (-1) d
+      b = addDays 1 dNext
+  in (Date d, Date b) : periodToSpan (MultiYear dNext (n - 1))
+
+maxSpan :: Period -> (LDate, LDate)
+maxSpan (Span b e) = (b, e)
+maxSpan (MultiYear d n) =
+  let dNext = addGregorianYearsClip (negate (fromIntegral n :: Integer)) d
+      b = addDays 1 dNext
+  in (Date b, Date d)
+
 
 -- | The Report data type contains all the necessary informations to produce all
 -- standard reports (trial balance, balance sheet, etc.) All the accounts are
 -- listed in the reportLines, even those without any transaction at all.
 data Report = Report {
-  rBeginDate :: Day,
-  rEndDate :: Day,
+  rPeriod :: Period,
   rJournalFile :: FilePath,
-  rLines :: [ReportLine],
   rLedger :: Ledger
 } deriving (Eq, Show)
-
-data ReportLine = ReportLine {
-  rlAccount :: Account,
-  rlEndDateBalance :: Quantity,
-  rlOpeningBalance :: Quantity,
-  rlActive :: Bool
-} deriving (Eq, Show)
-
-rlGroup :: ReportLine -> AccountGroup
-rlGroup = aGroup . rlAccount
-
-data ReportNode
-  = RNGroup Int T.Text AccountGroup
-  | RNSubGroup Int T.Text AccountGroup
-  | RNSubSubGroup Int T.Text AccountGroup
-  | RNReportLine ReportLine
-
-nodeNumber :: ReportNode -> Int
-nodeNumber (RNGroup n _  _) = n
-nodeNumber (RNReportLine l) = aNumber $ rlAccount l
-nodeNumber (RNSubGroup n _ _) = n
-nodeNumber (RNSubSubGroup n _ _) = n
-
-nodeName :: ReportNode -> T.Text
-nodeName (RNGroup _ n  _) = n
-nodeName (RNReportLine l) = aName $ rlAccount l
-nodeName (RNSubGroup _ n _) = n
-nodeName (RNSubSubGroup _ n _) = n
-
-nodeGroup :: ReportNode -> AccountGroup
-nodeGroup (RNGroup _ _ n) = n
-nodeGroup (RNReportLine l) = aGroup $ rlAccount l
-nodeGroup (RNSubGroup _ _ n) = n
-nodeGroup (RNSubSubGroup _ _ n) = n
-
-forestToReportLines :: Forest ReportNode -> [ReportLine]
-forestToReportLines = concatMap treeToReportLines
-
-treeToReportLines :: Tree ReportNode -> [ReportLine]
-treeToReportLines (Node (RNReportLine l) _) = [l]
-treeToReportLines (Node _ xs) = forestToReportLines xs
-
-reportLinesToForest :: [ReportLine] -> Forest ReportNode
-reportLinesToForest ls =
-  let groups = groupBy ((==) `on` rlGroup) $ sortBy (comparing rlGroup) ls
-      groupNodes = sortBy (comparing (nodeNumber . rootLabel))
-                 $ map mkGroupTree groups
-  in groupNodes
-
-mkGroupTree :: [ReportLine] -> Tree ReportNode
-mkGroupTree xs =
-  let accGroup = rlGroup $ head xs
-      groupName = T.pack $ show accGroup
-      number = minimum $ map (aNumber . rlAccount) xs
-      children = mkSubGroupForest accGroup xs
-  in Node (RNGroup number groupName accGroup) children
-
-mkForest :: (Account -> T.Text) ->
-            ([ReportLine] -> Tree ReportNode) ->
-            [ReportLine] ->
-            Forest ReportNode
-mkForest _ _ [] = []
-mkForest gr mkTree ls =
-  let (noGroups, groups') = partition (T.null . gr . rlAccount) ls
-      groups :: [[ReportLine]]
-      groups = groupBy ((==) `on` (gr . rlAccount))
-             $ sortBy (comparing (gr . rlAccount)) groups'
-      nodes :: Forest ReportNode
-      nodes = sortBy (comparing (nodeNumber . rootLabel))
-            $ map mkTree groups
-  in insertNoGroups
-     (sortBy (comparing (aNumber . rlAccount)) noGroups)
-     nodes
-
-mkSubGroupForest :: AccountGroup -> [ReportLine] -> Forest ReportNode
-mkSubGroupForest accGroup = mkForest aSubgroup (mkSubGroupTree accGroup)
-
-mkSubGroupTree :: AccountGroup -> [ReportLine] -> Tree ReportNode
-mkSubGroupTree accGroup xs =
-  let groupName = aSubgroup $ rlAccount $ head xs
-      number = minimum $ map (aNumber . rlAccount) xs
-      children = mkSubSubGroupForest accGroup xs
-  in Node (RNSubGroup number groupName accGroup) children
-
-mkSubSubGroupForest :: AccountGroup -> [ReportLine] -> Forest ReportNode
-mkSubSubGroupForest accGroup = mkForest aSubsubgroup (mkSubSubGroupTree accGroup)
-
-mkSubSubGroupTree :: AccountGroup -> [ReportLine] -> Tree ReportNode
-mkSubSubGroupTree accGroup xs =
-  let groupName = aSubsubgroup $ rlAccount $ head xs
-      number = minimum $ map (aNumber . rlAccount) xs
-      children :: Forest ReportNode
-      children = sortBy (comparing (nodeNumber . rootLabel))
-               $ map (flip Node [] . RNReportLine) xs
-  in Node (RNSubSubGroup number groupName accGroup) children
-
-insertNoGroups :: [ReportLine] -> Forest ReportNode -> Forest ReportNode
-insertNoGroups xs [] = map (flip Node [] . RNReportLine) xs
-insertNoGroups [] xs = xs
-insertNoGroups (x : xs) (t:ts) =
-  if (aNumber $ rlAccount x) <= (nodeNumber $ rootLabel t)
-  then (Node (RNReportLine x) []) : insertNoGroups xs (t:ts)
-  else t : insertNoGroups (x : xs) ts
 
 data BalanceFormat
   = TwoColumnDebitCredit
@@ -167,23 +81,40 @@ data BalanceFormat
   | InflowOutflow
   deriving (Eq, Show)
 
+-- Standard way to report the requested period
+periodToText :: Report -> [T.Text]
+periodToText r =
+  let bal = lBalanceMap $ rLedger r
+      p = rPeriod r
+  in case p of
+      Span b e -> let b' = maybe "" (T.pack . show) $ lDateToDay bal b
+                      e' = maybe "" (T.pack . show) $ lDateToDay bal e
+                  in ["Start date", b'] ++
+                     ["End date", e']
+      MultiYear d _ -> ["Year-end", T.pack $ show d]
+
+lDateToDay :: BalanceMap -> LDate -> Maybe Day
+lDateToDay m MinDate = minDate m
+lDateToDay m MaxDate = maxDate m
+lDateToDay _ (Date d) = Just d
+
 amountTitle :: BalanceFormat -> [T.Text]
 amountTitle TwoColumnDebitCredit = ["Debit", "Credit"]
 amountTitle _ = ["Balance"]
 
-reportTotal :: (ReportLine -> Quantity) ->
-               [ReportLine] ->
-               Quantity
-reportTotal f ys = sum $ map f ys
+-- reportTotal :: (ReportLine -> Quantity) ->
+--                [ReportLine] ->
+--                Quantity
+-- reportTotal f ys = sum $ map f ys
 
-reportTotalDrCr :: (ReportLine -> Quantity) ->
-                   [ReportLine] ->
-                   (Quantity, Quantity)
-reportTotalDrCr f ys =
-    let xs :: [(Quantity, Quantity)]
-        xs = map (\n -> if n < 0 then (0, negate n) else (n, 0))
-           $ map f ys
-    in (sum $ map fst xs, sum $ map snd xs)
+-- reportTotalDrCr :: (ReportLine -> Quantity) ->
+--                    [ReportLine] ->
+--                    (Quantity, Quantity)
+-- reportTotalDrCr f ys =
+--     let xs :: [(Quantity, Quantity)]
+--         xs = map (\n -> if n < 0 then (0, negate n) else (n, 0))
+--            $ map f ys
+--     in (sum $ map fst xs, sum $ map snd xs)
 
 serializeAmount :: BalanceFormat -> AccountGroup -> Quantity -> [T.Text]
 serializeAmount NormallyPositive g x
@@ -196,84 +127,250 @@ serializeAmount TwoColumnDebitCredit g x
   | x < 0 = ["",T.pack $ show $ negate x]
   | otherwise = [T.pack $ show x, ""]
 
-cashFlow :: ReportLine -> Quantity
-cashFlow r = rlEndDateBalance r - rlOpeningBalance r
+-- Computes the cashflow for all the periods
+reportCashFlow :: Account -> Report -> [Quantity]
+reportCashFlow acc r =
+  let m = lBalanceMap $ rLedger r
+      ps = periodToSpan $ rPeriod r
+  in map (cashFlow m acc) ps
 
-lDateToDay :: BalanceMap -> LDate -> Maybe Day
-lDateToDay m MinDate = minDate m
-lDateToDay m MaxDate = maxDate m
-lDateToDay _ (Date d) = Just d
+isReportActive :: Account -> Report -> Bool
+isReportActive acc r =
+  let m = lBalanceMap $ rLedger r
+      ps = periodToSpan $ rPeriod r
+  in any (isActive m acc) ps
 
-report :: (MonadError Error m) =>
-          FilePath -> LDate -> LDate -> Ledger -> m Report
-report path beginDate endDate l = do
-      eDate <- maybe (throwError "Cannot infer the end date since \
-                                 \there is no transaction in the ledger")
-               return
-               $ lDateToDay (lBalanceMap l) endDate
-      bDate <- maybe (throwError "Cannot infer the begin date since \
-                                   \there is no transaction in the ledger")
-               return
-               $ lDateToDay (lBalanceMap l) beginDate
+isActive :: BalanceMap -> Account -> (LDate, LDate) -> Bool
+isActive m acc (d1, d2) =
+  case balanceAtDate m (aId acc) d2 of
+    Nothing -> False
+    Just (d, _) -> Date d < d1
 
-      let err b e = throwError
-                     $ "Begin date ("
-                     ++ show b
-                     ++ ") greater than end date ("
-                     ++ show e
-                     ++ ")."
+-- cashFlow m acc (d1, d2) computes the cashflow from the start of d1 to the end of d2.
+cashFlow :: BalanceMap -> Account -> (LDate, LDate) -> Quantity
+cashFlow m acc (d1, d2) = balance m acc d2 - openingBalance m acc d1
 
-          errMax b e = throwError
-                     $ "Begin date ("
-                     ++ show b
-                     ++ ") greater than the greatest date in the journal file ("
-                     ++ show e
-                     ++ ")."
-      when (eDate < bDate)
-           (case endDate of
-             MaxDate -> errMax bDate eDate
-             _ -> err bDate eDate)
+reportBalance :: Account -> Report -> [Quantity]
+reportBalance acc r =
+  let m = lBalanceMap $ rLedger r
+      ps = map snd $ periodToSpan $ rPeriod r
+  in map (balance m acc) ps
 
+-- Computes the balance at the end of the day
+balance :: BalanceMap -> Account -> LDate -> Quantity
+balance m acc d = maybe 0 snd $ balanceAtDate m (aId acc) d
 
-      let lines = reportLines bDate eDate l
+-- Computes the balance at the end of the previous day
+openingBalance :: BalanceMap -> Account -> LDate -> Quantity
+openingBalance _ _ MinDate = 0
+openingBalance m acc (Date d) =
+  maybe 0 snd $ balanceAtDate m (aId acc) (Date $ addDays (-1) d)
+openingBalance m acc MaxDate =
+  case balanceAtDate m (aId acc) MaxDate of
+    Nothing -> 0
+    Just (d, _) -> openingBalance m acc (Date d)
 
-      return $ Report bDate eDate path lines l
+-- Compute the total for each "column", assuming the [Quantity] list all
+-- have the same length
+computeTotal :: [[Quantity]] -> [Quantity]
+computeTotal [] = []
+computeTotal ([]:_) = []
+computeTotal xs =
+  let xs' = map tail xs
+      t = sum $ map head xs
+  in t  : computeTotal xs'
 
-reportLines :: Day -> Day -> Ledger -> [ReportLine]
-reportLines bDate eDate l =
-  let m = lBalanceMap l
-      accMap = lAccounts l
+computeTotalDrCr :: [[Quantity]] -> [(Quantity, Quantity)]
+computeTotalDrCr [] = []
+computeTotalDrCr ([]:_) = []
+computeTotalDrCr xs =
+  let xs' = map tail xs
+      dr = sum $ filter (> 0) $ map head xs
+      cr = negate $ sum $ filter (< 0) $ map head xs
+  in (dr, cr)  : computeTotalDrCr xs'
 
-      m1 :: HashMap
-            T.Text
-            (Maybe (Day, Quantity), Maybe (Day, Quantity))
-      m1 = fmap (\m0 -> (M.lookupLT bDate m0, M.lookupLE eDate m0)) m
+-- Total lines
+totalText :: BalanceFormat -> [[Quantity]] -> [T.Text]
+totalText f xs =
+  case f of
+    InflowOutflow ->
+      (\qs -> ["", "Total"] ++
+              map (T.pack . show) qs)
+      $ computeTotal xs
+    TwoColumnDebitCredit ->
+      (\qs -> ["", "Total"] ++
+              concatMap (\(dr, cr) -> [T.pack $ show dr, T.pack $ show cr]) qs)
+      $ computeTotalDrCr xs
+    NormallyPositive -> []
 
-      m3 :: [(T.Text, Maybe (Day, Quantity), Maybe (Day, Quantity))]
-      m3 = map (\(t, (q1,q2)) ->  (t, q1, q2))
-         $ HM.toList m1
+-- Adds two list of quantities
+addList :: [Quantity] -> [Quantity] -> [Quantity]
+addList xs ys = map (uncurry (+)) $ zip xs ys
 
-      toReport (aId, q1, q2) =
-        let a = accMap HM.! aId
-        in case q2 of
-             Nothing -> ReportLine a 0 0 False
-             Just (d, q2') ->
-                let active = (d >= bDate)
-                    q1' = (maybe 0 snd q1)
-                in ReportLine a q2' q1' active
-
-  in map toReport m3
+reportLedgerOpeningBalance :: Report -> [Quantity]
+reportLedgerOpeningBalance r =
+  let ps = map fst $ periodToSpan $ rPeriod r
+  in map (ledgerOpeningBalance r) ps
 
 -- | Computes the opening balance
-openingBalance :: [ReportLine] -> Quantity
-openingBalance rl
-      = sum
-      $ map rlOpeningBalance
-      $ filter (isIncomeStatementGroup . aGroup . rlAccount) rl
+ledgerOpeningBalance :: Report -> LDate -> Quantity
+ledgerOpeningBalance r d = cata alg (lAccounts $ rLedger r)
+  where m :: BalanceMap
+        m = lBalanceMap $ rLedger r
 
--- | Computes the earnings
-earnings :: [ReportLine] -> Quantity
-earnings rl
-  = sum
-  $ map cashFlow
-  $ filter (isIncomeStatementGroup . aGroup . rlAccount) rl
+        alg :: TreeF ChartNode Quantity -> Quantity
+        alg = qtyAlgebra (\a -> openingBalance m a d)
+
+
+
+reportEarnings :: Report -> [Quantity]
+reportEarnings r =
+    let ps = periodToSpan $ rPeriod r
+    in map (earnings r) ps
+
+-- -- | Computes the earnings
+earnings :: Report -> (LDate, LDate) -> Quantity
+earnings r d = cata alg (lAccounts $ rLedger r)
+  where m :: BalanceMap
+        m = lBalanceMap $ rLedger r
+
+        alg :: TreeF ChartNode Quantity -> Quantity
+        alg = qtyAlgebra (\a -> cashFlow m a d)
+
+-- Helper for ledgerOpeningBalance and earnings
+qtyAlgebra :: (Account -> Quantity) ->
+              TreeF ChartNode Quantity ->
+              Quantity
+qtyAlgebra f (NodeF (CAccount a) _) = f a
+qtyAlgebra _ (NodeF (Group _ x) xs) | isIncomeStatementGroup x = sum xs
+qtyAlgebra _ (NodeF (Group _ _) _) = 0
+qtyAlgebra _ (NodeF _ xs) = sum xs
+
+-- Helper to extract from the chart of accounts informations about accounts
+cataAccounts :: forall a . Report -> (Account -> Maybe a) -> [(Account, a)]
+cataAccounts r f = cata alg (lAccounts $ rLedger r)
+  where   alg :: TreeF ChartNode [(Account, a)] -> [(Account, a)]
+          alg (NodeF (CAccount a) _) =
+            case f a of
+              Nothing -> []
+              Just x -> [(a, x)]
+          alg (NodeF _ xs) = concat xs
+
+data FlatReportOption = FlatReportOption {
+  frBalanceFormat :: BalanceFormat,
+  frShowInactiveAccounts :: Bool
+} deriving (Eq, Show)
+
+-- Creates a report with only the accounts, no grouping by group subgroup ...
+flatReport :: T.Text ->
+              (Account -> Maybe [Quantity]) ->
+              FlatReportOption ->
+              Report ->
+              [[T.Text]]
+flatReport name serialize opt r =
+  let
+    title :: [[T.Text]]
+    title = [name]
+            : ["Journal file", T.pack $ rJournalFile r]
+            : periodToText r :
+            [[], ("Account number" : "Account Name" : amountTitle (frBalanceFormat opt))]
+
+    accData :: [(Account, [Quantity])]
+    accData = cataAccounts r serialize
+
+    accLines :: [[T.Text]]
+    accLines = map toText accData
+
+    toText :: (Account, [Quantity]) -> [T.Text]
+    toText (acc, bal) =
+      let front = [T.pack $ show $ aNumber acc, aName acc]
+          gr = aGroup acc
+          amnt = concatMap (serializeAmount (frBalanceFormat opt) gr) bal
+      in front ++ amnt
+
+    total :: [T.Text]
+    total = totalText (frBalanceFormat opt) (map snd accData)
+
+    csvlines ::  [[T.Text]]
+    csvlines =  title
+             ++ accLines
+             ++ ([] : [total])
+
+  in csvlines
+
+data GroupReportOption = GroupReportOption {
+  grShowInactiveAccounts :: Bool
+} deriving (Eq, Show)
+
+-- Creates a report with both the accounts, groups, subgroups ...
+groupReport :: T.Text ->
+               (Account -> Maybe [Quantity]) ->
+               (AccountGroup -> Bool) ->
+               Report ->
+               [[T.Text]]
+groupReport name accountAlg keepGroup r =
+  let
+    -- Header lines
+    title :: [[T.Text]]
+    title = [name]
+            : ["Journal file", T.pack $ rJournalFile r]
+            : periodToText r : [[]]
+
+    groupData = cata algFilter (lAccounts $ rLedger r)
+    groupData2 = cata algText groupData
+
+    -- Filters the unwanted accounts and precompute some value
+    algFilter :: TreeF ChartNode (Tree (ChartNode, [Quantity])) ->
+                 Tree (ChartNode, [Quantity])
+    -- We compute the balance for the accounts
+    algFilter (NodeF (CAccount a) _) =
+      case accountAlg a of
+        Nothing -> Node (CAccount a, []) []
+        Just xs -> Node (CAccount a, xs) []
+    -- We remove the income statement group
+    algFilter (NodeF (Group n a) xs) =
+      if keepGroup a
+      then let xssQty = map (snd . rootLabel) xs
+               qty = foldr addList (repeat 0) xssQty
+           in  Node (Group n a, qty) xs
+      else Node (Group n a, []) []
+    -- We remove the empty sub and sub sub group
+    algFilter (NodeF x xs) =
+      let xs' = filter (not . null . snd . rootLabel) xs
+      in case xs' of
+          [] -> Node (x, []) []
+          xss -> let xssQty = map (snd . rootLabel) xss
+                     qty = foldr addList (repeat 0) xssQty
+                 in Node (x, qty) xss
+
+    algText :: TreeF (ChartNode, [Quantity]) [[T.Text]] ->
+                 [[T.Text]]
+    algText (NodeF (CAccount a, qty) _) = [accountText a qty]
+    algText (NodeF (Root, _) xs) = intercalate [] xs
+    algText (NodeF (n,qty) yss) =
+      let header :: T.Text
+          header = nodeName n
+          footer = T.append "Total " header
+          gr = nodeGroup n
+          footerTotal :: [T.Text]
+          footerTotal = concatMap (serializeAmount NormallyPositive gr) qty
+          txt :: [[T.Text]]
+          txt = [header] :
+                (concat yss) ++
+                [footer : footerTotal]
+      in txt
+
+    accountText :: Account -> [Quantity] -> [T.Text]
+    accountText acc bal =
+       let front = T.append (aName acc)
+                 $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
+           gr = aGroup acc
+           amnt = concatMap (serializeAmount NormallyPositive gr) bal
+       in front : amnt
+
+    csvlines ::  [[T.Text]]
+    csvlines =  title
+             ++ [[]]
+             ++ groupData2
+
+  in csvlines

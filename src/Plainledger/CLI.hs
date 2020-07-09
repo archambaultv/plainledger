@@ -17,29 +17,51 @@ import Options.Applicative
 import Plainledger.CLI.Command
 import Plainledger.CLI.Run
 import Plainledger.Journal.Day
+import Plainledger.Reports
 
-dateparser :: Char -> String -> String -> String -> Parser (Maybe Day)
-dateparser shortOption optionStr helpStr meta = option
-  (eitherReader $ fmap Just . parseISO8601M)
-  (value Nothing <>
+dateparser :: LDate -> Char -> String -> String -> String -> Parser LDate
+dateparser def shortOption optionStr helpStr meta = option
+  (eitherReader $ fmap Date . parseISO8601M)
+  (value def <>
    short shortOption <>
    long optionStr <>
    help helpStr <>
    metavar meta)
 
-startDate :: Parser (Maybe Day)
+startDate :: Parser (LDate)
 startDate = dateparser
+             MinDate
             'b'
             "begin"
             "All transactions in the journal file before this date are ignored"
             "BEGIN"
 
-endDate :: Parser (Maybe Day)
+endDate :: Parser (LDate)
 endDate = dateparser
+          MaxDate
           'e'
           "end"
           "All transactions in the journal file after this date are ignored"
           "END"
+
+endDay :: Parser Day
+endDay = option
+  (eitherReader parseISO8601M)
+  (short 'e' <>
+   long "end" <>
+   help "All transactions in the journal file after this date are ignored" <>
+   metavar "END")
+
+multiYear :: Parser Int
+multiYear = option auto
+          ( long "years"
+         <> short 'y'
+         <> help "How many fiscal year to show in the reports"
+         <> metavar "YEARS" )
+
+period :: Parser Period
+period = (MultiYear <$> endDay <*> multiYear)
+       <|> (Span <$> startDate <*> endDate)
 
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
@@ -93,8 +115,7 @@ transactionsCommand = CTransactions
                <$> (TransactionsCommand
                    <$> journalFile
                    <*> csvFile
-                   <*> startDate
-                   <*> endDate
+                   <*> period
                    <*> txnDecodeOption
                    <*> validationOption)
 
@@ -108,12 +129,11 @@ trialBalanceCommand = CTrialBalance
                <$> (TrialBalanceCommand
                    <$> journalFile
                    <*> csvFile
-                   <*> startDate
-                   <*> endDate
+                   <*> period
                    <*> trialBalanceOption)
 
 trialBalanceOption :: Parser TrialBalanceOption
-trialBalanceOption = TrialBalanceOption
+trialBalanceOption = FlatReportOption
                    <$> balanceFormat
                    <*> showInactiveAccounts
 
@@ -141,12 +161,11 @@ cashFlowCommand = CCashFlow
                <$> (CashFlowCommand
                    <$> journalFile
                    <*> csvFile
-                   <*> startDate
-                   <*> endDate
+                   <*> period
                    <*> cashFlowOption)
 
 cashFlowOption :: Parser CashFlowOption
-cashFlowOption = CashFlowOption
+cashFlowOption = FlatReportOption
                    <$> balanceFormat
                    <*> showInactiveAccounts
 
@@ -174,12 +193,11 @@ balanceSheetCommand = CBalanceSheet
                <$> (BalanceSheetCommand
                    <$> journalFile
                    <*> csvFile
-                   <*> startDate
-                   <*> endDate
+                   <*> period
                    <*> balanceSheetOption)
 
 balanceSheetOption :: Parser BalanceSheetOption
-balanceSheetOption = BalanceSheetOption
+balanceSheetOption = GroupReportOption
                    <$> showInactiveAccounts
 
   where showInactiveAccounts = flag False True
@@ -199,8 +217,7 @@ incomeStatementCommand = CIncomeStatement
                <$> (IncomeStatementCommand
                    <$> journalFile
                    <*> csvFile
-                   <*> startDate
-                   <*> endDate
+                   <*> period
                    <*> balanceSheetOption)
 
 incomeStatementInfo :: ParserInfo Command

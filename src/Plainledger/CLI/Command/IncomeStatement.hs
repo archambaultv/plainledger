@@ -15,13 +15,11 @@ module Plainledger.CLI.Command.IncomeStatement
   )
 where
 
-import Data.Time
 import Plainledger.Reports
 
 data IncomeStatementCommand = IncomeStatementCommand {
   isJournalFile :: String,
   isOuputFile :: String,
-  isStartDate :: Maybe Day,
-  isEndDate :: Maybe Day,
+  isPeriod :: Period,
   isOption :: IncomeStatementOption
   }

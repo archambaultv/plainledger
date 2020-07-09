@@ -12,17 +12,15 @@ module Plainledger.CLI.Command.Cashflow
   (
   CashFlowCommand(..),
   BalanceFormat(..),
-  CashFlowOption(..)
+  CashFlowOption
   )
 where
 
-import Data.Time
 import Plainledger.Reports
 
 data CashFlowCommand = CashFlowCommand {
   cfJournalFile :: String,
   cfOuputFile :: String,
-  cfStartDate :: Maybe Day,
-  cfEndDate :: Maybe Day,
+  cfPeriod :: Period,
   cfOption :: CashFlowOption
   }

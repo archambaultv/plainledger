@@ -13,6 +13,7 @@ module Plainledger.CLI.Run.IncomeStatement
   runIncomeStatement
   ) where
 
+import qualified Data.Csv as C
 import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
@@ -27,15 +28,7 @@ runIncomeStatement c = do
      journal <- runExceptT $ journalFileToJournal (isJournalFile c) journalFile
      case journal >>= journalToLedger of
        Left err -> putStrLn err
-       Right l ->
-        let sd = maybe MinDate Date $ (isStartDate c)
-            ed = maybe MaxDate Date $ (isEndDate c)
-        in do
-          tb <- either fail return
-                $ reportToIncomeStatement (isOption c)
-               <$> report
-                   (isJournalFile c)
-                   sd
-                   ed
-                   l
-          BL.writeFile (isOuputFile c) tb
+       Right l -> do
+          let report = Report (isPeriod c) (isJournalFile c) l
+          let tb = reportToIncomeStatement (isOption c) report
+          BL.writeFile (isOuputFile c) (C.encode tb)

@@ -9,91 +9,36 @@
 
 module Plainledger.Reports.TrialBalance (
   reportToTrialBalance,
-  TrialBalanceOption(..)
+  TrialBalanceOption
   )
 where
 
-import Data.ByteString.Lazy (ByteString)
-import Data.Csv (encode)
-import Data.List hiding (group, lines)
-import Data.Ord
 import Plainledger.Ledger
 import Plainledger.Reports.Report
 import Prelude hiding (lines)
-import Prelude hiding (lines)
 import qualified Data.Text as T
 
-tbBalance :: ReportLine -> Quantity
-tbBalance l =
-  if isIncomeStatementGroup $ rlGroup l
-  then cashFlow l
-  else rlEndDateBalance l
+type TrialBalanceOption = FlatReportOption
 
-data TrialBalanceOption = TrialBalanceOption {
-  tboBalanceFormat :: BalanceFormat,
-  tboShowInactiveAccounts :: Bool
-} deriving (Eq, Show)
 
-reportToTrialBalance :: TrialBalanceOption -> Report -> ByteString
-reportToTrialBalance opt tb =
+
+reportToTrialBalance :: TrialBalanceOption -> Report -> [[T.Text]]
+reportToTrialBalance opt r =
   let
-    -- Header lines
-    title :: [[T.Text]]
-    title = ["Trial Balance"]
-            : ["Journal file", T.pack $ rJournalFile tb]
-            : ["Start date", T.pack $ show $ rBeginDate tb]
-            : ["End date", T.pack $ show $ rEndDate tb]
-            : []
-            : ("Account number" : "Account Name"
-               : amountTitle (tboBalanceFormat opt)
-               ++ ["Commodity"])
-            : []
+      openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal $ rLedger r
 
-    openBal = openingBalance $ rLines tb
-    openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal $ rLedger tb
+      serialize :: Account -> Maybe [Quantity]
+      serialize a
+        | isReportActive a r == False
+          && aId a /= openBalAcc
+          && all (== 0) (computeTrialBalance a)
+          && not (frShowInactiveAccounts opt) = Nothing
+      serialize acc = Just (computeTrialBalance acc)
 
-    serialize :: ReportLine -> [T.Text]
-    serialize l
-      | rlActive l == False
-        && aId (rlAccount l) /= openBalAcc
-        && tbBalance l == 0
-        && not (tboShowInactiveAccounts opt) = []
-    serialize l@(ReportLine acc _ _ _) =
-       let front = [T.pack $ show $ aNumber acc, aName acc]
-           bal = computeBalance l
-           gr = aGroup acc
-           amnt = serializeAmount (tboBalanceFormat opt) gr bal
-       in front ++ amnt
+      computeTrialBalance :: Account -> [Quantity]
+      computeTrialBalance a =
+        if isIncomeStatementGroup $ aGroup a
+        then reportCashFlow a r
+        else reportBalance a r
 
-    computeBalance :: ReportLine -> Quantity
-    computeBalance y =
-      if aId (rlAccount y) == openBalAcc
-      then openBal + tbBalance y
-      else tbBalance y
-
-    trialBalLines = filter (not . null)
-                  $ map serialize
-                  $ sortBy (comparing (aNumber . rlAccount))
-                  $ rLines tb
-
-     -- Total lines
-    total :: [T.Text]
-    total = case (tboBalanceFormat opt) of
-              InflowOutflow ->
-                (\q -> ["", "Total"]
-                                ++ [T.pack $ show q])
-                $ reportTotal computeBalance
-                $ rLines tb
-              TwoColumnDebitCredit ->
-                (\(dr, cr) -> ["", "Total"]
-                                    ++ [T.pack $ show dr, T.pack $ show cr])
-                $ reportTotalDrCr computeBalance
-                $ rLines tb
-              NormallyPositive -> []
-
-    csvlines ::  [[T.Text]]
-    csvlines =  title
-             ++ trialBalLines
-             ++ ([] : [total])
-
-  in encode csvlines
+  in flatReport "Trial Balance" serialize opt r

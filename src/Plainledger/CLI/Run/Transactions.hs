@@ -13,11 +13,11 @@ module Plainledger.CLI.Run.Transactions
   runTransactions
   ) where
 
-import Data.Time
 import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
 import Plainledger.Ledger
+import Plainledger.Reports
 import Control.Monad.Except
 
 -- / Reads the journal file and the exports the transactions in CSV format
@@ -31,16 +31,18 @@ runTransactions c = do
                  else fmap jTransactions journal
      case txns of
        Left err -> putStrLn err
-       Right xs ->
+       Right xs -> do
         let opt = tcEncodeFormat c
-        in BL.writeFile
+        let (sd, ed) = maxSpan (tcPeriod c)
+        BL.writeFile
           (tcOuputFile c)
           $ encodeTransactions opt
-          $ filterDate (tcStartDate c) (tcEndDate c)
+          $ filterDate sd ed
           $ xs
 
-filterDate :: Maybe Day -> Maybe Day -> [TransactionF p] -> [TransactionF p]
-filterDate Nothing Nothing ts = ts
-filterDate (Just s) e ts =
-  filterDate Nothing e $ filter (\t -> tDate t >= s) ts
-filterDate _ (Just e) ts = filter (\t -> tDate t <= e) ts
+filterDate :: LDate -> LDate -> [TransactionF p] -> [TransactionF p]
+filterDate MinDate MaxDate ts = ts
+filterDate (Date s) e ts =
+    filterDate MinDate e $ filter (\t -> tDate t >= s) ts
+filterDate _ (Date e) ts = filter (\t -> tDate t <= e) ts
+filterDate _ _ ts = ts

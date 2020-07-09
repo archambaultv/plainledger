@@ -13,6 +13,7 @@ module Plainledger.CLI.Run.BalanceSheet
   runBalanceSheet
   ) where
 
+import qualified Data.Csv as C
 import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
@@ -27,15 +28,7 @@ runBalanceSheet c = do
      journal <- runExceptT $ journalFileToJournal (bsJournalFile c) journalFile
      case journal >>= journalToLedger of
        Left err -> putStrLn err
-       Right l ->
-        let sd = maybe MinDate Date $ (bsStartDate c)
-            ed = maybe MaxDate Date $ (bsEndDate c)
-        in do
-          tb <- either fail return
-                $ reportToBalanceSheet (bsOption c)
-               <$> report
-                   (bsJournalFile c)
-                   sd
-                   ed
-                   l
-          BL.writeFile (bsOuputFile c) tb
+       Right l -> do
+          let report = Report (bsPeriod c) (bsJournalFile c) l
+          let tb = reportToBalanceSheet (bsOption c) report
+          BL.writeFile (bsOuputFile c) (C.encode tb)

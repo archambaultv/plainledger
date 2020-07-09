@@ -8,6 +8,10 @@
 --
 -- This module defines the account data type.
 
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
+
 module Plainledger.Journal.Account (
   Account(..),
   encodeAccounts,
@@ -20,13 +24,31 @@ module Plainledger.Journal.Account (
   isBalanceSheetGroup,
   isIncomeStatementGroup,
   isCreditGroup,
-  isDebitGroup
+  isDebitGroup,
+  ChartOfAccount,
+  ChartNode(..),
+  TreeF(..),
+  accountsToChartOfAccounts,
+  nodeNumber,
+  nodeGroup,
+  nodeSubGroup,
+  nodeSubSubGroup,
+  nodeName
+  -- cataChart,
+  -- GroupF(..),
+  -- SubGroupF(..),
+  -- SubSubGroupF(..),
+  -- Group,
+  -- SubGroup,
+  -- SubSubGroup
   )
 where
 
 import Data.Char (toLower)
 import Data.Hashable (Hashable)
+import Data.Function
 import Control.Monad.Except
+import Data.Tree
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy (ByteString)
 import Data.Csv (Record, Field, ToField(..),toRecord, FromField(..))
@@ -38,6 +60,7 @@ import Plainledger.Error
 import Plainledger.Internal.Csv
 import Plainledger.Journal.Configuration
 import Plainledger.Journal.Tag
+import Data.Functor.Foldable.TH
 import Prelude hiding (lines)
 import qualified Data.Csv as C
 import qualified Data.HashMap.Strict as HM
@@ -205,3 +228,162 @@ decodeAccountsFile :: FilePath -> ExceptT Error IO  [Account]
 decodeAccountsFile f = do
         csvBS <- liftIO $ BL.readFile f
         decodeAccounts csvBS
+
+type ChartOfAccount = Tree ChartNode
+
+data ChartNode
+  = Root
+  | Group Int AccountGroup
+  | SubGroup Int AccountGroup T.Text
+  | SubSubGroup Int AccountGroup T.Text T.Text
+  | CAccount Account
+  deriving (Eq, Show)
+
+nodeGroup :: ChartNode -> AccountGroup
+nodeGroup Root = error "nodeGroup called on Root"
+nodeGroup (Group _ x) = x
+nodeGroup (SubGroup _ x _) = x
+nodeGroup (SubSubGroup _ x _ _) = x
+nodeGroup (CAccount x) = aGroup x
+
+nodeSubGroup :: ChartNode -> T.Text
+nodeSubGroup Root = error "nodeSubGroup called on Root"
+nodeSubGroup (Group _ _) = error "nodeSubGroup called on Group"
+nodeSubGroup (SubGroup _ _ x) = x
+nodeSubGroup (SubSubGroup _ _ x _) = x
+nodeSubGroup (CAccount x) = aSubsubgroup x
+
+nodeSubSubGroup :: ChartNode -> T.Text
+nodeSubSubGroup Root = error "nodeSubSubGroup called on Root"
+nodeSubSubGroup (Group _ _) = error "nodeSubSubGroup called on Group"
+nodeSubSubGroup (SubGroup _ _ _) = error "nodeSubSubGroup called on SubGroup"
+nodeSubSubGroup (SubSubGroup _ _ _ x) = x
+nodeSubSubGroup (CAccount x) = aSubsubgroup x
+
+nodeNumber :: ChartNode -> Int
+nodeNumber Root = error "nodeNumber called on Root"
+nodeNumber (Group x _) = x
+nodeNumber (SubGroup x _ _) = x
+nodeNumber (SubSubGroup x _ _ _) = x
+nodeNumber (CAccount x) = aNumber x
+
+nodeName :: ChartNode -> T.Text
+nodeName Root = error "nodeName called on Root"
+nodeName (Group _ a) = T.pack $ show a
+nodeName (SubGroup _ _ x) = x
+nodeName (SubSubGroup _ _ _ x) = x
+nodeName (CAccount x) = aName x
+
+-- data GroupF a = Group {
+--   gGroup :: AccountGroup,
+--   gChildren :: [Either Account a]
+-- } deriving (Eq, Show, Functor)
+-- type Group = GroupF SubGroup
+--
+-- data SubGroupF a = SubGroup {
+--   sgName :: T.Text,
+--   sgChildren :: NE.NonEmpty (Either Account a)
+-- } deriving (Eq, Show, Functor)
+-- type SubGroup = SubGroupF SubSubGroup
+--
+-- data SubSubGroupF a = SubSubGroup {
+--   ssgName :: T.Text,
+--   ssgChildren :: NE.NonEmpty a
+-- } deriving (Eq, Show, Functor)
+-- type SubSubGroup = SubSubGroupF Account
+
+makeBaseFunctor ''Tree
+
+-- The list of the main groups, always in the order of AccountGroup
+accountsToChartOfAccounts :: [Account] -> ChartOfAccount
+accountsToChartOfAccounts acc =
+         Node Root
+         $ map mkGroupTree
+         $ groupBy ((==) `on` aGroup)
+         $ sortOn aGroup acc
+
+-- All accounts must have the same AccountGroup
+mkGroupTree :: [Account] -> Tree ChartNode
+mkGroupTree [] = error "mkGroupTree received the empty list"
+mkGroupTree xs =
+  let accGroup = aGroup $ head xs
+      (acc, subgroups) = partition (\a -> aSubgroup a == "") xs
+
+      sg :: [Tree ChartNode]
+      sg = map (mkSubGroupTree accGroup)
+         $ groupBy ((==) `on` aSubgroup)
+         $ sortOn aSubgroup subgroups
+
+      ac :: [Tree ChartNode]
+      ac = map (\a -> Node (CAccount a) []) acc
+
+      n :: Int
+      n = minimum $ map (nodeNumber . rootLabel) (sg ++ ac)
+
+      children :: [Tree ChartNode]
+      children = sortOn (nodeNumber . rootLabel)
+               $ sg ++ ac
+  in Node (Group n accGroup) children
+
+-- All accounts must have the same SubGroup
+mkSubGroupTree :: AccountGroup -> [Account] -> Tree ChartNode
+mkSubGroupTree _ [] = error "mkSubGroupTree received the empty list"
+mkSubGroupTree accGroup xs =
+  let accSubGroup = aSubgroup $ head xs
+      (acc, subsubgroups) = partition (\a -> aSubsubgroup a == "") xs
+
+      sg :: [Tree ChartNode]
+      sg = map (mkSubSubGroupTree accGroup accSubGroup)
+         $ groupBy ((==) `on` aSubsubgroup)
+         $ sortOn aSubsubgroup subsubgroups
+
+      ac :: [Tree ChartNode]
+      ac = map (\a -> Node (CAccount a) []) acc
+
+      n :: Int
+      n = minimum $ map (nodeNumber . rootLabel) (sg ++ ac)
+
+      children :: [Tree ChartNode]
+      children = sortOn (nodeNumber . rootLabel)
+               $ sg ++ ac
+
+  in Node (SubGroup n accGroup accSubGroup) children
+
+-- All accounts must have the same SubSubGroup
+mkSubSubGroupTree :: AccountGroup -> T.Text -> [Account] -> Tree ChartNode
+mkSubSubGroupTree _ _ [] = error "mkSubSubGroupTree received the empty list"
+mkSubSubGroupTree accGroup accSubGroup xs =
+  let n = minimum $ map aNumber xs
+      accSubSubGroup = aSubsubgroup $ head xs
+
+      ac :: [Tree ChartNode]
+      ac = sortOn (nodeNumber . rootLabel)
+         $ map (\a -> Node (CAccount a) []) xs
+
+  in Node (SubSubGroup n accGroup accSubGroup accSubSubGroup) ac
+
+-- -- Catamorphism for the chart of accounts
+-- cataChart :: forall a b c d e.
+--              (Account -> a) ->
+--              (SubSubGroupF a -> b) ->
+--              (SubGroupF b -> c) ->
+--              (GroupF c -> d) ->
+--              ([d] -> e) ->
+--              ChartOfAccountF x y z ->
+--              e
+-- cataChart fAcc fssg fsg fg froot cs =
+--   let cs :: [(x, GroupF (Either Account (y, SubGroupF (Either Account (z, SubSubGroup)))))]
+--
+--       cs1 :: [(x, GroupF ((y, SubGroupF ((z, SubSubGroupF a)))))]
+--       cs1 = fmap (fmap (fmap (fmap (fmap (fmap (fmap fAcc)))))) cs
+--
+--       cs2 :: [(x, GroupF ((y, SubGroupF b)))]
+--       cs2 = fmap (fmap (fmap (fssg))) cs1
+--
+--       cs3 :: [(x, GroupF c)]
+--       cs3 = fmap (fmap fsg) cs2
+--
+--       cs4 :: [d]
+--       cs4 = fmap fg cs3
+--
+--   in froot cs4

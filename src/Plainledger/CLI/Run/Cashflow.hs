@@ -13,6 +13,7 @@ module Plainledger.CLI.Run.Cashflow
   runCashFlow
   ) where
 
+import qualified Data.Csv as C
 import qualified Data.Yaml as Y
 import qualified Data.ByteString.Lazy as BL
 import Plainledger.CLI.Command
@@ -27,15 +28,7 @@ runCashFlow c = do
      journal <- runExceptT $ journalFileToJournal (cfJournalFile c) journalFile
      case journal >>= journalToLedger of
        Left err -> putStrLn err
-       Right l ->
-        let sd = maybe MinDate Date $ (cfStartDate c)
-            ed = maybe MaxDate Date $ (cfEndDate c)
-        in do
-          tb <- either fail return
-                $ reportToCashFlow (cfOption c)
-               <$> report
-                   (cfJournalFile c)
-                   sd
-                   ed
-                   l
-          BL.writeFile (cfOuputFile c) tb
+       Right l -> do
+          let report = Report (cfPeriod c) (cfJournalFile c) l
+          let tb = reportToCashFlow (cfOption c) report
+          BL.writeFile (cfOuputFile c) (C.encode tb)

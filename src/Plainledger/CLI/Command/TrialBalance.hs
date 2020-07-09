@@ -12,17 +12,15 @@ module Plainledger.CLI.Command.TrialBalance
   (
   TrialBalanceCommand(..),
   BalanceFormat(..),
-  TrialBalanceOption(..)
+  TrialBalanceOption
   )
 where
 
-import Data.Time
 import Plainledger.Reports
 
 data TrialBalanceCommand = TrialBalanceCommand {
   tbcJournalFile :: String,
   tbcOuputFile :: String,
-  tbcStartDate :: Maybe Day,
-  tbcEndDate :: Maybe Day,
+  tbcPeriod :: Period,
   tbcOption :: TrialBalanceOption
   }

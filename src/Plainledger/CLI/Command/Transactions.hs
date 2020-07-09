@@ -16,7 +16,7 @@ module Plainledger.CLI.Command.Transactions
   )
 where
 
-import Data.Time
+import Plainledger.Reports.Report
 import Plainledger.Journal.Transaction (CsvRecordOptions(..))
 
 type CsvEncodeFormat = CsvRecordOptions
@@ -25,8 +25,7 @@ type CsvEncodeFormat = CsvRecordOptions
 data TransactionsCommand = TransactionsCommand {
   tcJournalFile :: String,
   tcOuputFile :: String,
-  tcStartDate :: Maybe Day,
-  tcEndDate :: Maybe Day,
+  tcPeriod :: Period,
   tcEncodeFormat :: CsvEncodeFormat,
   tcValidation :: Bool
   }
