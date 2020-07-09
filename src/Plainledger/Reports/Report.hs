@@ -30,6 +30,7 @@ module Plainledger.Reports.Report (
   cataAccounts,
   maxSpan,
   flatReport,
+  periodToSpan,
   FlatReportOption(..),
   GroupReportOption(..),
   groupReport
@@ -56,7 +57,7 @@ periodToSpan (MultiYear _ n) | n <= 0 = []
 periodToSpan (MultiYear d n) =
   let dNext = addGregorianYearsClip (-1) d
       b = addDays 1 dNext
-  in (Date d, Date b) : periodToSpan (MultiYear dNext (n - 1))
+  in periodToSpan (MultiYear dNext (n - 1)) ++ [(Date b, Date d)]
 
 maxSpan :: Period -> (LDate, LDate)
 maxSpan (Span b e) = (b, e)
