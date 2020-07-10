@@ -28,4 +28,4 @@ data TransactionsCommand = TransactionsCommand {
   tcPeriod :: Period,
   tcEncodeFormat :: CsvEncodeFormat,
   tcValidation :: Bool
-  }
+  } deriving (Eq, Show)

@@ -126,6 +126,7 @@ encodeTransactions MultipleRecords xs =
 
 data CsvRecordOptions = SingleRecord
                       | MultipleRecords
+    deriving (Eq, Show)
 
 -- | Test if the file has a SingleRecord header or a MultipleRecords header
 decodeHeader :: (MonadError Error m) =>
