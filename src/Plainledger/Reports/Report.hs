@@ -52,13 +52,14 @@ data Period
   deriving (Eq, Show)
 
 -- Returns the list of Begin and Enddate for each period
+-- The first period is the most recent one
 periodToSpan :: Period -> [(LDate, LDate)]
 periodToSpan (Span b e) = [(b, e)]
 periodToSpan (MultiYear _ n) | n <= 0 = []
 periodToSpan (MultiYear d n) =
   let dNext = addGregorianYearsClip (-1) d
       b = addDays 1 dNext
-  in periodToSpan (MultiYear dNext (n - 1)) ++ [(Date b, Date d)]
+  in (Date b, Date d) : periodToSpan (MultiYear dNext (n - 1))
 
 maxSpan :: Period -> (LDate, LDate)
 maxSpan (Span b e) = (b, e)
