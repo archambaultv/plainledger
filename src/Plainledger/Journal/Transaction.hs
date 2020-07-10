@@ -33,6 +33,7 @@ import Plainledger.Journal.Posting
 import Plainledger.Journal.Tag
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
+import Plainledger.Internal.Utils
 import GHC.Generics hiding (to, from)
 import qualified Data.ByteString.Lazy as BL
 import Prelude hiding (lines)
@@ -156,7 +157,17 @@ decodeTransactions SingleRecord bs = do
     let notTags = HS.fromList
                   $ ["date", "transaction id"]
                   ++ postingHeader (HS.fromList $ V.toList $ csv V.! 0) 1
-    in csvToData (csv :: C.Csv) (fromLine notTags)
+        headerDup :: String
+        headerDup = intercalate ", "
+                  $ findDuplicates
+                  $ map show
+                  $ V.toList
+                  $ csv V.! 0
+    in if null headerDup
+       then csvToData (csv :: C.Csv) (fromLine notTags)
+       else throwError $ "Two or more column with the same header (" ++
+                         headerDup ++ ")"
+
 
   where fromLine :: (MonadError Error m) =>
                     HS.HashSet Field ->
@@ -209,6 +220,15 @@ decodeTransactions SingleRecord bs = do
 
 decodeTransactions MultipleRecords bs = do
   csv <- either throwError return $ C.decode C.NoHeader bs
+  let  headerDup = intercalate ", "
+                 $ findDuplicates
+                 $ map show
+                 $ V.toList
+                 $ csv V.! 0
+  if null headerDup
+    then return ()
+    else throwError $ "Two or more column with the same header (" ++
+                      headerDup ++ ")"
   txns <- csvToData (csv :: C.Csv) fromLine
   let txnsGroup = groupBy ((==) `on` tTransactionId)
                 $ sortBy (comparing tTransactionId) txns

@@ -44,6 +44,7 @@ validationTestTree =
    testGroup "Validation"
     [ validationOk,
       validationFailure "transaction-no-date.csv" VTransaction,
+      validationFailure "transactions-duplicate-column.csv" VTransaction,
       validationFailure "group-field.csv" VAccount,
       validationFailure "group-field-non-null.csv" VAccount,
       validationFailure "earnings-account-non-null.yaml" VConfig,
