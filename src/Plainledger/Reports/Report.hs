@@ -96,6 +96,19 @@ periodToText r =
                      ["End date", e']
       MultiYear d _ -> ["Year-end", T.pack $ show d]
 
+-- Header for multi-column report
+periodHeader :: Period -> [[T.Text]]
+periodHeader (Span _ _) = []
+periodHeader p@(MultiYear _ _)
+  = (:[])
+  $ map (T.pack . show . year . toGregorian . fromDate . snd)
+  $ periodToSpan p
+
+  where fromDate (Date x) = x
+        fromDate _ = error "fromDate without Date constructor"
+
+        year (x,_,_) = x
+
 lDateToDay :: BalanceMap -> LDate -> Maybe Day
 lDateToDay m MinDate = minDate m
 lDateToDay m MaxDate = maxDate m
@@ -317,7 +330,9 @@ groupReport name accountAlg keepGroup r =
     title :: [[T.Text]]
     title = [name]
             : ["Journal file", T.pack $ rJournalFile r]
-            : periodToText r : [[]]
+            : periodToText r
+            : []
+            : (map ("" :) $ periodHeader $ rPeriod r)
 
     groupData = cata algFilter (lAccounts $ rLedger r)
     groupData2 = para algText groupData
@@ -389,7 +404,6 @@ groupReport name accountAlg keepGroup r =
 
     csvlines ::  [[T.Text]]
     csvlines =  title
-             ++ [[]]
              ++ groupData2
 
   in csvlines
