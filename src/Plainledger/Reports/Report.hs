@@ -40,6 +40,7 @@ where
 import Data.Time
 import Data.Tree
 import Data.List
+import Data.Bifunctor
 import Plainledger.Ledger
 import Data.Functor.Foldable
 import qualified Data.Text as T
@@ -318,7 +319,7 @@ groupReport name accountAlg keepGroup r =
             : periodToText r : [[]]
 
     groupData = cata algFilter (lAccounts $ rLedger r)
-    groupData2 = cata algText groupData
+    groupData2 = para algText groupData
 
     -- Filters the unwanted accounts and precompute some value
     algFilter :: TreeF ChartNode (Tree (ChartNode, [Quantity])) ->
@@ -344,11 +345,11 @@ groupReport name accountAlg keepGroup r =
                      qty = foldr addList (repeat 0) xssQty
                  in Node (x, qty) xss
 
-    algText :: TreeF (ChartNode, [Quantity]) [[T.Text]] ->
+    algText :: TreeF (ChartNode, [Quantity]) (Tree (ChartNode, [Quantity]), [[T.Text]]) ->
                  [[T.Text]]
     algText (NodeF (CAccount a, qty) _) = [accountText a qty]
-    algText (NodeF (Root, _) xs) = intercalate [] xs
-    algText (NodeF (n,qty) yss) =
+    algText (NodeF (Root, _) xs) = intercalate [[]] $ map snd xs
+    algText (NodeF (n,qty) xs) =
       let header :: T.Text
           header = nodeName n
           footer = T.append "Total " header
@@ -357,9 +358,25 @@ groupReport name accountAlg keepGroup r =
           footerTotal = concatMap (serializeAmount NormallyPositive gr) qty
           txt :: [[T.Text]]
           txt = [header] :
-                (concat yss) ++
+                (intercalateLine $ map (first (fst . rootLabel)) xs) ++
+                footerLine (map (fst . rootLabel . fst) xs) ++
                 [footer : footerTotal]
       in txt
+
+    -- Adds an extra whiteline after each subgroups and subsubgroup
+    intercalateLine :: [(ChartNode, [[T.Text]])] -> [[T.Text]]
+    intercalateLine [] = []
+    intercalateLine (x:[]) = snd x
+    intercalateLine (x:y:xs) =
+       case (fst x, fst y) of
+         (CAccount _, CAccount _) -> snd x ++ intercalateLine (y:xs)
+         _ -> snd x ++ [[]] ++ intercalateLine (y:xs)
+
+    footerLine :: [ChartNode] -> [[T.Text]]
+    footerLine xs =
+      if all (\n -> case n of CAccount _ -> True; _ -> False) xs
+      then []
+      else [[]]
 
     accountText :: Account -> [Quantity] -> [T.Text]
     accountText acc bal =
