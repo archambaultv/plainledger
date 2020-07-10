@@ -172,7 +172,6 @@ decodeTransactions SingleRecord bs = do
         postingHeader m n =
           let accountKey =  toField $ "account id (" ++ show n ++ ")"
               amountKey =  toField $ "amount (" ++ show n ++ ")"
-              commodityKey =  toField $ "commodity (" ++ show n ++ ")"
               balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
           in case HS.member accountKey m of
               False -> []
@@ -180,7 +179,6 @@ decodeTransactions SingleRecord bs = do
                 let xs = postingHeader m (n + 1)
                 in accountKey
                    : amountKey
-                   : commodityKey
                    : balanceDateKey
                    : xs
 
