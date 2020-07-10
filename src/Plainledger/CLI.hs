@@ -44,23 +44,24 @@ endDate = dateparser
           "All transactions in the journal file after this date are ignored"
           "END"
 
-endDay :: Parser Day
-endDay = option
+yearEndDay :: Parser Day
+yearEndDay = option
   (eitherReader parseISO8601M)
-  (short 'e' <>
-   long "end" <>
-   help "All transactions in the journal file after this date are ignored" <>
-   metavar "END")
+  (short 'p' <>
+   long "year-end" <>
+   help "The year-end date. All transactions in the journal file after this date are ignored" <>
+   metavar "YEAR-END")
 
 multiYear :: Parser Int
 multiYear = option auto
           ( long "years"
          <> short 'y'
+         <> value 1
          <> help "How many fiscal year to show in the reports"
          <> metavar "YEARS" )
 
 period :: Parser Period
-period = (MultiYear <$> endDay <*> multiYear)
+period = (MultiYear <$> yearEndDay <*> multiYear)
        <|> (Span <$> startDate <*> endDate)
 
 journalFile :: Parser String
