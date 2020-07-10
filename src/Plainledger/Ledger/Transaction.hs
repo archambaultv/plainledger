@@ -50,7 +50,7 @@ validateJTransactions accs jtransactions = do
     transactions <- traverse jtransactionToTransaction jtransactions
     _ <- traverse (checkTxnAccount accs) transactions
     transactions1 <- validateTransactionsId transactions
-    let (bm, bm2) = computeBalanceTx transactions1
+    let (bm, bm2) = computeBalanceTx (HS.toList accs) transactions1
 
     return (bm, bm2, transactions1)
 
@@ -88,8 +88,8 @@ computeBalancePs ps =
   in HM.fromList $ zip accounts balance
 
 -- Computes a balanceMap from the transaction date and the balance date
-computeBalanceTx :: [Transaction] -> (BalanceMap, BalanceMap)
-computeBalanceTx txns =
+computeBalanceTx :: [T.Text] -> [Transaction] -> (BalanceMap, BalanceMap)
+computeBalanceTx accs txns =
   let psTx = concatMap
              -- Overwrite balance date by the transaction date
              (\t -> map (first (const (tDate t))) (tPostings t))
@@ -97,7 +97,14 @@ computeBalanceTx txns =
 
       psBal = concatMap tPostings txns
 
-  in (computeBalancePs psTx, computeBalancePs psBal)
+      -- The empty map for all accounts
+      map0 :: BalanceMap
+      map0 = HM.fromList $ zip accs (repeat M.empty)
+
+      mapTx = computeBalancePs psTx
+      mapBal = computeBalancePs psBal
+
+  in (HM.union mapTx map0, HM.union mapBal map0)
 
 checkTxnAccount :: (MonadError Error m) =>
                     HS.HashSet T.Text -> Transaction -> m ()
