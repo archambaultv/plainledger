@@ -143,10 +143,13 @@ accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
 
 validateAccounts :: (MonadError Error m) =>
                       [Account] ->
+                      Configuration ->
                       m [Account]
-validateAccounts accounts = do
+validateAccounts accounts config = do
   validateAccountIdNonNull accounts
   validateAccountIdNoDup accounts
+  validateOpeningBalanceAccount accounts config
+  validateEarningsAccount accounts config
   let accWithNames = map
                      (\a -> if T.null (aName a) then a{aName = aId a} else a)
                      accounts
@@ -183,6 +186,30 @@ validateAccountIdNoDup accounts =
              $ HM.keys dup)
           ++ "."
      else return ()
+
+validateOpeningBalanceAccount :: (MonadError Error m) =>
+                           [Account] ->
+                           Configuration ->
+                           m ()
+validateOpeningBalanceAccount accounts config =
+  if cOpeningBalanceAccount config `elem` (map aId accounts)
+  then return ()
+  else throwError
+       $ "The opening balance account \""
+       ++ T.unpack (cOpeningBalanceAccount config)
+       ++ "\" declared in the configuration file does not appear in the accounts files."
+
+validateEarningsAccount :: (MonadError Error m) =>
+                           [Account] ->
+                           Configuration ->
+                           m ()
+validateEarningsAccount accounts config =
+  if cEarningsAccount config `elem` (map aId accounts)
+  then return ()
+  else throwError
+       $ "The earnings account \""
+       ++ T.unpack (cEarningsAccount config)
+       ++ "\" declared in the configuration file does not appear in the accounts files."
 
 -- CSV functions
 coreHeader :: [Field]

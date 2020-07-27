@@ -1,7 +1,7 @@
 # Configuration options
 configuration:
-  opening-balance-account: Solde d'ouverture
-  earnings-account: Bénéfice net
+  opening-balance-account: Opening Balance
+  earnings-account: Earnings
 
 # Accounts
 accounts:

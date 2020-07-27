@@ -48,7 +48,9 @@ validationTestTree =
       validationFailure "group-field.csv" VAccount,
       validationFailure "group-field-non-null.csv" VAccount,
       validationFailure "earnings-account-non-null.yaml" VConfig,
+      validationFailure "earnings-account-wrong-name.yaml" VConfig,
       validationFailure "opening-balance-non-null.yaml" VConfig,
+      validationFailure "opening-balance-wrong-name.yaml" VConfig,
       validationFailure "account-id-duplicate.csv" VAccount,
       validationFailure "account-id-non-null.csv" VAccount,
       validationFailure "balance-valid-account-id.csv" VAccount

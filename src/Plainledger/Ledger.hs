@@ -37,7 +37,7 @@ data Ledger = Ledger {
 journalToLedger :: (MonadError Error m) => Journal -> m Ledger
 journalToLedger (Journal config accounts txns bals) = do
   validateConfig config
-  accounts' <- validateAccounts accounts
+  accounts' <- validateAccounts accounts config
   let accMap = accountsToChartOfAccounts accounts'
   let accSet = HS.fromList $ map aId accounts'
   (balanceMap, balanceAssertionMap, transactions') <- validateJTransactions
