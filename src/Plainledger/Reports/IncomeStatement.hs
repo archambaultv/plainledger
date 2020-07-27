@@ -35,4 +35,4 @@ reportToIncomeStatement opt r =
       rEarnings = reportEarnings r
       earningsLines = concatMap (serializeAmount NormallyPositive Revenue) rEarnings
 
-    in report ++ [[]] ++ [earningsLines]
+    in report ++ [[]] ++ ["Earnings" : earningsLines]
