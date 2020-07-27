@@ -54,6 +54,6 @@ trialBalanceTestTree =
               csv <- either fail return $ C.decode C.NoHeader csvBS
               -- Cassava (Data.Csv) ignores empty lines, so we need to filter them
               -- The file name is not the same because the path differs
-              (filter (not . null) $ drop 2 tb) @?= (drop 2 $ map V.toList (V.toList csv))
+              (filter (not . null) tb) @?= map V.toList (V.toList csv)
 
     ]
