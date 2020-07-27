@@ -34,26 +34,6 @@ data Ledger = Ledger {
 } deriving (Eq, Show)
 
 -- | Converts the journal to a ledger.
--- journalToLedger verifies a series of properties that a valid ledger should
--- satisfies :
--- Configuration :
---  Asserts all members of the group mapping are non null
---  Asserts opening balance account is non null
---  Asserts earnings account is non null
---  Asserts default commodity is non null
--- Accounts :
---  Asserts all accounts group field are in the configuration group mapping.
---  Asserts all accounts Id are unique and non null
---  Asserts configuration earning and opening balance accounts truly exists
--- Transactions :
---  Asserts all transactions have valid unique transaction id
---  Asserts all transactions have valid postings
---  Asserts all transactions have a well defined commodity
---  Asserts all transactions balance to zero for all commodities
--- Balances :
---  Asserts all balance have a valid account field
---  Asserts all balance have a well defined commodity
---  Asserts all balance assertions are correct
 journalToLedger :: (MonadError Error m) => Journal -> m Ledger
 journalToLedger (Journal config accounts txns bals) = do
   validateConfig config
