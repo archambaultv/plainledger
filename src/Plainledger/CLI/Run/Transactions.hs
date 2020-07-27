@@ -10,7 +10,8 @@
 
 module Plainledger.CLI.Run.Transactions
 (
-  runTransactions
+  runTransactions,
+  filterDate
   ) where
 
 import qualified Data.Yaml as Y

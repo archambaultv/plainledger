@@ -20,6 +20,7 @@ import Plainledger.CLI.Run.TrialBalance
 import Plainledger.CLI.Run.Cashflow
 import Plainledger.CLI.Run.BalanceSheet
 import Plainledger.CLI.Run.IncomeStatement
+import Plainledger.CLI.Run.AllReports
 
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
@@ -29,3 +30,4 @@ runCommand (CTrialBalance x) = runTrialBalance x
 runCommand (CCashFlow x) = runCashFlow x
 runCommand (CBalanceSheet x) = runBalanceSheet x
 runCommand (CIncomeStatement x) = runIncomeStatement x
+runCommand (CAllReports x) = runAllReports x

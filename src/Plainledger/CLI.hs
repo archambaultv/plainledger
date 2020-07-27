@@ -70,6 +70,9 @@ journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
 csvFile :: Parser String
 csvFile = argument str (metavar "CSV-FILE" <> help "The csv file")
 
+csvDir :: Parser String
+csvDir = argument str (metavar "CSV-DIR" <> help "The directory in which to output the csv files")
+
 -- outputArg :: Parser String
 -- outputArg = argument str (metavar "OUTPUT-FILE" <> help "The ouptut file")
 --
@@ -226,6 +229,19 @@ incomeStatementInfo = info (incomeStatementCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the income statement in a CSV format")
 
+allReportsCommand :: Parser Command
+allReportsCommand = CAllReports
+               <$> (AllReportsCommand
+                   <$> journalFile
+                   <*> csvDir
+                   <*> period
+                   <*> trialBalanceOption)
+
+allReportsInfo :: ParserInfo Command
+allReportsInfo = info (allReportsCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints all the reports a CSV format")
+
 parseCommand :: Parser Command
 parseCommand = subparser
   ( command "accounts" accountsInfo
@@ -233,7 +249,8 @@ parseCommand = subparser
   <> command "trialbalance" trialBalanceInfo
   <> command "cashflow" cashFlowInfo
   <> command "balancesheet" balanceSheetInfo
-  <> command "incomestatement" incomeStatementInfo)
+  <> command "incomestatement" incomeStatementInfo
+  <> command "reports" allReportsInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

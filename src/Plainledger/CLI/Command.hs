@@ -16,7 +16,8 @@ module Plainledger.CLI.Command
   module Plainledger.CLI.Command.TrialBalance,
   module Plainledger.CLI.Command.Cashflow,
   module Plainledger.CLI.Command.BalanceSheet,
-  module Plainledger.CLI.Command.IncomeStatement
+  module Plainledger.CLI.Command.IncomeStatement,
+  module Plainledger.CLI.Command.AllReports
   )
 where
 
@@ -26,6 +27,7 @@ import Plainledger.CLI.Command.TrialBalance
 import Plainledger.CLI.Command.Cashflow
 import Plainledger.CLI.Command.BalanceSheet
 import Plainledger.CLI.Command.IncomeStatement
+import Plainledger.CLI.Command.AllReports
 
 data Command
   = CAccounts AccountsCommand
@@ -34,3 +36,4 @@ data Command
   | CCashFlow CashFlowCommand
   | CBalanceSheet BalanceSheetCommand
   | CIncomeStatement IncomeStatementCommand
+  | CAllReports AllReportsCommand
