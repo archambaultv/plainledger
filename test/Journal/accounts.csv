@@ -1,6 +1,7 @@
 id,name,number,group,subgroup,subsubgroup,bank,description
 Chequing,,1001,Asset,A1,,Bank ABC,Hello World !
-Line of credit,,1051,Asset,A2,,,
+House,My House on ABC Street,1051,Asset
+Line of credit,,2051,Liability,A2,,,
 Credit card,My credit card,2001,Liability,,,,
 Mortgage,,2002,Liability,L1,,,
 Opening Balance,,3001,Equity,,,Bank XYZ,
