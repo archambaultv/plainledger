@@ -160,7 +160,7 @@ isActive :: BalanceMap -> Account -> (LDate, LDate) -> Bool
 isActive m acc (d1, d2) =
   case balanceAtDate m (aId acc) d2 of
     Nothing -> False
-    Just (d, _) -> Date d < d1
+    Just (d, _) -> Date d >= d1
 
 -- cashFlow m acc (d1, d2) computes the cashflow from the start of d1 to the end of d2.
 cashFlow :: BalanceMap -> Account -> (LDate, LDate) -> Quantity

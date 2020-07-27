@@ -40,32 +40,39 @@ trialBalanceTestTree =
                          [(fromGregorian 2016 07 01, fromGregorian 2017 06 30),
                           (fromGregorian 2017 07 01, fromGregorian 2018 06 30)]
           periodToSpan (MultiYear end years) @?= reverse goodSpan,
-      testCase "Balance sheet 2018" $ do
-         let s = Date $ fromGregorian 2018 01 01
-         let e = Date $ fromGregorian 2018 12 31
-         journalFile <- Y.decodeFileThrow ledgerPath
-         journal <- runExceptT $ journalFileToJournal ledgerPath journalFile
-         case journal >>= journalToLedger of
-           Left err -> putStrLn err
-           Right l -> do
-              let report = Report (Span s e) ledgerPath l
-              let tb = reportToBalanceSheet (GroupReportOption False) report
-              csvBS <- BL.readFile "test/Reports/Balance 2018.csv"
-              csv <- either fail return $ C.decode C.NoHeader csvBS
-              -- Cassava (Data.Csv) ignores empty lines, so we need to filter them
-              (filter (not . null) tb) @?= map V.toList (V.toList csv),
-      testCase "Trial balance 2018" $ do
-         let s = Date $ fromGregorian 2018 01 01
-         let e = Date $ fromGregorian 2018 12 31
-         journalFile <- Y.decodeFileThrow ledgerPath
-         journal <- runExceptT $ journalFileToJournal ledgerPath journalFile
-         case journal >>= journalToLedger of
-           Left err -> putStrLn err
-           Right l -> do
-              let report = Report (Span s e) ledgerPath l
-              let tb = reportToTrialBalance (FlatReportOption TwoColumnDebitCredit False) report
-              csvBS <- BL.readFile "test/Reports/Trial Balance 2018.csv"
-              csv <- either fail return $ C.decode C.NoHeader csvBS
-              -- Cassava (Data.Csv) ignores empty lines, so we need to filter them
-              (filter (not . null) tb) @?= map V.toList (V.toList csv)
+      testCase "Balance sheet 2018" $
+          testReport2018
+          (reportToBalanceSheet (GroupReportOption False))
+          "test/Reports/Balance 2018.csv",
+      testCase "Trial balance 2018" $
+          testReport2018
+          (reportToTrialBalance (FlatReportOption TwoColumnDebitCredit False))
+          "test/Reports/Trial Balance 2018.csv",
+      testCase "Income statement 2018" $
+          testReport2018
+          (reportToIncomeStatement (GroupReportOption False))
+          "test/Reports/Income statement 2018.csv",
+      testCase "Cashflow 2018" $
+          testReport2018
+          (reportToCashFlow (FlatReportOption TwoColumnDebitCredit False))
+          "test/Reports/Cashflow 2018.csv"
     ]
+
+testReport2018 :: (C.FromField a, Eq a, Show a) =>
+                  (Report -> [[a]]) ->
+                  FilePath ->
+                  IO ()
+testReport2018 mkReport f = do
+   let s = Date $ fromGregorian 2018 01 01
+   let e = Date $ fromGregorian 2018 12 31
+   journalFile <- Y.decodeFileThrow ledgerPath
+   journal <- runExceptT $ journalFileToJournal ledgerPath journalFile
+   case journal >>= journalToLedger of
+     Left err -> putStrLn err
+     Right l -> do
+        let report = Report (Span s e) ledgerPath l
+        let tb = mkReport report
+        csvBS <- BL.readFile f
+        csv <- either fail return $ C.decode C.NoHeader csvBS
+        -- Cassava (Data.Csv) ignores empty lines, so we need to filter them
+        (filter (not . null) tb) @?= map V.toList (V.toList csv)
