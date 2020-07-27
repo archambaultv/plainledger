@@ -53,7 +53,19 @@ trialBalanceTestTree =
               csvBS <- BL.readFile "test/Reports/Balance 2018.csv"
               csv <- either fail return $ C.decode C.NoHeader csvBS
               -- Cassava (Data.Csv) ignores empty lines, so we need to filter them
-              -- The file name is not the same because the path differs
+              (filter (not . null) tb) @?= map V.toList (V.toList csv),
+      testCase "Trial balance 2018" $ do
+         let s = Date $ fromGregorian 2018 01 01
+         let e = Date $ fromGregorian 2018 12 31
+         journalFile <- Y.decodeFileThrow ledgerPath
+         journal <- runExceptT $ journalFileToJournal ledgerPath journalFile
+         case journal >>= journalToLedger of
+           Left err -> putStrLn err
+           Right l -> do
+              let report = Report (Span s e) ledgerPath l
+              let tb = reportToTrialBalance (FlatReportOption TwoColumnDebitCredit False) report
+              csvBS <- BL.readFile "test/Reports/Trial Balance 2018.csv"
+              csv <- either fail return $ C.decode C.NoHeader csvBS
+              -- Cassava (Data.Csv) ignores empty lines, so we need to filter them
               (filter (not . null) tb) @?= map V.toList (V.toList csv)
-
     ]

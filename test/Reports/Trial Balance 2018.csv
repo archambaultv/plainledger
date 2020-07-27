@@ -1,0 +1,20 @@
+Trial Balance
+Journal file,test/Journal/Journal.yaml
+Start date,2018-01-01,End date,2018-12-31
+
+Account number,Account Name,Debit,Credit
+1001,Chequing,9835.68,
+1051,My House on ABC Street,275000,
+2001,My credit card,508,
+2002,Mortgage,,164375
+2051,Line of credit,,5963.45
+3001,Opening Balance,,107684
+4152,Company Foo,,10000
+4153,Rental,,1000
+5002,Food,123.45,
+5003,Taxes,2298.32,
+5006,Clothes,187,
+5010,Entertainment,400,
+5011,Misc,670,
+
+,Total,289022.45,289022.45
