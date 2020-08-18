@@ -55,16 +55,34 @@ trialBalanceTestTree =
       testCase "Cashflow 2018" $
           testReport2018
           (reportToCashFlow (FlatReportOption TwoColumnDebitCredit False))
-          "test/Reports/Cashflow 2018.csv"
+          "test/Reports/Cashflow 2018.csv",
+      testCase "Trial balance 2019" $
+          testReport2019
+          (reportToTrialBalance (FlatReportOption TwoColumnDebitCredit False))
+          "test/Reports/Trial Balance 2019.csv"
     ]
+
+testReport2019 :: (C.FromField a, Eq a, Show a) =>
+                  (Report -> [[a]]) ->
+                  FilePath ->
+                  IO ()
+testReport2019 = testReport (fromGregorian 2019 01 01) (fromGregorian 2019 12 31)
 
 testReport2018 :: (C.FromField a, Eq a, Show a) =>
                   (Report -> [[a]]) ->
                   FilePath ->
                   IO ()
-testReport2018 mkReport f = do
-   let s = Date $ fromGregorian 2018 01 01
-   let e = Date $ fromGregorian 2018 12 31
+testReport2018 = testReport (fromGregorian 2018 01 01) (fromGregorian 2018 12 31)
+
+testReport :: (C.FromField a, Eq a, Show a) =>
+               Day ->
+               Day ->
+                  (Report -> [[a]]) ->
+                  FilePath ->
+                  IO ()
+testReport d1 d2 mkReport f = do
+   let s = Date d1
+   let e = Date d2
    journalFile <- Y.decodeFileThrow ledgerPath
    journal <- runExceptT $ journalFileToJournal ledgerPath journalFile
    case journal >>= journalToLedger of
