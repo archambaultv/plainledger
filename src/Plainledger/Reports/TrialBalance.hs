@@ -26,6 +26,7 @@ reportToTrialBalance :: TrialBalanceOption -> Report -> [[T.Text]]
 reportToTrialBalance opt r =
   let
       openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal $ rLedger r
+      rOpenBal = reportLedgerOpeningBalance r
 
       serialize :: Account -> Maybe [Quantity]
       serialize a
@@ -38,7 +39,14 @@ reportToTrialBalance opt r =
       computeTrialBalance :: Account -> [Quantity]
       computeTrialBalance a =
         if isIncomeStatementGroup $ aGroup a
-        then reportCashFlow a r
-        else reportBalance a r
+        then adjustBalance a $ reportCashFlow a r
+        else adjustBalance a $ reportBalance a r
+
+      -- Adjust the balance for the opening balance
+      adjustBalance :: Account -> [Quantity] -> [Quantity]
+      adjustBalance acc xs =
+        if aId acc == openBalAcc
+        then addList rOpenBal xs
+        else xs
 
   in flatReport "Trial Balance" serialize opt r

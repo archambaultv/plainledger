@@ -33,15 +33,15 @@ reportToBalanceSheet opt r =
         | isReportActive a r == False
           && aId a /= openBalAcc
           && aId a /= earningsAcc
-          && (all (== 0) (balanceQty a r))
+          && (all (== 0) (balanceQty a))
           && not (grShowInactiveAccounts opt) = Nothing
-      accountAlg acc = Just (balanceQty acc r)
+      accountAlg acc = Just (balanceQty acc)
 
-      balanceQty :: Account -> Report -> [Quantity]
-      balanceQty a rep =
+      balanceQty :: Account -> [Quantity]
+      balanceQty a =
           if isIncomeStatementGroup $ aGroup a
-          then adjustBalance a $ reportCashFlow a rep
-          else adjustBalance a $ reportBalance a rep
+          then adjustBalance a $ reportCashFlow a r
+          else adjustBalance a $ reportBalance a r
 
       -- Adjust the balance for the earnings and open balance
       adjustBalance :: Account -> [Quantity] -> [Quantity]
