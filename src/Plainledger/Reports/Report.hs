@@ -345,7 +345,7 @@ groupReport name accountAlg keepGroup r =
       case accountAlg a of
         Nothing -> Node (CAccount a, []) []
         Just xs -> Node (CAccount a, xs) []
-    -- We remove the income statement group
+    -- We remove the unwanted group
     algFilter (NodeF (Group n a) xs) =
       if keepGroup a
       then let xssQty = map (snd . rootLabel) xs
