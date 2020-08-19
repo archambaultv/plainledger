@@ -59,7 +59,11 @@ trialBalanceTestTree =
       testCase "Trial balance 2019" $
           testReport2019
           (reportToTrialBalance (FlatReportOption TwoColumnDebitCredit False))
-          "test/Reports/Trial Balance 2019.csv"
+          "test/Reports/Trial Balance 2019.csv",
+      testCase "Balance sheet 2019" $
+          testReport2019
+          (reportToBalanceSheet (GroupReportOption False))
+          "test/Reports/Balance 2019.csv"
     ]
 
 testReport2019 :: (C.FromField a, Eq a, Show a) =>
