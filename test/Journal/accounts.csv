@@ -1,6 +1,7 @@
 id,name,number,group,subgroup,subsubgroup,bank,description
 Chequing,,1001,Asset,A1,,Bank ABC,Hello World !
 House,My House on ABC Street,1051,Asset
+Unused,,1102,Asset,A2,,,
 Line of credit,,2051,Liability,A2,,,
 Credit card,My credit card,2001,Liability,,,,
 Mortgage,,2002,Liability,L1,,,
@@ -13,3 +14,4 @@ Taxes,,5003,Expense,E1,E11,,
 Clothes,,5006,Expense,E1,E11,,
 Entertainment,,5010,Expense,E1,E12,,
 Misc,,5011,Expense,E1,E12,,
+Unused2,,5102,Expense,E2,,,

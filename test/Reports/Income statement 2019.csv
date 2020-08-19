@@ -1,0 +1,23 @@
+Income Statement
+Journal file,test/Journal/Journal.yaml
+Start date,2019-01-01,End date,2019-12-31
+
+Revenue
+Company Foo (4152),2500
+Rental (4153),1000
+Total Revenue,3500
+
+Expense
+E1
+Food (5002),220.00
+
+E11
+Taxes (5003),649.58
+Clothes (5006),450
+Total E11,1099.58
+
+Total E1,1319.58
+
+Total Expense,1319.58
+
+Earnings,2180.42
