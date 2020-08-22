@@ -348,18 +348,19 @@ groupReport name accountAlg keepGroup r =
     -- We remove the unwanted group
     algFilter (NodeF (Group n a) xs) =
       if keepGroup a
-      then let xssQty = map (snd . rootLabel) xs
-               qty = foldr addList (repeat 0) xssQty
-           in  Node (Group n a, qty) xs
+      then filterEmpty (Group n a) xs
       else Node (Group n a, []) []
-    -- We remove the empty sub and sub sub group
-    algFilter (NodeF x xs) =
-      let xs' = filter (not . null . snd . rootLabel) xs
-      in case xs' of
+
+    algFilter (NodeF x xs) = filterEmpty x xs
+
+    -- We remove the empty group, sub, sub sub group and account
+    filterEmpty x xs =
+      let xss = filter (not . null . snd . rootLabel) xs
+      in case xss of
           [] -> Node (x, []) []
-          xss -> let xssQty = map (snd . rootLabel) xss
-                     qty = foldr addList (repeat 0) xssQty
-                 in Node (x, qty) xss
+          _ -> let xssQty = map (snd . rootLabel) xss
+                   qty = foldr addList (repeat 0) xssQty
+               in Node (x, qty) xss
 
     algText :: TreeF (ChartNode, [Quantity]) (Tree (ChartNode, [Quantity]), [[T.Text]]) ->
                  [[T.Text]]
