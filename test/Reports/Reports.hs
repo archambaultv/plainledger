@@ -94,7 +94,7 @@ testReport d1 d2 mkReport f = do
    journalFile <- Y.decodeFileThrow ledgerPath
    journal <- runExceptT $ journalFileToJournal ledgerPath journalFile
    case journal >>= journalToLedger of
-     Left err -> putStrLn err
+     Left err -> fail err
      Right l -> do
         let report = Report (Span s e) ledgerPath l
         let tb = mkReport report

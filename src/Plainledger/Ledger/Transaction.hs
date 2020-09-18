@@ -82,10 +82,10 @@ computeBalancePs ps =
       accounts :: [T.Text]
       accounts = map (pAccount . head) byId
 
-      balance :: [M.Map Day Quantity]
-      balance = map computeBalance byId
+      balance1 :: [M.Map Day Quantity]
+      balance1 = map computeBalance byId
 
-  in HM.fromList $ zip accounts balance
+  in HM.fromList $ zip accounts balance1
 
 -- Computes a balanceMap from the transaction date and the balance date
 computeBalanceTx :: [T.Text] -> [Transaction] -> (BalanceMap, BalanceMap)

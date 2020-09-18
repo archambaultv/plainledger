@@ -15,11 +15,8 @@ module Plainledger.Reports.Report (
   computeTotalDrCr,
   isActive,
   isReportActive,
-  cashFlow,
   reportCashFlow,
-  balance,
   reportBalance,
-  openingBalance,
   amountTitle,
   serializeAmount,
   periodToText,
@@ -148,7 +145,7 @@ reportCashFlow :: Account -> Report -> [Quantity]
 reportCashFlow acc r =
   let m = lBalanceMap $ rLedger r
       ps = periodToSpan $ rPeriod r
-  in map (cashFlow m acc) ps
+  in map (cashFlow m (aId acc)) ps
 
 isReportActive :: Account -> Report -> Bool
 isReportActive acc r =
@@ -162,29 +159,12 @@ isActive m acc (d1, d2) =
     Nothing -> False
     Just (d, _) -> Date d >= d1
 
--- cashFlow m acc (d1, d2) computes the cashflow from the start of d1 to the end of d2.
-cashFlow :: BalanceMap -> Account -> (LDate, LDate) -> Quantity
-cashFlow m acc (d1, d2) = balance m acc d2 - openingBalance m acc d1
 
 reportBalance :: Account -> Report -> [Quantity]
 reportBalance acc r =
   let m = lBalanceMap $ rLedger r
       ps = map snd $ periodToSpan $ rPeriod r
-  in map (balance m acc) ps
-
--- Computes the balance at the end of the day
-balance :: BalanceMap -> Account -> LDate -> Quantity
-balance m acc d = maybe 0 snd $ balanceAtDate m (aId acc) d
-
--- Computes the balance at the end of the previous day
-openingBalance :: BalanceMap -> Account -> LDate -> Quantity
-openingBalance _ _ MinDate = 0
-openingBalance m acc (Date d) =
-  maybe 0 snd $ balanceAtDate m (aId acc) (Date $ addDays (-1) d)
-openingBalance m acc MaxDate =
-  case balanceAtDate m (aId acc) MaxDate of
-    Nothing -> 0
-    Just (d, _) -> openingBalance m acc (Date d)
+  in map (balance m (aId acc)) ps
 
 -- Compute the total for each "column", assuming the [Quantity] list all
 -- have the same length
@@ -226,41 +206,18 @@ addList xs ys = map (uncurry (+)) $ zip xs ys
 reportLedgerOpeningBalance :: Report -> [Quantity]
 reportLedgerOpeningBalance r =
   let ps = map fst $ periodToSpan $ rPeriod r
-  in map (ledgerOpeningBalance r) ps
-
--- | Computes the opening balance
-ledgerOpeningBalance :: Report -> LDate -> Quantity
-ledgerOpeningBalance r d = cata alg (lAccounts $ rLedger r)
-  where m :: BalanceMap
-        m = lBalanceMap $ rLedger r
-
-        alg :: TreeF ChartNode Quantity -> Quantity
-        alg = qtyAlgebra (\a -> openingBalance m a d)
-
-
+      l = rLedger r
+      accs = lAccounts l
+      balMap = lBalanceMap l
+  in map (ledgerOpeningBalance accs balMap) ps
 
 reportEarnings :: Report -> [Quantity]
 reportEarnings r =
     let ps = periodToSpan $ rPeriod r
-    in map (earnings r) ps
-
--- -- | Computes the earnings
-earnings :: Report -> (LDate, LDate) -> Quantity
-earnings r d = cata alg (lAccounts $ rLedger r)
-  where m :: BalanceMap
-        m = lBalanceMap $ rLedger r
-
-        alg :: TreeF ChartNode Quantity -> Quantity
-        alg = qtyAlgebra (\a -> cashFlow m a d)
-
--- Helper for ledgerOpeningBalance and earnings
-qtyAlgebra :: (Account -> Quantity) ->
-              TreeF ChartNode Quantity ->
-              Quantity
-qtyAlgebra f (NodeF (CAccount a) _) = f a
-qtyAlgebra _ (NodeF (Group _ x) xs) | isIncomeStatementGroup x = sum xs
-qtyAlgebra _ (NodeF (Group _ _) _) = 0
-qtyAlgebra _ (NodeF _ xs) = sum xs
+        l = rLedger r
+        accs = lAccounts l
+        balMap = lBalanceMap l
+    in map (earnings accs balMap) ps
 
 -- Helper to extract from the chart of accounts informations about accounts
 cataAccounts :: forall a . Report -> (Account -> Maybe a) -> [(Account, a)]

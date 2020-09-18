@@ -53,10 +53,13 @@ validationTestTree =
       validationFailure "opening-balance-wrong-name.yaml" VConfig,
       validationFailure "account-id-duplicate.csv" VAccount,
       validationFailure "account-id-non-null.csv" VAccount,
-      validationFailure "balance-valid-account-id.csv" VAccount
+      validationFailure "balance-valid-account-id.csv" VBalance,
+      validationFailure "balance-assertions-wrong-amount.csv" VBalance,
+      validationFailure "trial-balance-assertions-wrong-amount.csv" VTrialBalance,
+      validationFailure "trial-balance-assertions-wrong-id.csv" VTrialBalance
     ]
 
-data JournalCsv = VTransaction | VBalance | VAccount | VConfig
+data JournalCsv = VTransaction | VBalance | VAccount | VConfig | VTrialBalance
   deriving (Eq, Show)
 
 validationFailure :: String -> JournalCsv -> TestTree
@@ -66,6 +69,7 @@ validationFailure file opt = testCase file $ do
   jf <- case opt of
          VTransaction -> pure journalFile{jfTransactions = ["opening-balances.csv", f]}
          VBalance -> pure journalFile{jfBalances=[f]}
+         VTrialBalance -> pure journalFile{jfTrialBalances=[f]}
          VAccount -> pure journalFile{jfAccounts=[f]}
          VConfig -> do
                 c <- decodeFileThrow ("test/Journal/" ++ f) :: IO Configuration

@@ -49,7 +49,8 @@ data JournalF t = Journal
   {jConfiguration :: Configuration,
    jAccounts   :: [Account],
    jTransactions :: [t],
-   jBalances :: [Balance]
+   jBalances :: [Balance],
+   jTrialBalances :: [TrialBalanceAssertion]
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
@@ -59,17 +60,19 @@ data JournalFile = JournalFile {
     jfConfiguration :: Configuration,
     jfAccounts :: [String],
     jfTransactions :: [String],
-    jfBalances :: [String]
+    jfBalances :: [String],
+    jfTrialBalances :: [String]
 } deriving (Show, Eq)
 
 -- Reads the include files in the journal file
 journalFileToJournal :: FilePath -> JournalFile -> ExceptT Error IO Journal
-journalFileToJournal path (JournalFile c ai ti bi) = do
+journalFileToJournal path (JournalFile c ai ti bi tbi) = do
   let dir = takeDirectory path
   acc <- fmap concat $ traverse (decodeAccountsFile) (map (dir </>) ai)
   txns <- fmap concat $ traverse (decodeJTransactionsFile) (map (dir </>) ti)
   bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
-  return $ Journal c acc txns bals
+  trialbals <- fmap concat $ traverse (decodeTrialBalanceAssertionFile) (map (dir </>) tbi)
+  return $ Journal c acc txns bals trialbals
 
 -- | The Data.Yaml.Pretty configuration object created so that the
 -- fields in the yaml file follow the convention of this software.
@@ -81,9 +84,11 @@ yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
        fieldOrder "accounts" = 2
        fieldOrder "transactions" = 3
        fieldOrder "balance-assertions" = 4
+       fieldOrder "trial-balance-assertions" = 5
+
        -- Configuration fields
-       fieldOrder "opening-balance-account" = 5
-       fieldOrder "earnings-account" = 6
+       fieldOrder "opening-balance-account" = 50
+       fieldOrder "earnings-account" = 51
 
        fieldOrder _ = 99
 
@@ -94,21 +99,24 @@ instance FromJSON JournalFile where
     <*> (fromMaybe [] <$> v .:? "accounts")
     <*> (fromMaybe [] <$> v .:? "transactions")
     <*> (fromMaybe [] <$> v .:? "balance-assertions")
+    <*> (fromMaybe [] <$> v .:? "trial-balance-assertions")
 
   parseJSON _ = fail "Expected Object for Ledger value"
 
 -- To JSON instance
 instance ToJSON JournalFile where
-  toJSON (JournalFile config accounts txns bals) =
+  toJSON (JournalFile config accounts txns bals trialbals) =
     Y.object
     $ ["configuration" .= config,
        "accounts" .= accounts,
        "transactions" .= txns,
-       "balance-assertions" .= bals]
+       "balance-assertions" .= bals,
+       "trial-balance-assertions" .= trialbals]
 
-  toEncoding (JournalFile config accounts txns bals) =
+  toEncoding (JournalFile config accounts txns bals trialbals) =
     pairs
     $ "configuration"   .= config
     <> "accounts"   .= accounts
     <> "transactions" .= txns
     <> "balance-assertions" .= bals
+    <> "trial-balance-assertions" .= trialbals

@@ -11,8 +11,14 @@ module Plainledger.Ledger.Balance (
   BalanceMap,
   balanceAtDate,
   validateBalances,
+  validateTrialBalances,
   minDate,
   maxDate,
+  cashFlow,
+  balance,
+  openingBalance,
+  ledgerOpeningBalance,
+  earnings,
   module Plainledger.Journal.Balance
   )
 where
@@ -20,6 +26,7 @@ where
 import Data.Time
 import Data.Maybe
 import Control.Monad.Except
+import Data.Functor.Foldable
 import qualified Data.Text as T
 import Plainledger.Journal.Balance
 import Plainledger.Journal
@@ -75,57 +82,130 @@ balanceAtDate m acc d =
     Date d2 -> balanceDate m acc (M.lookupLE d2)
     MaxDate -> balanceDate m acc M.lookupMax
 
+-- Computes the balance at the end of the day
+balance :: BalanceMap -> T.Text -> LDate -> Quantity
+balance m acc d = maybe 0 snd $ balanceAtDate m acc d
+
+-- Computes the balance at the end of the previous day
+openingBalance :: BalanceMap -> T.Text -> LDate -> Quantity
+openingBalance _ _ MinDate = 0
+openingBalance m acc (Date d) =
+  maybe 0 snd $ balanceAtDate m acc (Date $ addDays (-1) d)
+openingBalance m acc MaxDate =
+  case balanceAtDate m acc MaxDate of
+    Nothing -> 0
+    Just (d, _) -> openingBalance m acc (Date d)
+
+-- cashFlow m acc (d1, d2) computes the cashflow from the start of d1 to the end of d2.
+cashFlow :: BalanceMap -> T.Text -> (LDate, LDate) -> Quantity
+cashFlow m acc (d1, d2) = balance m acc d2 - openingBalance m acc d1
+
 -- Balances :
 --  Asserts all balance have a valid account field
 --  Asserts all balance assertions are correct
-validateBalances :: (MonadError Error m) =>
-                      HashSet T.Text ->
+validateBalances :: forall m . (MonadError Error m) =>
+                      [Account] ->
                       BalanceMap ->
                       [Balance] ->
-                      m [Balance]
+                      m ()
 validateBalances accs balMap bs = do
-    _ <- traverse (checkBalanceAccount accs) bs
-    _ <- traverse (checkBalanceAmount balMap) bs
-    return bs
+    let accSet = HS.fromList $ map aId accs
+    _ <- traverse (checkBalanceAccount accSet) (map bAccount bs)
+    _ <- traverse checkBalanceAmount bs
+    return ()
 
-  where checkBalanceAccount :: (MonadError Error m) =>
-                                HashSet T.Text -> Balance -> m ()
-        checkBalanceAccount s b =
-          if HS.member (bAccount b) s
-          then return ()
-          else throwError
-               $ "Unknown account id \""
-               ++ T.unpack (bAccount b)
-               ++ "\"."
+  where checkBalanceAmount :: Balance -> m ()
+        checkBalanceAmount b =
+          let d = bDate b
+              bAtDate = snd <$> balanceAtDate balMap (bAccount b) (Date d)
+          in checkBalance (bAccount b) (bDate b) (bAtDate, bAmount b)
 
-        checkBalanceAmount :: (MonadError Error m) =>
-                              BalanceMap -> Balance -> m ()
-        checkBalanceAmount m b =
-          let bAtDate = snd
-                      <$> balanceAtDate m (bAccount b) (Date $ bDate b)
-          in case (bAtDate, bAmount b) of
-               (Nothing, 0) -> return ()
-               (Nothing, x) ->
-                      throwError
-                      $ "Balance assertion failed for account \""
-                      ++ T.unpack (bAccount b)
-                      ++ "\" on date "
-                      ++ show (bDate b)
-                      ++ ".\nAsserted balance : "
-                      ++ show x
-                      ++ "\nComputed balance : 0 (no transaction for \
-                         \this account)"
-               (Just y, x) | y /= x ->
-                    throwError
-                     $ "Balance assertion failed for account \""
-                     ++ T.unpack (bAccount b)
-                     ++ "\" on date "
-                     ++ show (bDate b)
-                     ++ ".\nAsserted balance : "
-                     ++ show x
-                     ++ "\nComputed balance : "
-                     ++ show y
-                     ++ "."
-                     ++ "\nDifference       : "
-                     ++ show (x - y)
-               _ -> return ()
+checkBalance :: (MonadError Error m) => T.Text -> Day -> (Maybe Quantity, Quantity) -> m ()
+checkBalance accId date z =
+  case z of
+       (Nothing, 0) -> return ()
+       (Nothing, x) ->
+              throwError
+              $ "Balance assertion failed for account \""
+              ++ T.unpack accId
+              ++ "\" on date "
+              ++ show date
+              ++ ".\nAsserted balance : "
+              ++ show x
+              ++ "\nComputed balance : 0 (no transaction for \
+                 \this account)"
+       (Just y, x) | y /= x ->
+            throwError
+             $ "Balance assertion failed for account \""
+             ++ T.unpack accId
+             ++ "\" on date "
+             ++ show date
+             ++ ".\nAsserted balance : "
+             ++ show x
+             ++ "\nComputed balance : "
+             ++ show y
+             ++ "."
+             ++ "\nDifference       : "
+             ++ show (x - y)
+       _ -> return ()
+
+checkBalanceAccount :: (MonadError Error m) => HashSet T.Text -> T.Text -> m ()
+checkBalanceAccount s b =
+        if HS.member b s
+        then return ()
+        else throwError
+             $ "Unknown account id \""
+             ++ T.unpack b
+             ++ "\"."
+
+validateTrialBalances :: forall m . (MonadError Error m) =>
+                      Configuration ->
+                      [Account] ->
+                      ChartOfAccount ->
+                      BalanceMap ->
+                      [TrialBalanceAssertion] ->
+                      m ()
+validateTrialBalances config accs accTree balMap bs = do
+  let accSet = HS.fromList $ map aId accs
+  let accMap = HM.fromList $ map (\a -> (aId a, a)) accs
+  _ <- traverse (checkBalanceAccount accSet) (map tbaAccount bs)
+  _ <- traverse (checkBalanceAmount accMap) bs
+  return ()
+
+  where checkBalanceAmount :: HashMap T.Text Account -> TrialBalanceAssertion -> m ()
+        checkBalanceAmount accMap b =
+          let sd = tbaStartDate b
+              ed = tbaEndDate b
+              accId = (tbaAccount b)
+              startBal = Just $ openingBalance balMap accId (Date sd)
+              endBal = snd <$> balanceAtDate balMap accId (Date ed)
+              group = aGroup $ accMap HM.! accId
+              amount = if isIncomeStatementGroup group
+                       then ((-) <$> endBal <*> startBal)
+                       else if accId == cOpeningBalanceAccount config
+                            then (+) <$> endBal <*> Just (ledgerOpeningBalance accTree balMap (Date sd))
+                            else endBal
+          in checkBalance (tbaAccount b) (tbaEndDate b) (amount, tbaAmount b)
+
+
+-- | Computes the opening balance
+ledgerOpeningBalance :: ChartOfAccount -> BalanceMap -> LDate -> Quantity
+ledgerOpeningBalance acc m d = cata alg acc
+  where alg :: TreeF ChartNode Quantity -> Quantity
+        alg = sumIncomeStatement (\a -> openingBalance m (aId a) d)
+
+
+-- -- | Computes the earnings
+earnings :: ChartOfAccount -> BalanceMap -> (LDate, LDate) -> Quantity
+earnings acc m d = cata alg acc
+  where alg :: TreeF ChartNode Quantity -> Quantity
+        alg = sumIncomeStatement (\a -> cashFlow m (aId a) d)
+
+-- Helper for ledgerOpeningBalance and earnings
+sumIncomeStatement :: (Account -> Quantity) ->
+                      TreeF ChartNode Quantity ->
+                      Quantity
+sumIncomeStatement f (NodeF (CAccount a) _) = f a
+sumIncomeStatement _ (NodeF (Group _ x) xs) | isIncomeStatementGroup x = sum xs
+sumIncomeStatement _ (NodeF (Group _ _) _) = 0
+sumIncomeStatement _ (NodeF _ xs) = sum xs

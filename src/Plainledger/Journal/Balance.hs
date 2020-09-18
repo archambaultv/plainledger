@@ -10,7 +10,9 @@
 
 module Plainledger.Journal.Balance (
   Balance(..),
-  decodeBalanceFile
+  TrialBalanceAssertion(..),
+  decodeBalanceFile,
+  decodeTrialBalanceAssertionFile
   )
 where
 
@@ -19,12 +21,8 @@ import Data.Scientific
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Csv as C
-import Data.Csv (FromRecord(..),
-                 FromNamedRecord(..),
-                 ToRecord(..),
+import Data.Csv (FromNamedRecord(..),
                  ToNamedRecord(..),
-                 ToField(..),
-                 (.!),
                  record,
                  namedRecord,
                  DefaultOrdered)
@@ -35,7 +33,7 @@ import Control.Monad.Except
 import Plainledger.Error
 
 -- | The Balance data type reprensents an assertion about the total of an
--- account at a particular date.
+-- account at a particular date. Used for bank reconciliation
 data Balance = Balance
   {bDate :: Day,
    bAccount   :: T.Text,
@@ -43,28 +41,12 @@ data Balance = Balance
   }
   deriving (Eq, Show)
 
-instance FromRecord Balance where
-    parseRecord v
-        | length v == 4 = Balance
-                          <$> (v .! 0 >>= either fail return . parseISO8601M)
-                          <*> v .! 1
-                          <*> (realToFrac <$>
-                               (v .! 2 >>= C.parseField :: C.Parser Scientific))
-        | otherwise     = mzero
-
 instance FromNamedRecord Balance where
     parseNamedRecord m =
       Balance
       <$> (m C..: "date" >>= either fail return . parseISO8601M)
       <*> m C..: "account"
       <*> (read <$> m C..: "amount")
-
-instance ToRecord Balance where
-    toRecord (Balance d acc amnt) =
-      record [
-      toField (toISO8601 d),
-      toField acc,
-      toField (realToFrac amnt :: Scientific)]
 
 instance ToNamedRecord Balance where
     toNamedRecord (Balance d acc amnt) =
@@ -76,7 +58,39 @@ instance ToNamedRecord Balance where
 instance DefaultOrdered Balance where
   headerOrder _ = record ["date","account","amount"]
 
+data TrialBalanceAssertion = TrialBalanceAssertion
+  {tbaStartDate :: Day,
+   tbaEndDate   :: Day,
+   tbaAccount :: T.Text,
+   tbaAmount :: Quantity
+  }
+  deriving (Eq, Show)
+
+instance FromNamedRecord TrialBalanceAssertion where
+    parseNamedRecord m =
+      TrialBalanceAssertion
+      <$> (m C..: "start date" >>= either fail return . parseISO8601M)
+      <*> (m C..: "end date" >>= either fail return . parseISO8601M)
+      <*> m C..: "account"
+      <*> (read <$> m C..: "amount")
+
+instance ToNamedRecord TrialBalanceAssertion where
+    toNamedRecord (TrialBalanceAssertion startdate enddate acc amnt) =
+      namedRecord [
+        "start date" C..= (toISO8601 startdate),
+        "end date" C..= (toISO8601 enddate),
+        "account" C..= acc,
+        "amount" C..= (realToFrac amnt :: Scientific)]
+
+instance DefaultOrdered TrialBalanceAssertion where
+  headerOrder _ = record ["start date","end date", "account","amount"]
+
 decodeBalanceFile :: String -> ExceptT Error IO [Balance]
 decodeBalanceFile f = do
+    csvBS <- liftIO $ BL.readFile f
+    either throwError (return . V.toList . snd) $ C.decodeByName csvBS
+
+decodeTrialBalanceAssertionFile :: String -> ExceptT Error IO [TrialBalanceAssertion]
+decodeTrialBalanceAssertionFile f = do
     csvBS <- liftIO $ BL.readFile f
     either throwError (return . V.toList . snd) $ C.decodeByName csvBS
