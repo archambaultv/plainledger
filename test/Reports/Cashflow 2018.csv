@@ -3,7 +3,7 @@ Journal file,test/Journal/Journal.yaml
 Start date,2018-01-01,End date,2018-12-31
 
 Account number,Account Name,Debit,Credit
-1001,Chequing,6601.68,
+1001,Compte chèque,6601.68,
 2001,My credit card,743,
 2002,Mortgage,500,
 2051,Line of credit,,523.45

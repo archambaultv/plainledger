@@ -1,19 +1,19 @@
-date,note,account id (1),amount (1),balance date (1),account id (2),amount (2),balance date (2),account id (3),amount (3)
-2018-01-02,Feel free to comment,Chequing,1950.42,,Salary,-2500,,Taxes,549.58
-2018-01-06,,Credit card,-100,,Clothes,100,,,
-2018-01-10,,Line of credit,-123.45,,Food,123.45,,,
-2018-01-14,,Chequing,-500,,Mortgage,500,,,
-2018-01-18,,Chequing,1950.42,,Salary,-2500,,Taxes,549.58
-2018-01-30,Recorded in February on the credit card statement,Chequing,-800,,Credit card,800,2018-02-01,,
-2018-02-02,,Line of credit,-400,,Entertainment,,,,
-2018-02-05,,Chequing,1950.42,,Salary,-2500,,Taxes,549.58
-2018-02-08,,Chequing,900,,Rental,-1000,,Taxes,100
-2018-02-14,,Credit card,,,Clothes,87,,,
-2018-02-17,,Credit card,-670,,Misc,670,,,
-2018-02-20,,Chequing,1950.42,,Salary,-2500,,Taxes,549.58
-2018-02-23,,Chequing,-800,,Credit card,800,,,
-2019-02-02,,Chequing,1950.42,,Salary,-2500,,Taxes,549.58
-2019-02-06,,Credit card,-450,,Clothes,450,,,
-2019-02-10,,Line of credit,-220,,Food,220,,,
-2019-05-08,,Chequing,900,,Rental,-1000,,Taxes,100
-2019-03-23,,Chequing,-300,,Credit card,300,,,
+Date,Commentaire,Compte 1,Montant 1,Date du relevé 1,Compte 2,Montant 2,Date du relevé 2,Compte 3,Montant 3
+2018-01-02,Un commentaire,Compte chèque,1950.42,,Salaire,-2500,,Taxes,549.58
+2018-01-06,,Carte de crédit,-100,,Vêtements,100,,,
+2018-01-10,,Marge de crédit,-123.45,,Nourriture,123.45,,,
+2018-01-14,,Compte chèque,-500,,Hypothèque,500,,,
+2018-01-18,,Compte chèque,1950.42,,Salaire,-2500,,Taxes,549.58
+2018-01-30,Apparaît en février sur le relevé,Compte chèque,-800,,Carte de crédit,800,2018-02-01,,
+2018-02-02,,Marge de crédit,-400,,Divertissements,,,,
+2018-02-05,,Compte chèque,1950.42,,Salaire,-2500,,Taxes,549.58
+2018-02-08,,Compte chèque,900,,Revenu de location,-1000,,Taxes,100
+2018-02-14,,Carte de crédit,,,Vêtements,87,,,
+2018-02-17,,Carte de crédit,-670,,Dépense non catégorisée,670,,,
+2018-02-20,,Compte chèque,1950.42,,Salaire,-2500,,Taxes,549.58
+2018-02-23,,Compte chèque,-800,,Carte de crédit,800,,,
+2019-02-02,,Compte chèque,1950.42,,Salaire,-2500,,Taxes,549.58
+2019-02-06,,Carte de crédit,-450,,Vêtements,450,,,
+2019-02-10,,Marge de crédit,-220,,Nourriture,220,,,
+2019-05-08,,Compte chèque,900,,Revenu de location,-1000,,Taxes,100
+2019-03-23,,Compte chèque,-300,,Carte de crédit,300,,,

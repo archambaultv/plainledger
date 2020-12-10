@@ -3,7 +3,7 @@ Journal file,test/Journal/Journal.yaml
 Start date,2018-01-01,End date,2018-12-31
 
 Account number,Account Name,Debit,Credit
-1001,Chequing,9835.68,
+1001,Compte chèque,9835.68,
 1051,My House on ABC Street,275000,
 2001,My credit card,508,
 2002,Mortgage,,164375

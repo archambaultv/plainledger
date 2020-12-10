@@ -1,20 +1,21 @@
-# Configuration options
+# Options de configuration
 configuration:
-  opening-balance-account: Opening Balance
-  earnings-account: Earnings
+  solde d'ouverture: Solde d'ouverture
+  bénéfice: Bénéfice
+  nom: Comptabilité ACME
+  séparateur csv: ;
+  séparateur décimale: ,
+  premier mois de l'exercice comptable : Juillet
 
-# Accounts
-accounts:
-  - accounts.csv
+# Compte
+comptes:
+  - comptes.csv
 
 # Transactions
 transactions:
-  - opening-balances.csv
+  - solde d'ouverture.csv
   - transactions.csv
 
-# Balance assertions
-balance-assertions:
-  - balance-assertions.csv
-
-trial-balance-assertions:
-  - trial-balance-assertions.csv
+# Vérification de soldes
+vérification de soldes:
+  - vérification de soldes.csv
