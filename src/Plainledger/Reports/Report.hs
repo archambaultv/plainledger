@@ -42,10 +42,52 @@ import Plainledger.Ledger
 import Data.Functor.Foldable
 import qualified Data.Text as T
 
-data Period
-  = Span LDate LDate -- | One period from start date to end date (both included)
-  | MultiYear Day Int -- | MultiYear D X means yearly for X years, counting
-                        --  backwards from D date (included)
+-- | Determines the start date and end date of the reports
+data ReportPeriod
+  = AllDates
+  | CustomPeriod Date Date
+  | FromBeginningUntil Date
+  | ThisMonth
+  | ThisMonthToDate
+  | ThisCalendarQuarter
+  | ThisCalendarQuarterToDate
+  | ThisFiscalQuarter
+  | ThisFiscalQuarterToDate
+  | ThisCalendarYear
+  | ThisCalendarYearToDate
+  | ThisCalendarYearToLastMonth
+  | ThisFiscalYear
+  | ThisFiscalYearToDate
+  | ThisFiscalYearToLastMonth
+  | Since30DaysAgo
+  | Since60DaysAgo
+  | Since90DaysAgo
+  | Since365DaysAgo
+  | SinceDate Date
+  deriving (Eq, Show)
+
+-- | Not all combinaison of CompareAnotherPeriod and Report Period are valid
+data CompareAnotherPeriod
+  = PreviousPeriod Bool Bool Int -- | Sliding window. Show Diff, Show Percent, Nb of Period
+  | PreviousYear Bool Bool Int-- | Substract one year to the period. Show Diff, Show Percent, Nb of Period
+  | CustomCompare [(Date, Date)] -- | A custom comparison
+  deriving (Eq, Show)
+
+-- | Which row to show in the report
+data ShowRow
+  = ShowActive
+  | ShowAll
+  | ShowNonZero
+  deriving (Eq, Show)
+
+-- | Possible report columns
+data DisplayColumns
+  = Months
+  | CalendarQuartesr
+  | FiscalQuarters
+  | CalendarYears
+  | FiscalYears
+  | Counterparty
   deriving (Eq, Show)
 
 -- Returns the list of Begin and Enddate for each period
@@ -66,14 +108,11 @@ maxSpan (MultiYear d n) =
   in (Date b, Date d)
 
 
--- | The Report data type contains all the necessary informations to produce all
--- standard reports (trial balance, balance sheet, etc.) All the accounts are
--- listed in the reportLines, even those without any transaction at all.
-data Report = Report {
-  rPeriod :: Period,
-  rJournalFile :: FilePath,
-  rLedger :: Ledger
-} deriving (Eq, Show)
+data Report
+  = BalanceSheetReport
+  | IncomeStatementReport
+  | TrialBalanceReport
+  | TransactionsReport
 
 data BalanceFormat
   = TwoColumnDebitCredit

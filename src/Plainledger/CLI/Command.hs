@@ -23,8 +23,8 @@ import Plainledger.CLI.Command.TrialBalance
 import Plainledger.CLI.Command.BalanceSheet
 import Plainledger.CLI.Command.IncomeStatement
 
-data Command
-  = CTransactions TransactionsCommand
-  | CTrialBalance TrialBalanceCommand
-  | CBalanceSheet BalanceSheetCommand
-  | CIncomeStatement IncomeStatementCommand
+data Command {
+  cJournalFile :: String,
+  cReport :: Report
+  }
+

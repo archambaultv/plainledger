@@ -17,7 +17,7 @@ import Plainledger.Ledger
 import Plainledger.Reports.Report
 import qualified Data.Text as T
 
-type BalanceSheetOption = GroupReportOption
+type BalanceSheetOption = TrialBalanceOption
 
 reportToBalanceSheet :: BalanceSheetOption -> Report -> [[T.Text]]
 reportToBalanceSheet opt r =

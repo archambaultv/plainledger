@@ -18,8 +18,12 @@ import Plainledger.Reports.Report
 import Prelude hiding (lines)
 import qualified Data.Text as T
 
-type TrialBalanceOption = FlatReportOption
-
+data TrialBalanceOption = TrialBalanceOption {
+  tbReportPeriod :: ReportPeriod,
+  tbCompareAnotherPeriod :: CompareAnotherPeriod,
+  tbShowRow :: ShowRow,
+  tbDisplayColumns :: DisplayColumns
+}
 
 
 reportToTrialBalance :: TrialBalanceOption -> Report -> [[T.Text]]
