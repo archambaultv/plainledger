@@ -39,7 +39,7 @@ reportToBalanceSheet opt r =
 
       balanceQty :: Account -> [Quantity]
       balanceQty a =
-          if isIncomeStatementGroup $ aGroup a
+          if isIncomeStatementType $ aType a
           then adjustBalance a $ reportCashFlow a r
           else adjustBalance a $ reportBalance a r
 
@@ -52,4 +52,4 @@ reportToBalanceSheet opt r =
              then addList rEarnings xs
              else xs
 
-    in groupReport "Balance Sheet" accountAlg isBalanceSheetGroup r
+    in groupReport "Balance Sheet" accountAlg isBalanceSheetType r

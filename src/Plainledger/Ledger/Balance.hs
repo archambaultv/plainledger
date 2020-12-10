@@ -179,8 +179,8 @@ validateTrialBalances config accs accTree balMap bs = do
               accId = (tbaAccount b)
               startBal = Just $ openingBalance balMap accId (Date sd)
               endBal = snd <$> balanceAtDate balMap accId (Date ed)
-              group = aGroup $ accMap HM.! accId
-              amount = if isIncomeStatementGroup group
+              group = aType $ accMap HM.! accId
+              amount = if isIncomeStatementType group
                        then ((-) <$> endBal <*> startBal)
                        else if accId == cOpeningBalanceAccount config
                             then (+) <$> endBal <*> Just (ledgerOpeningBalance accTree balMap (Date sd))
@@ -206,6 +206,6 @@ sumIncomeStatement :: (Account -> Quantity) ->
                       TreeF ChartNode Quantity ->
                       Quantity
 sumIncomeStatement f (NodeF (CAccount a) _) = f a
-sumIncomeStatement _ (NodeF (Group _ x) xs) | isIncomeStatementGroup x = sum xs
+sumIncomeStatement _ (NodeF (Group _ x) xs) | isIncomeStatementType x = sum xs
 sumIncomeStatement _ (NodeF (Group _ _) _) = 0
 sumIncomeStatement _ (NodeF _ xs) = sum xs

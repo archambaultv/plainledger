@@ -42,7 +42,7 @@ reportToTrialBalance opt r =
 
       computeTrialBalance :: Account -> [Quantity]
       computeTrialBalance a =
-        if isIncomeStatementGroup $ aGroup a
+        if isIncomeStatementType $ aType a
         then adjustBalance a $ reportCashFlow a r
         else adjustBalance a $ reportBalance a r
 

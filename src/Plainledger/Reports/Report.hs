@@ -168,14 +168,14 @@ amountTitle _ = ["Balance"]
 --            $ map f ys
 --     in (sum $ map fst xs, sum $ map snd xs)
 
-serializeAmount :: BalanceFormat -> AccountGroup -> Quantity -> [T.Text]
+serializeAmount :: BalanceFormat -> AccountType -> Quantity -> [T.Text]
 serializeAmount NormallyPositive g x
   | g `elem` [Asset, Expense] = [T.pack $ show x]
   | otherwise = [T.pack $ show $ negate x]
 serializeAmount InflowOutflow _ x = [T.pack $ show x]
 serializeAmount TwoColumnDebitCredit g x
-  | x == 0 && isDebitGroup g = ["0",""]
-  | x == 0 && isCreditGroup g = ["","0"]
+  | x == 0 && isDebitType g = ["0",""]
+  | x == 0 && isCreditType g = ["","0"]
   | x < 0 = ["",T.pack $ show $ negate x]
   | otherwise = [T.pack $ show x, ""]
 
@@ -295,8 +295,8 @@ flatReport name serialize opt r =
 
     toText :: (Account, [Quantity]) -> [T.Text]
     toText (acc, bal) =
-      let front = [T.pack $ show $ aNumber acc, aName acc]
-          gr = aGroup acc
+      let front = [T.pack $ show $ aNumber acc, aDisplayName acc]
+          gr = aType acc
           amnt = concatMap (serializeAmount (frBalanceFormat opt) gr) bal
       in front ++ amnt
 
@@ -317,7 +317,7 @@ data GroupReportOption = GroupReportOption {
 -- Creates a report with both the accounts, groups, subgroups ...
 groupReport :: T.Text ->
                (Account -> Maybe [Quantity]) ->
-               (AccountGroup -> Bool) ->
+               (AccountType -> Bool) ->
                Report ->
                [[T.Text]]
 groupReport name accountAlg keepGroup r =
@@ -393,9 +393,9 @@ groupReport name accountAlg keepGroup r =
 
     accountText :: Account -> [Quantity] -> [T.Text]
     accountText acc bal =
-       let front = T.append (aName acc)
+       let front = T.append (aDisplayName acc)
                  $ T.concat [" (", T.pack $ show $ aNumber acc, ")"]
-           gr = aGroup acc
+           gr = aType acc
            amnt = concatMap (serializeAmount NormallyPositive gr) bal
        in front : amnt
 

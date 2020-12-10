@@ -19,21 +19,20 @@ module Plainledger.Journal.Account (
   validateAccounts,
   accountsToHashMap,
   decodeAccountsFile,
-  AccountGroup(..),
-  validateConfig,
-  isBalanceSheetGroup,
-  isIncomeStatementGroup,
-  isCreditGroup,
-  isDebitGroup,
-  ChartOfAccount,
-  ChartNode(..),
-  TreeF(..),
-  accountsToChartOfAccounts,
-  nodeNumber,
-  nodeGroup,
-  nodeSubGroup,
-  nodeSubSubGroup,
-  nodeName
+  AccountType(..),
+  isBalanceSheetType,
+  isIncomeStatementType,
+  isCreditType,
+  isDebitType,
+  -- ChartOfAccount,
+  -- ChartNode(..),
+  -- TreeF(..),
+  -- accountsToChartOfAccounts,
+  -- nodeNumber,
+  -- nodeGroup,
+  -- nodeSubGroup,
+  -- nodeSubSubGroup,
+  -- nodeName
   -- cataChart,
   -- GroupF(..),
   -- SubGroupF(..),
@@ -69,91 +68,54 @@ import qualified Data.Text as T
 
 -- | The top level grouping of an account. Must be Asset, Liability,
 -- Equity, Revenue or Expense.
-data AccountGroup = Asset
-                  | Liability
-                  | Equity
-                  | Revenue
-                  | Expense
-                  deriving (Show, Eq, Ord, Generic)
+data AccountType = Asset
+                | Liability
+                | Equity
+                | Revenue
+                | Expense
+                deriving (Show, Eq, Ord, Generic)
 
-instance Hashable AccountGroup
-instance ToField AccountGroup where
-  toField Asset = toField ("Asset" :: String)
-  toField Liability = toField ("Liability" :: String)
-  toField Equity = toField ("Equity" :: String)
-  toField Revenue = toField ("Revenue" :: String)
-  toField Expense = toField ("Expense" :: String)
+isBalanceSheetType :: AccountType -> Bool
+isBalanceSheetType a = a `elem` [Asset, Liability, Equity]
 
-instance FromField AccountGroup where
-  parseField x = do
-    s <- parseField x
-    case (map toLower s) of
-         "asset" -> return Asset
-         "liability" -> return Liability
-         "equity" -> return Equity
-         "revenue" -> return Revenue
-         "expense" -> return Expense
-         _ -> fail $ "Unknown account group \"" ++ s ++ "\". Must be one of the following\n" ++
-                   " Asset\n" ++
-                   " Liability\n" ++
-                   " Equity\n" ++
-                   " Revenue\n" ++
-                   " Expense"
+isIncomeStatementType :: AccountType -> Bool
+isIncomeStatementType = not . isBalanceSheetType
 
-isBalanceSheetGroup :: AccountGroup -> Bool
-isBalanceSheetGroup a = a `elem` [Asset, Liability, Equity]
+isCreditType :: AccountType -> Bool
+isCreditType a = a `elem` [Liability, Equity, Revenue]
 
-isIncomeStatementGroup :: AccountGroup -> Bool
-isIncomeStatementGroup = not . isBalanceSheetGroup
-
-isCreditGroup :: AccountGroup -> Bool
-isCreditGroup a = a `elem` [Liability, Equity, Revenue]
-
-isDebitGroup :: AccountGroup -> Bool
-isDebitGroup = not . isCreditGroup
+isDebitType :: AccountType -> Bool
+isDebitType = not . isCreditType
 
 -- | The Account data type serves as aggregation point for commodities
 -- relating to a particuliar purpose.
-data Account = Account
-  {aId :: T.Text,
-   aName :: T.Text,
-   aNumber :: Int,
-   aGroup :: AccountGroup,
-   aSubgroup :: T.Text, -- | Empty means no subgoup
-   aSubsubgroup :: T.Text, -- | Empty means no subsubgroup
-   aTags :: [Tag]
-  }
+data Account = Account {
+  aId :: T.Text,
+  aDisplayName :: T.Text,
+  aNumber :: Int,
+  aType :: AccountType,
+  aGroup :: T.Text, -- | Empty means no subgoup
+  aSubGroup :: T.Text, -- | Empty means no subsubgroup
+}
   deriving (Show, Generic)
-
--- / We sort the accounts when comparing two accounts
--- The Eq instance is mainly used in the unittests. In a validated ledger,
--- you can rely on the aId to identify an account.
-instance Eq Account where
-  a1 == a2 =  aId a1 == aId a2
-           && aName a1 == aName a2
-           && aNumber a1 == aNumber a2
-           && aGroup a1 == aGroup a2
-           && aSubgroup a1 == aSubgroup a2
-           && aSubsubgroup a1 == aSubsubgroup a2
-           && sortBy (comparing tagId) (aTags a1) ==
-              sortBy (comparing tagId) (aTags a2)
 
 accountsToHashMap :: [Account] -> HashMap T.Text Account
 accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
 
 validateAccounts :: (MonadError Error m) =>
-                      [Account] ->
-                      Configuration ->
-                      m [Account]
+                    [Account] ->
+                    Configuration ->
+                    m [Account]
 validateAccounts accounts config = do
   validateAccountIdNonNull accounts
   validateAccountIdNoDup accounts
   validateOpeningBalanceAccount accounts config
   validateEarningsAccount accounts config
   let accWithNames = map
-                     (\a -> if T.null (aName a) then a{aName = aId a} else a)
+                     (\a -> if T.null (aDisplayName a) then a{aDisplayName = aId a} else a)
                      accounts
   return accWithNames
+
 
 validateAccountIdNonNull :: (MonadError Error m) =>
                             [Account] ->
@@ -161,7 +123,7 @@ validateAccountIdNonNull :: (MonadError Error m) =>
 validateAccountIdNonNull accounts =
   let nullId = filter
                (T.null . fst)
-               (map (\a -> (aId a, aName a)) accounts)
+               (map (\a -> (aId a, aDisplayName a)) accounts)
   in if null nullId
      then return ()
      else throwError
@@ -213,25 +175,24 @@ validateEarningsAccount accounts config =
 
 -- CSV functions
 coreHeader :: [Field]
-coreHeader = ["id", "name", "number", "group", "subgroup", "subsubgroup"]
+coreHeader = ["Id", "Nom", "Numéro", "Type", "Groupe", "Sous-groupe"]
 
 -- / Encode a list of accounts as a Csv. The first line is the header
 encodeAccounts :: [Account] -> ByteString
 encodeAccounts accs =
-  let tagH = tagHeader $ concatMap aTags accs
-      header = toRecord $ coreHeader ++ tagH
-      lines = header : map (toLine tagH) accs
+  let header = toRecord $ coreHeader
+      lines = header : map toLine accs
   in C.encode lines
 
-  where toLine :: [Field] -> Account -> Record
-        toLine tagH a =
+  where toLine :: Account -> Record
+        toLine a =
           let coreLine = [toField $ aId a,
-                          toField $ aName a,
+                          toField $ aDisplayName a,
                           toField $ aNumber a,
+                          toField $ aType a,
                           toField $ aGroup a,
-                          toField $ aSubgroup a,
-                          toField $ aSubsubgroup a]
-          in toRecord $ coreLine ++ tagLine (aTags a) tagH
+                          toField $ aSubGroup a]
+          in toRecord coreLine
 
 -- | The first line is the header
 decodeAccounts :: (MonadError Error m) => ByteString -> m [Account]
@@ -242,152 +203,151 @@ decodeAccounts bs = do
   where fromLine :: (MonadError Error m) =>
                     HM.HashMap Field Field -> m Account
         fromLine m = do
-          id' <- findColumn "id" m
-          name <- findColumnDefault "" "name" m
-          number <- findColumn "number" m
-          group <- findColumn "group" m
-          subgroup <- findColumnDefault "" "subgroup" m
-          subsubgroup <- findColumnDefault "" "subsubgroup" m
-          tags <- recordToTags m (HS.fromList coreHeader)
-          return $ Account id' name number group subgroup subsubgroup tags
+          id' <- findColumn "Id" m
+          name <- findColumnDefault "" "Nom" m
+          number <- findColumn "Numéro" m
+          group <- findColumn "Type" m
+          subgroup <- findColumnDefault "" "Groupe" m
+          subsubgroup <- findColumnDefault "" "Sous-groupe" m
+          return $ Account id' name number group subgroup subsubgroup
 
 decodeAccountsFile :: FilePath -> ExceptT Error IO  [Account]
 decodeAccountsFile f = do
         csvBS <- liftIO $ BL.readFile f
         decodeAccounts csvBS
 
-type ChartOfAccount = Tree ChartNode
+-- type ChartOfAccount = Tree ChartNode
 
-data ChartNode
-  = Root
-  | Group Int AccountGroup
-  | SubGroup Int AccountGroup T.Text
-  | SubSubGroup Int AccountGroup T.Text T.Text
-  | CAccount Account
-  deriving (Eq, Show)
+-- data ChartNode
+--   = Root
+--   | Group Int AccountType
+--   | SubGroup Int AccountType T.Text
+--   | SubSubGroup Int AccountType T.Text T.Text
+--   | CAccount Account
+--   deriving (Eq, Show)
 
-nodeGroup :: ChartNode -> AccountGroup
-nodeGroup Root = error "nodeGroup called on Root"
-nodeGroup (Group _ x) = x
-nodeGroup (SubGroup _ x _) = x
-nodeGroup (SubSubGroup _ x _ _) = x
-nodeGroup (CAccount x) = aGroup x
+-- nodeGroup :: ChartNode -> AccountType
+-- nodeGroup Root = error "nodeGroup called on Root"
+-- nodeGroup (Group _ x) = x
+-- nodeGroup (SubGroup _ x _) = x
+-- nodeGroup (SubSubGroup _ x _ _) = x
+-- nodeGroup (CAccount x) = aType x
 
-nodeSubGroup :: ChartNode -> T.Text
-nodeSubGroup Root = error "nodeSubGroup called on Root"
-nodeSubGroup (Group _ _) = error "nodeSubGroup called on Group"
-nodeSubGroup (SubGroup _ _ x) = x
-nodeSubGroup (SubSubGroup _ _ x _) = x
-nodeSubGroup (CAccount x) = aSubsubgroup x
+-- nodeSubGroup :: ChartNode -> T.Text
+-- nodeSubGroup Root = error "nodeSubGroup called on Root"
+-- nodeSubGroup (Group _ _) = error "nodeSubGroup called on Group"
+-- nodeSubGroup (SubGroup _ _ x) = x
+-- nodeSubGroup (SubSubGroup _ _ x _) = x
+-- nodeSubGroup (CAccount x) = aSubGroup x
 
-nodeSubSubGroup :: ChartNode -> T.Text
-nodeSubSubGroup Root = error "nodeSubSubGroup called on Root"
-nodeSubSubGroup (Group _ _) = error "nodeSubSubGroup called on Group"
-nodeSubSubGroup (SubGroup _ _ _) = error "nodeSubSubGroup called on SubGroup"
-nodeSubSubGroup (SubSubGroup _ _ _ x) = x
-nodeSubSubGroup (CAccount x) = aSubsubgroup x
+-- nodeSubSubGroup :: ChartNode -> T.Text
+-- nodeSubSubGroup Root = error "nodeSubSubGroup called on Root"
+-- nodeSubSubGroup (Group _ _) = error "nodeSubSubGroup called on Group"
+-- nodeSubSubGroup (SubGroup _ _ _) = error "nodeSubSubGroup called on SubGroup"
+-- nodeSubSubGroup (SubSubGroup _ _ _ x) = x
+-- nodeSubSubGroup (CAccount x) = aSubGroup x
 
-nodeNumber :: ChartNode -> Int
-nodeNumber Root = error "nodeNumber called on Root"
-nodeNumber (Group x _) = x
-nodeNumber (SubGroup x _ _) = x
-nodeNumber (SubSubGroup x _ _ _) = x
-nodeNumber (CAccount x) = aNumber x
+-- nodeNumber :: ChartNode -> Int
+-- nodeNumber Root = error "nodeNumber called on Root"
+-- nodeNumber (Group x _) = x
+-- nodeNumber (SubGroup x _ _) = x
+-- nodeNumber (SubSubGroup x _ _ _) = x
+-- nodeNumber (CAccount x) = aNumber x
 
-nodeName :: ChartNode -> T.Text
-nodeName Root = error "nodeName called on Root"
-nodeName (Group _ a) = T.pack $ show a
-nodeName (SubGroup _ _ x) = x
-nodeName (SubSubGroup _ _ _ x) = x
-nodeName (CAccount x) = aName x
+-- nodeName :: ChartNode -> T.Text
+-- nodeName Root = error "nodeName called on Root"
+-- nodeName (Group _ a) = T.pack $ show a
+-- nodeName (SubGroup _ _ x) = x
+-- nodeName (SubSubGroup _ _ _ x) = x
+-- nodeName (CAccount x) = aDisplayName x
 
--- data GroupF a = Group {
---   gGroup :: AccountGroup,
---   gChildren :: [Either Account a]
--- } deriving (Eq, Show, Functor)
--- type Group = GroupF SubGroup
---
--- data SubGroupF a = SubGroup {
---   sgName :: T.Text,
---   sgChildren :: NE.NonEmpty (Either Account a)
--- } deriving (Eq, Show, Functor)
--- type SubGroup = SubGroupF SubSubGroup
---
--- data SubSubGroupF a = SubSubGroup {
---   ssgName :: T.Text,
---   ssgChildren :: NE.NonEmpty a
--- } deriving (Eq, Show, Functor)
--- type SubSubGroup = SubSubGroupF Account
+-- -- data GroupF a = Group {
+-- --   gGroup :: AccountType,
+-- --   gChildren :: [Either Account a]
+-- -- } deriving (Eq, Show, Functor)
+-- -- type Group = GroupF SubGroup
+-- --
+-- -- data SubGroupF a = SubGroup {
+-- --   sgName :: T.Text,
+-- --   sgChildren :: NE.NonEmpty (Either Account a)
+-- -- } deriving (Eq, Show, Functor)
+-- -- type SubGroup = SubGroupF SubSubGroup
+-- --
+-- -- data SubSubGroupF a = SubSubGroup {
+-- --   ssgName :: T.Text,
+-- --   ssgChildren :: NE.NonEmpty a
+-- -- } deriving (Eq, Show, Functor)
+-- -- type SubSubGroup = SubSubGroupF Account
 
-makeBaseFunctor ''Tree
+-- makeBaseFunctor ''Tree
 
--- The list of the main groups, always in the order of AccountGroup
-accountsToChartOfAccounts :: [Account] -> ChartOfAccount
-accountsToChartOfAccounts acc =
-         Node Root
-         $ map mkGroupTree
-         $ groupBy ((==) `on` aGroup)
-         $ sortOn aGroup acc
+-- -- The list of the main groups, always in the order of AccountType
+-- accountsToChartOfAccounts :: [Account] -> ChartOfAccount
+-- accountsToChartOfAccounts acc =
+--          Node Root
+--          $ map mkGroupTree
+--          $ groupBy ((==) `on` aType)
+--          $ sortOn aType acc
 
--- All accounts must have the same AccountGroup
-mkGroupTree :: [Account] -> Tree ChartNode
-mkGroupTree [] = error "mkGroupTree received the empty list"
-mkGroupTree xs =
-  let accGroup = aGroup $ head xs
-      (acc, subgroups) = partition (\a -> aSubgroup a == "") xs
+-- -- All accounts must have the same AccountType
+-- mkGroupTree :: [Account] -> Tree ChartNode
+-- mkGroupTree [] = error "mkGroupTree received the empty list"
+-- mkGroupTree xs =
+--   let accGroup = aType $ head xs
+--       (acc, subgroups) = partition (\a -> aGroup a == "") xs
 
-      sg :: [Tree ChartNode]
-      sg = map (mkSubGroupTree accGroup)
-         $ groupBy ((==) `on` aSubgroup)
-         $ sortOn aSubgroup subgroups
+--       sg :: [Tree ChartNode]
+--       sg = map (mkSubGroupTree accGroup)
+--          $ groupBy ((==) `on` aGroup)
+--          $ sortOn aGroup subgroups
 
-      ac :: [Tree ChartNode]
-      ac = map (\a -> Node (CAccount a) []) acc
+--       ac :: [Tree ChartNode]
+--       ac = map (\a -> Node (CAccount a) []) acc
 
-      n :: Int
-      n = minimum $ map (nodeNumber . rootLabel) (sg ++ ac)
+--       n :: Int
+--       n = minimum $ map (nodeNumber . rootLabel) (sg ++ ac)
 
-      children :: [Tree ChartNode]
-      children = sortOn (nodeNumber . rootLabel)
-               $ sg ++ ac
-  in Node (Group n accGroup) children
+--       children :: [Tree ChartNode]
+--       children = sortOn (nodeNumber . rootLabel)
+--                $ sg ++ ac
+--   in Node (Group n accGroup) children
 
--- All accounts must have the same SubGroup
-mkSubGroupTree :: AccountGroup -> [Account] -> Tree ChartNode
-mkSubGroupTree _ [] = error "mkSubGroupTree received the empty list"
-mkSubGroupTree accGroup xs =
-  let accSubGroup = aSubgroup $ head xs
-      (acc, subsubgroups) = partition (\a -> aSubsubgroup a == "") xs
+-- -- All accounts must have the same SubGroup
+-- mkSubGroupTree :: AccountType -> [Account] -> Tree ChartNode
+-- mkSubGroupTree _ [] = error "mkSubGroupTree received the empty list"
+-- mkSubGroupTree accGroup xs =
+--   let accSubGroup = aGroup $ head xs
+--       (acc, subsubgroups) = partition (\a -> aSubGroup a == "") xs
 
-      sg :: [Tree ChartNode]
-      sg = map (mkSubSubGroupTree accGroup accSubGroup)
-         $ groupBy ((==) `on` aSubsubgroup)
-         $ sortOn aSubsubgroup subsubgroups
+--       sg :: [Tree ChartNode]
+--       sg = map (mkSubSubGroupTree accGroup accSubGroup)
+--          $ groupBy ((==) `on` aSubGroup)
+--          $ sortOn aSubGroup subsubgroups
 
-      ac :: [Tree ChartNode]
-      ac = map (\a -> Node (CAccount a) []) acc
+--       ac :: [Tree ChartNode]
+--       ac = map (\a -> Node (CAccount a) []) acc
 
-      n :: Int
-      n = minimum $ map (nodeNumber . rootLabel) (sg ++ ac)
+--       n :: Int
+--       n = minimum $ map (nodeNumber . rootLabel) (sg ++ ac)
 
-      children :: [Tree ChartNode]
-      children = sortOn (nodeNumber . rootLabel)
-               $ sg ++ ac
+--       children :: [Tree ChartNode]
+--       children = sortOn (nodeNumber . rootLabel)
+--                $ sg ++ ac
 
-  in Node (SubGroup n accGroup accSubGroup) children
+--   in Node (SubGroup n accGroup accSubGroup) children
 
--- All accounts must have the same SubSubGroup
-mkSubSubGroupTree :: AccountGroup -> T.Text -> [Account] -> Tree ChartNode
-mkSubSubGroupTree _ _ [] = error "mkSubSubGroupTree received the empty list"
-mkSubSubGroupTree accGroup accSubGroup xs =
-  let n = minimum $ map aNumber xs
-      accSubSubGroup = aSubsubgroup $ head xs
+-- -- All accounts must have the same SubSubGroup
+-- mkSubSubGroupTree :: AccountType -> T.Text -> [Account] -> Tree ChartNode
+-- mkSubSubGroupTree _ _ [] = error "mkSubSubGroupTree received the empty list"
+-- mkSubSubGroupTree accGroup accSubGroup xs =
+--   let n = minimum $ map aNumber xs
+--       accSubSubGroup = aSubGroup $ head xs
 
-      ac :: [Tree ChartNode]
-      ac = sortOn (nodeNumber . rootLabel)
-         $ map (\a -> Node (CAccount a) []) xs
+--       ac :: [Tree ChartNode]
+--       ac = sortOn (nodeNumber . rootLabel)
+--          $ map (\a -> Node (CAccount a) []) xs
 
-  in Node (SubSubGroup n accGroup accSubGroup accSubSubGroup) ac
+--   in Node (SubSubGroup n accGroup accSubGroup accSubSubGroup) ac
 
 -- -- Catamorphism for the chart of accounts
 -- cataChart :: forall a b c d e.

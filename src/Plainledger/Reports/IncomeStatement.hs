@@ -30,7 +30,7 @@ reportToIncomeStatement opt r =
           && not (grShowInactiveAccounts opt) = Nothing
       serialize acc = Just (reportCashFlow acc r)
 
-      report = groupReport "Income Statement" serialize isIncomeStatementGroup r
+      report = groupReport "Income Statement" serialize isIncomeStatementType r
 
       rEarnings = reportEarnings r
       earningsLines = concatMap (serializeAmount NormallyPositive Revenue) rEarnings
