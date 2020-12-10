@@ -1,0 +1,17 @@
+Id;Nom;Nombre;Type;Groupe;Sous-groupe;Commentaire
+Compte chèque;;1001;Asset;Actif 1;;Hello World !
+Maison;Maison 123 rue principale;1051;Asset;;;
+Inutilisé;;1102;Asset;Actif 2;;;
+Marge de crédit;;2051;Liability;Actif 2;;;
+Carte de crédit;My credit card;2001;Liability;;;;
+Hypothèque;;2002;Liability;L1;;;
+Solde d'ouverture;;3001;Equity;;;
+Bénéfice;;3002;Equity;;;;
+Salaire;Salaire compagnie Foo Bar;4152;Revenue;;;;
+Revenu de location;;4153;Revenue;;;;
+Nourriture;;5002;Expense;E1;;;
+Taxes;;5003;Expense;E1;E11;;
+Vêtements;;5006;Expense;E1;E11;;
+Divertissements;;5010;Expense;E1;E12;;
+Dépenses non catégorisée;;5011;Expense;E1;E12;;
+Inutilisé 2;;5102;Expense;E2;;;
