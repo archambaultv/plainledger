@@ -14,20 +14,14 @@ module Plainledger.CLI.Run
   ) where
 
 import Plainledger.CLI.Command
-import Plainledger.CLI.Run.Accounts
 import Plainledger.CLI.Run.Transactions
 import Plainledger.CLI.Run.TrialBalance
-import Plainledger.CLI.Run.Cashflow
 import Plainledger.CLI.Run.BalanceSheet
 import Plainledger.CLI.Run.IncomeStatement
-import Plainledger.CLI.Run.AllReports
 
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
-runCommand (CAccounts x) = runAccounts x
 runCommand (CTransactions x) = runTransactions x
 runCommand (CTrialBalance x) = runTrialBalance x
-runCommand (CCashFlow x) = runCashFlow x
 runCommand (CBalanceSheet x) = runBalanceSheet x
 runCommand (CIncomeStatement x) = runIncomeStatement x
-runCommand (CAllReports x) = runAllReports x

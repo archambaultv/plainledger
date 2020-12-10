@@ -84,18 +84,6 @@ csvDir = argument str (metavar "CSV-DIR" <> help "The directory in which to outp
 --            <> metavar "OUTPUT-FILE"
 --            <> help "The output file."
 
-accountsCommand :: Parser Command
-accountsCommand = CAccounts
-               <$> (AccountsCommand
-                   <$> journalFile
-                   <*> csvFile)
-
-accountsInfo :: ParserInfo Command
-accountsInfo = info (accountsCommand <**> helper)
-              (fullDesc
-               <> progDesc "Prints all accounts and their properties\
-                            \ in a CSV format")
-
 txnDecodeOption :: Parser CsvRecordOptions
 txnDecodeOption = flag MultipleRecords SingleRecord
    ( long "single-record"
@@ -160,37 +148,6 @@ trialBalanceInfo = info (trialBalanceCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the trial balance in a CSV format")
 
-cashFlowCommand :: Parser Command
-cashFlowCommand = CCashFlow
-               <$> (CashFlowCommand
-                   <$> journalFile
-                   <*> csvFile
-                   <*> period
-                   <*> cashFlowOption)
-
-cashFlowOption :: Parser CashFlowOption
-cashFlowOption = FlatReportOption
-                   <$> balanceFormat
-                   <*> showInactiveAccounts
-
-  where balanceFormat = flag TwoColumnDebitCredit InflowOutflow
-           ( long "signed-balance"
-          <> short 's'
-          <> help "Does not report the balance with debit credit columns, but only \
-                  \with a signed quantity. A positive amount means debit and a \
-                  \negative amount means credit.")
-
-        showInactiveAccounts = flag False True
-           ( long "show-all-accounts"
-          <> short 'a'
-          <> help "Show all the accounts defined in the accounts section of \
-                  \the JOURNAL-FILE in the report, including accounts \
-                  \without transactions.")
-
-cashFlowInfo :: ParserInfo Command
-cashFlowInfo = info (cashFlowCommand <**> helper)
-              (fullDesc
-               <> progDesc "Prints the cash flow report in a CSV format")
 
 balanceSheetCommand :: Parser Command
 balanceSheetCommand = CBalanceSheet
@@ -244,13 +201,10 @@ allReportsInfo = info (allReportsCommand <**> helper)
 
 parseCommand :: Parser Command
 parseCommand = subparser
-  ( command "accounts" accountsInfo
-  <> command "transactions" transactionsInfo
+  ( command "transactions" transactionsInfo
   <> command "trialbalance" trialBalanceInfo
-  <> command "cashflow" cashFlowInfo
   <> command "balancesheet" balanceSheetInfo
-  <> command "incomestatement" incomeStatementInfo
-  <> command "reports" allReportsInfo)
+  <> command "incomestatement" incomeStatementInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)
