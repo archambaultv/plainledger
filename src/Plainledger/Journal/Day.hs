@@ -27,5 +27,5 @@ parseISO8601M s =
   let d = parseTimeM False defaultTimeLocale
           (iso8601DateFormat Nothing) s
   in case d of
-       Nothing -> throwError $ ParseDateErr s
+       Nothing -> throwError $ mkErrorNoPos $ ParseDateErr s
        Just d' -> return d'

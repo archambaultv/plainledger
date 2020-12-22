@@ -1,5 +1,5 @@
 -- |
--- Module      :  Plainledger.SourcePos
+-- Module      :  Plainledger.Error.SourcePos
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
@@ -8,7 +8,7 @@
 --
 -- This module defines the SourcePos data type
 
-module Plainledger.SourcePos
+module Plainledger.Error.SourcePos
 (
   SourcePos(..)
 ) where
@@ -16,9 +16,10 @@ module Plainledger.SourcePos
 
 
 -- | Source position in the csv file. The column refers to the ith csv column, not the column position
--- in the source file
+-- in the source file. A value of 0 for spRow or spColumn means we do not have this information.
 data SourcePos = SourcePos {
   spFile :: String, 
-  spRow :: Int,
-  spColumn :: Int
+  spCsvRow :: Int,
+  spCsvColumn :: Int
 }
+  deriving (Eq, Show)

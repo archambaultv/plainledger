@@ -2,7 +2,7 @@ module Main where
 
 import Test.Tasty
 import Journal.Journal
-import Reports.Reports
+import Report.Report
 
 main :: IO ()
 main = defaultMain tests

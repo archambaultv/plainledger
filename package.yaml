@@ -1,5 +1,5 @@
 name:                plainledger
-version:             0.3.0.0
+version:             0.4.0.0
 github:              "archambaultv/plainledger"
 license:             OtherLicense # OBSD
 author:              "Vincent Archambault-Bouffard"
@@ -24,10 +24,8 @@ dependencies:
 - Decimal
 - time
 - text
-- yaml
 - cassava
 - vector
-- aeson
 - scientific
 - bytestring
 - containers
@@ -37,7 +35,6 @@ dependencies:
 - mtl
 - optparse-applicative
 - filepath
-- recursion-schemes
 
 ghc-options:
 - -Wall

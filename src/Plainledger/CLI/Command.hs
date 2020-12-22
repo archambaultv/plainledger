@@ -9,22 +9,35 @@
 -- This module defines all the possible terminal commands
 
 module Plainledger.CLI.Command
-  (
+(
   Command(..),
-  module Plainledger.CLI.Command.Transactions,
-  module Plainledger.CLI.Command.TrialBalance,
-  module Plainledger.CLI.Command.BalanceSheet,
-  module Plainledger.CLI.Command.IncomeStatement,
-  )
-where
+  runCommand
+) where
 
-import Plainledger.CLI.Command.Transactions
-import Plainledger.CLI.Command.TrialBalance
-import Plainledger.CLI.Command.BalanceSheet
-import Plainledger.CLI.Command.IncomeStatement
+import Control.Monad.Except
+import qualified Data.Csv as C
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text.IO as T
+import Plainledger.Journal
+import Plainledger.Report
 
-data Command {
+data Command = Command {
   cJournalFile :: String,
+  cOutputFile :: String,
   cReport :: Report
   }
 
+-- / How to execute the CLI commands
+runCommand :: Command -> IO ()
+runCommand (Command journalPath outputPath report) = do
+       -- Reads the Journal file
+       journalFile <- runExceptT $ decodeJournalFileIO journalPath
+       putStrLn (show journalFile)
+       -- Create the journal object
+       -- journal <- runExceptT $ journalFileToJournal journalPath journalFile
+       -- -- Check for internal errors in the journal and proceed with the report
+       -- case journal >>= journalToLedger of
+       --   Left err -> putStrLn err
+       --   Right l -> do
+       --      let reportBS = computeReport journal report >>= C.encode
+       --      maybe (putStrLn . BL.pack) (BL.writeFile outputPath) reportBS

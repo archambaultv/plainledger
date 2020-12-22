@@ -1,0 +1,9 @@
+Paramètre,Valeur
+Compte pour les soldes d'ouverture,Solde d'ouverture
+Compte pour les bénéfices,Bénéfice
+Nom,My Company
+Séparateur de décimale,.
+Premier mois de l'exercice comptable,7
+Fichier des comptes,comptes.csv
+Fichiers des transactions,transactions.csv
+Fichiers des soldes,vérification de soldes.csv

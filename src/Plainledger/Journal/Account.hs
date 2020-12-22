@@ -8,22 +8,19 @@
 --
 -- This module defines the account data type.
 
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
-
-module Plainledger.Journal.Account (
-  Account(..),
-  encodeAccounts,
-  decodeAccounts,
-  validateAccounts,
-  accountsToHashMap,
-  decodeAccountsFile,
-  AccountType(..),
-  isBalanceSheetType,
-  isIncomeStatementType,
-  isCreditType,
-  isDebitType,
+module Plainledger.Journal.Account 
+(
+  -- Account(..),
+  -- encodeAccounts,
+  -- decodeAccounts,
+  -- validateAccounts,
+  -- accountsToHashMap,
+  -- decodeAccountsFile,
+  -- AccountType(..),
+  -- isBalanceSheetType,
+  -- isIncomeStatementType,
+  -- isCreditType,
+  -- isDebitType,
   -- ChartOfAccount,
   -- ChartNode(..),
   -- TreeF(..),
@@ -43,178 +40,176 @@ module Plainledger.Journal.Account (
   )
 where
 
-import Data.Char (toLower)
-import Data.Hashable (Hashable)
-import Data.Function
-import Control.Monad.Except
-import Data.Tree
-import qualified Data.ByteString.Lazy as BL
-import Data.ByteString.Lazy (ByteString)
-import Data.Csv (Record, Field, ToField(..),toRecord, FromField(..))
-import Data.HashMap.Strict (HashMap)
-import Data.List hiding (group, lines)
-import Data.Ord (comparing)
-import GHC.Generics
-import Plainledger.Error
-import Plainledger.Internal.Csv
-import Plainledger.Journal.Configuration
-import Plainledger.Journal.Tag
-import Data.Functor.Foldable.TH
-import Prelude hiding (lines)
-import qualified Data.Csv as C
-import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
-import qualified Data.Text as T
+-- import Data.Char (toLower)
+-- import Data.Hashable (Hashable)
+-- import Data.Function
+-- import Control.Monad.Except
+-- import Data.Tree
+-- import qualified Data.ByteString.Lazy as BL
+-- import Data.ByteString.Lazy (ByteString)
+-- import Data.Csv (Record, Field, ToField(..),toRecord, FromField(..))
+-- import Data.HashMap.Strict (HashMap)
+-- import Data.List hiding (group, lines)
+-- import Data.Ord (comparing)
+-- import GHC.Generics
+-- import Plainledger.Error
+-- import Plainledger.Internal.Csv
+-- import Plainledger.Journal.JournalFile
+-- import Prelude hiding (lines)
+-- import qualified Data.Csv as C
+-- import qualified Data.HashMap.Strict as HM
+-- import qualified Data.HashSet as HS
+-- import qualified Data.Text as T
 
--- | The top level grouping of an account. Must be Asset, Liability,
--- Equity, Revenue or Expense.
-data AccountType = Asset
-                | Liability
-                | Equity
-                | Revenue
-                | Expense
-                deriving (Show, Eq, Ord, Generic)
+-- -- | The top level grouping of an account. Must be Asset, Liability,
+-- -- Equity, Revenue or Expense.
+-- data AccountType = Asset
+--                 | Liability
+--                 | Equity
+--                 | Revenue
+--                 | Expense
+--                 deriving (Show, Eq, Ord, Generic)
 
-isBalanceSheetType :: AccountType -> Bool
-isBalanceSheetType a = a `elem` [Asset, Liability, Equity]
+-- isBalanceSheetType :: AccountType -> Bool
+-- isBalanceSheetType a = a `elem` [Asset, Liability, Equity]
 
-isIncomeStatementType :: AccountType -> Bool
-isIncomeStatementType = not . isBalanceSheetType
+-- isIncomeStatementType :: AccountType -> Bool
+-- isIncomeStatementType = not . isBalanceSheetType
 
-isCreditType :: AccountType -> Bool
-isCreditType a = a `elem` [Liability, Equity, Revenue]
+-- isCreditType :: AccountType -> Bool
+-- isCreditType a = a `elem` [Liability, Equity, Revenue]
 
-isDebitType :: AccountType -> Bool
-isDebitType = not . isCreditType
+-- isDebitType :: AccountType -> Bool
+-- isDebitType = not . isCreditType
 
--- | The Account data type serves as aggregation point for commodities
--- relating to a particuliar purpose.
-data Account = Account {
-  aId :: T.Text,
-  aDisplayName :: T.Text,
-  aNumber :: Int,
-  aType :: AccountType,
-  aGroup :: T.Text, -- | Empty means no subgoup
-  aSubGroup :: T.Text, -- | Empty means no subsubgroup
-}
-  deriving (Show, Generic)
+-- -- | The Account data type serves as aggregation point for commodities
+-- -- relating to a particuliar purpose.
+-- data Account = Account {
+--   aId :: T.Text,
+--   aDisplayName :: T.Text,
+--   aNumber :: Int,
+--   aType :: AccountType,
+--   aGroup :: T.Text, -- | Empty means no subgoup
+--   aSubGroup :: T.Text -- | Empty means no subsubgroup
+-- }
+--   deriving (Show, Generic)
 
-accountsToHashMap :: [Account] -> HashMap T.Text Account
-accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
+-- accountsToHashMap :: [Account] -> HashMap T.Text Account
+-- accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
 
-validateAccounts :: (MonadError Error m) =>
-                    [Account] ->
-                    Configuration ->
-                    m [Account]
-validateAccounts accounts config = do
-  validateAccountIdNonNull accounts
-  validateAccountIdNoDup accounts
-  validateOpeningBalanceAccount accounts config
-  validateEarningsAccount accounts config
-  let accWithNames = map
-                     (\a -> if T.null (aDisplayName a) then a{aDisplayName = aId a} else a)
-                     accounts
-  return accWithNames
+-- validateAccounts :: (MonadError Error m) =>
+--                     [Account] ->
+--                     JournalFile ->
+--                     m [Account]
+-- validateAccounts accounts config = do
+--   validateAccountIdNonNull accounts
+--   validateAccountIdNoDup accounts
+--   validateOpeningBalanceAccount accounts config
+--   validateEarningsAccount accounts config
+--   let accWithNames = map
+--                      (\a -> if T.null (aDisplayName a) then a{aDisplayName = aId a} else a)
+--                      accounts
+--   return accWithNames
 
 
-validateAccountIdNonNull :: (MonadError Error m) =>
-                            [Account] ->
-                            m ()
-validateAccountIdNonNull accounts =
-  let nullId = filter
-               (T.null . fst)
-               (map (\a -> (aId a, aDisplayName a)) accounts)
-  in if null nullId
-     then return ()
-     else throwError
-          $ "Unallowed zero length account id for the following accounts : "
-          ++ (intercalate " "
-             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
-             $ map snd nullId)
-          ++ "."
+-- validateAccountIdNonNull :: (MonadError Error m) =>
+--                             [Account] ->
+--                             m ()
+-- validateAccountIdNonNull accounts =
+--   let nullId = filter
+--                (T.null . fst)
+--                (map (\a -> (aId a, aDisplayName a)) accounts)
+--   in if null nullId
+--      then return ()
+--      else throwError
+--           $ "Unallowed zero length account id for the following accounts : "
+--           ++ (intercalate " "
+--              $ map (\k -> "\"" ++ T.unpack k ++ "\"")
+--              $ map snd nullId)
+--           ++ "."
 
-validateAccountIdNoDup :: (MonadError Error m) =>
-                      [Account] ->
-                      m ()
-validateAccountIdNoDup accounts =
-  let dup = HM.filter (/= (1 :: Int))
-          $ HM.fromListWith (+)
-          $ zip (map aId accounts) (repeat 1)
-  in if HM.size dup /= 0
-     then throwError
-          $ "Duplicate account id : "
-          ++ (intercalate " "
-             $ map (\k -> "\"" ++ T.unpack k ++ "\"")
-             $ HM.keys dup)
-          ++ "."
-     else return ()
+-- validateAccountIdNoDup :: (MonadError Error m) =>
+--                       [Account] ->
+--                       m ()
+-- validateAccountIdNoDup accounts =
+--   let dup = HM.filter (/= (1 :: Int))
+--           $ HM.fromListWith (+)
+--           $ zip (map aId accounts) (repeat 1)
+--   in if HM.size dup /= 0
+--      then throwError
+--           $ "Duplicate account id : "
+--           ++ (intercalate " "
+--              $ map (\k -> "\"" ++ T.unpack k ++ "\"")
+--              $ HM.keys dup)
+--           ++ "."
+--      else return ()
 
-validateOpeningBalanceAccount :: (MonadError Error m) =>
-                           [Account] ->
-                           Configuration ->
-                           m ()
-validateOpeningBalanceAccount accounts config =
-  if cOpeningBalanceAccount config `elem` (map aId accounts)
-  then return ()
-  else throwError
-       $ "The opening balance account \""
-       ++ T.unpack (cOpeningBalanceAccount config)
-       ++ "\" declared in the configuration file does not appear in the accounts files."
+-- validateOpeningBalanceAccount :: (MonadError Error m) =>
+--                            [Account] ->
+--                            JournalFile ->
+--                            m ()
+-- validateOpeningBalanceAccount accounts config =
+--   if cOpeningBalanceAccount config `elem` (map aId accounts)
+--   then return ()
+--   else throwError
+--        $ "The opening balance account \""
+--        ++ T.unpack (cOpeningBalanceAccount config)
+--        ++ "\" declared in the JournalFile file does not appear in the accounts files."
 
-validateEarningsAccount :: (MonadError Error m) =>
-                           [Account] ->
-                           Configuration ->
-                           m ()
-validateEarningsAccount accounts config =
-  if cEarningsAccount config `elem` (map aId accounts)
-  then return ()
-  else throwError
-       $ "The earnings account \""
-       ++ T.unpack (cEarningsAccount config)
-       ++ "\" declared in the configuration file does not appear in the accounts files."
+-- validateEarningsAccount :: (MonadError Error m) =>
+--                            [Account] ->
+--                            JournalFile ->
+--                            m ()
+-- validateEarningsAccount accounts config =
+--   if cEarningsAccount config `elem` (map aId accounts)
+--   then return ()
+--   else throwError
+--        $ "The earnings account \""
+--        ++ T.unpack (cEarningsAccount config)
+--        ++ "\" declared in the JournalFile file does not appear in the accounts files."
 
--- CSV functions
-coreHeader :: [Field]
-coreHeader = ["Id", "Nom", "Numéro", "Type", "Groupe", "Sous-groupe"]
+-- -- CSV functions
+-- coreHeader :: [Field]
+-- coreHeader = ["Id", "Nom", "Numéro", "Type", "Groupe", "Sous-groupe"]
 
--- / Encode a list of accounts as a Csv. The first line is the header
-encodeAccounts :: [Account] -> ByteString
-encodeAccounts accs =
-  let header = toRecord $ coreHeader
-      lines = header : map toLine accs
-  in C.encode lines
+-- -- / Encode a list of accounts as a Csv. The first line is the header
+-- encodeAccounts :: [Account] -> ByteString
+-- encodeAccounts accs =
+--   let header = toRecord $ coreHeader
+--       lines = header : map toLine accs
+--   in C.encode lines
 
-  where toLine :: Account -> Record
-        toLine a =
-          let coreLine = [toField $ aId a,
-                          toField $ aDisplayName a,
-                          toField $ aNumber a,
-                          toField $ aType a,
-                          toField $ aGroup a,
-                          toField $ aSubGroup a]
-          in toRecord coreLine
+--   where toLine :: Account -> Record
+--         toLine a =
+--           let coreLine = [toField $ aId a,
+--                           toField $ aDisplayName a,
+--                           toField $ aNumber a,
+--                           toField $ aType a,
+--                           toField $ aGroup a,
+--                           toField $ aSubGroup a]
+--           in toRecord coreLine
 
--- | The first line is the header
-decodeAccounts :: (MonadError Error m) => ByteString -> m [Account]
-decodeAccounts bs = do
-  csv <- either throwError return $ C.decode C.NoHeader bs
-  csvToData (csv :: C.Csv) fromLine
+-- -- | The first line is the header
+-- decodeAccounts :: (MonadError Error m) => ByteString -> m [Account]
+-- decodeAccounts bs = do
+--   csv <- either throwError return $ C.decode C.NoHeader bs
+--   csvToData (csv :: C.Csv) fromLine
 
-  where fromLine :: (MonadError Error m) =>
-                    HM.HashMap Field Field -> m Account
-        fromLine m = do
-          id' <- findColumn "Id" m
-          name <- findColumnDefault "" "Nom" m
-          number <- findColumn "Numéro" m
-          group <- findColumn "Type" m
-          subgroup <- findColumnDefault "" "Groupe" m
-          subsubgroup <- findColumnDefault "" "Sous-groupe" m
-          return $ Account id' name number group subgroup subsubgroup
+--   where fromLine :: (MonadError Error m) =>
+--                     HM.HashMap Field Field -> m Account
+--         fromLine m = do
+--           id' <- findColumn "Id" m
+--           name <- findColumnDefault "" "Nom" m
+--           number <- findColumn "Numéro" m
+--           group <- findColumn "Type" m
+--           subgroup <- findColumnDefault "" "Groupe" m
+--           subsubgroup <- findColumnDefault "" "Sous-groupe" m
+--           return $ Account id' name number group subgroup subsubgroup
 
-decodeAccountsFile :: FilePath -> ExceptT Error IO  [Account]
-decodeAccountsFile f = do
-        csvBS <- liftIO $ BL.readFile f
-        decodeAccounts csvBS
+-- decodeAccountsFile :: FilePath -> ExceptT Error IO  [Account]
+-- decodeAccountsFile f = do
+--         csvBS <- liftIO $ BL.readFile f
+--         decodeAccounts csvBS
 
 -- type ChartOfAccount = Tree ChartNode
 
