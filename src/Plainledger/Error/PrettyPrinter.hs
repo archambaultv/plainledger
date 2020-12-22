@@ -55,9 +55,15 @@ printErrorType InvalidHeaderJournalFile
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
-showSourcePos (SourcePos f r c)
+showSourcePos (SourcePos f r c) | c <= 0
   = f
-  ++ ":"
+  ++ ":row "
   ++ show r
   ++ ":"
+showSourcePos (SourcePos f r c)
+  = f
+  ++ ":row "
+  ++ show r
+  ++ ":column "
   ++ show c
+  ++ ":"
