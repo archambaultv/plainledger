@@ -72,7 +72,7 @@ decodeJournalFile bs = do
 
 
   where processHeader :: [Char] -> m (Char, V.Vector (V.Vector T.Text))
-        processHeader [] = throwError $ mkErrorNoPos $ InvalidHeaderJournalFile
+        processHeader [] = throwError $ mkError (SourcePos "" 1 0) InvalidHeaderJournalFile
         processHeader (c:cs) =
           let csvOptions = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord c)
@@ -81,10 +81,10 @@ decodeJournalFile bs = do
           in case csv >>= inferLanguage of
               Right x -> return (c, x)
               Left EmptyJournalFile 
-                -> throwError $ mkErrorNoPos EmptyJournalFile
+                -> throwError $ mkError (SourcePos "" 0 0) EmptyJournalFile
               Left InvalidHeaderJournalFile 
                 -> if null cs 
-                   then throwError $ mkErrorNoPos InvalidHeaderJournalFile
+                   then throwError $ mkError (SourcePos "" 1 0) InvalidHeaderJournalFile
                    else processHeader cs
               Left _ -> processHeader cs
 
@@ -142,11 +142,11 @@ decodeJournalFile bs = do
         textField :: Int -> String -> V.Vector T.Text -> (T.Text -> a) -> m a
         textField i field x _ | V.null x
                              = throwError 
-                             $ mkError (SourcePos "" i 0)
+                             $ mkError (SourcePos "" i 2)
                              $ EmptyFieldInJournalFile field
         textField i field x _ | V.head x == "" 
                                 = throwError 
-                                $ mkError (SourcePos "" i 0)
+                                $ mkError (SourcePos "" i 2)
                                 $ EmptyFieldInJournalFile field
         textField _ _ x f = return $ f $ V.head x
 
@@ -156,7 +156,7 @@ decodeJournalFile bs = do
           x <- textField i field xs id
           case T.decimal x of
             Right (n, "") -> return $ f n
-            _ -> throwError $ mkError (SourcePos "" i 1) $ ParseIntErr (T.unpack x)
+            _ -> throwError $ mkError (SourcePos "" i 2) $ ParseIntErr (T.unpack x)
 
         -- Parse a char field and check for error
         charField :: Int -> String -> V.Vector T.Text -> (Char -> a) -> m a
@@ -164,17 +164,17 @@ decodeJournalFile bs = do
           x <- textField i field xs id
           case T.null (T.tail x) of
             True -> return $ f $ T.head x
-            False -> throwError $ mkError (SourcePos "" i 1) $ ParseCharErr (T.unpack x)
+            False -> throwError $ mkError (SourcePos "" i 2) $ ParseCharErr (T.unpack x)
 
         -- Parse many text fields (multiple columns) and check for error
         manyTextFields :: Int -> String -> V.Vector T.Text -> ([T.Text] -> a) -> m a
         manyTextFields i field x _ | V.null x
                                    = throwError 
-                                   $ mkError (SourcePos "" i 0)
+                                   $ mkError (SourcePos "" i 2)
                                    $ EmptyFieldInJournalFile field
         manyTextFields i field xs _ | V.all T.null xs
                                     = throwError 
-                                    $ mkError (SourcePos "" i 0)
+                                    $ mkError (SourcePos "" i 2)
                                     $ EmptyFieldInJournalFile field
         manyTextFields _ _ xs f = return $ f $ filter (not . T.null) $ V.toList xs
 
