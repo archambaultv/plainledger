@@ -24,7 +24,24 @@ journalFileTestTree =
           ["transactions.csv"] ["vérification de soldes.csv"],
       okConfig "Journal-03.csv" -- Without BOM
         $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' ',' 7 "comptes.csv" 
-          ["transactions.csv"] ["vérification de soldes.csv"]
+          ["transactions.csv"] ["vérification de soldes.csv"],
+      okConfig "Journal-04.csv" -- Without BOM
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company, Inc." '.' ',' 1 "comptes.csv" 
+          ["transactions 1.csv", "transactions 2.csv", "transactions 3.csv"] 
+          ["soldes 1.csv", "soldes 2.csv"],
+      okConfig "Journal-05.csv" -- With BOM
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' '\t' 7 "comptes.csv" 
+          ["transactions.csv"] ["vérification de soldes.csv"],
+      koConfig "Journal-06.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-06.csv" 1 0 ) InvalidHeaderJournalFile,
+      koConfig "Journal-07.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-07.csv" 1 0 ) InvalidHeaderJournalFile,
+      koConfig "Journal-08.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-08.csv" 2 2 ) 
+        (EmptyFieldInJournalFile "Compte pour les soldes d'ouverture"),
+      koConfig "Journal-09.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-09.csv" 0 0 ) 
+        (MissingFieldinJournalFile "Compte pour les soldes d'ouverture")
     ]
 
 okConfig :: String -> JournalFile -> TestTree
@@ -34,6 +51,14 @@ okConfig filename expectedJournal =
        case journal of
          Left err -> assertFailure $ printError err
          Right actual -> assertEqual "" expectedJournal actual
+
+koConfig :: String -> Error -> TestTree
+koConfig filename expectedErr =
+   testCase ("Assert error for " ++ filename) $ do
+       journal <- runExceptT $ decodeJournalFileIO ("test/Journal/JournalFile/" ++ filename)
+       case journal of
+         Left actual -> assertEqual "" expectedErr actual
+         Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
 
 -- validationTestTree :: TestTree
 -- validationTestTree =
