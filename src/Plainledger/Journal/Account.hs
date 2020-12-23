@@ -57,7 +57,6 @@ import Data.List hiding (group, lines)
 import Plainledger.Error
 import Plainledger.Internal.Csv
 import Plainledger.Internal.Utils
-import Plainledger.Journal.JournalFile
 import Prelude hiding (lines)
 import qualified Data.Csv as C
 --import qualified Data.HashMap.Strict as HM
@@ -110,14 +109,15 @@ data Account = Account {
 -- accountsToHashMap = HM.fromList . map (\a -> (aId a, a))
 
 validateAccounts :: (MonadError Errors m) =>
-                    JournalFile ->
+                    T.Text ->
+                    T.Text ->
                     [(SourcePos, Account)] ->
                     m [Account]
-validateAccounts config accounts = do
+validateAccounts openingAccount earningAccount accounts = do
   validateAccountIdNonNull accounts
   validateAccountIdNoDup accounts
-  validateOpeningBalanceAccount accounts config
-  validateEarningsAccount accounts config
+  validateOpeningBalanceAccount accounts openingAccount
+  validateEarningsAccount accounts earningAccount
   return $ map snd accounts
 
 
@@ -151,29 +151,29 @@ validateAccountIdNoDup accounts =
 
 validateOpeningBalanceAccount :: (MonadError Errors m) =>
                            [(SourcePos, Account)] ->
-                           JournalFile ->
+                           T.Text ->
                            m ()
-validateOpeningBalanceAccount accounts config =
-  if jfOpeningBalanceAccount config `elem` (map (aId . snd) accounts)
+validateOpeningBalanceAccount accounts openingAccount =
+  if openingAccount `elem` (map (aId . snd) accounts)
   then return ()
   else throwError
        $ mkErrorNoPos 
        $ OpeningBalanceNotDefined 
        $ T.unpack 
-       $ jfOpeningBalanceAccount config
+       $ openingAccount
      
 validateEarningsAccount :: (MonadError Errors m) =>
                            [(SourcePos, Account)] ->
-                           JournalFile ->
+                           T.Text ->
                            m ()
-validateEarningsAccount accounts config =
-  if jfEarningsAccount config `elem` (map (aId . snd) accounts)
+validateEarningsAccount accounts earningAccount =
+  if earningAccount `elem` (map (aId . snd) accounts)
   then return ()
   else throwError
        $ mkErrorNoPos 
        $ EarningsAccountNotDefined
        $ T.unpack
-       $ jfEarningsAccount config
+       $ earningAccount
 
 -- -- CSV functions
 -- coreHeader :: [Field]

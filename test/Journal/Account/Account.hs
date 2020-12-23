@@ -40,8 +40,41 @@ accountTestTree =
       okAccount "Account-03.csv" ',' accounts,
       -- With BOM, semicolon, only essential columns
       okAccount "Account-04.csv" ';' 
-      $ map (\a -> a{aDisplayName = aId a, aGroup = "", aSubGroup = ""}) accounts
+      $ map (\a -> a{aDisplayName = aId a, aGroup = "", aSubGroup = ""}) accounts,
+
+      koAccount "Account-05.csv" ';'
+      $ mkError (SourcePos "test/Journal/Account/Account-05.csv" 1 0) 
+        (MissingCsvColumn "Id"),
+
+      koAccount "Account-06.csv" ';'
+      $ mkError (SourcePos "test/Journal/Account/Account-06.csv" 1 0) 
+        (DuplicateCsvColumn "Numéro"),
+
+      koAccount "Account-07.csv" ';'
+      $ mkError (SourcePos "test/Journal/Account/Account-07.csv" 5 2) 
+        (ParseIntErr ""),
+
+      okValidateAccount "Account-02.csv" ';' accounts,
+
+      koValidateAccount "Account-08.csv" ';'
+      $ mkError (SourcePos "test/Journal/Account/Account-08.csv" 3 0) 
+        ZeroLengthAccountId,
+
+      koValidateAccount "Account-09.csv" ';'
+      $ mkErrorMultiPos 
+        [SourcePos "test/Journal/Account/Account-09.csv" 3 0,
+         SourcePos "test/Journal/Account/Account-09.csv" 5 0]   
+        (DuplicateAccountId "Maison"),
+
+
+      koValidateAccount "Account-10.csv" ';'
+      $ mkErrorNoPos (EarningsAccountNotDefined "Bénéfice"),
+
+
+      koValidateAccount "Account-11.csv" ';'
+      $ mkErrorNoPos (OpeningBalanceNotDefined "Solde d'ouverture")
     ]
+
 
 okAccount :: String -> Char -> [Account] -> TestTree
 okAccount filename sep expectedAccount = 
@@ -54,7 +87,27 @@ okAccount filename sep expectedAccount =
 koAccount :: String -> Char -> Errors -> TestTree
 koAccount filename sep expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       account <- runExceptT $ decodeAccountsFile ("test/Journal/JournalFile/" ++ filename) sep
+       account <- runExceptT $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
+       case account of
+         Left actual -> assertEqual "" expectedErr actual
+         Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
+
+okValidateAccount :: String -> Char -> [Account] -> TestTree
+okValidateAccount filename sep expectedAccount = 
+  testCase ("Decode " ++ filename) $ do
+       account <- runExceptT 
+                $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
+                >>= validateAccounts "Solde d'ouverture" "Bénéfice"
+       case account of
+         Left err -> assertFailure $ printErrors err
+         Right actual -> assertEqual "" expectedAccount actual
+
+
+koValidateAccount :: String -> Char -> Errors -> TestTree
+koValidateAccount filename sep expectedErr =
+   testCase ("Assert error for " ++ filename) $ do
+       account <- runExceptT $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
+                >>= validateAccounts "Solde d'ouverture" "Bénéfice"
        case account of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"

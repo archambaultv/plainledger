@@ -53,7 +53,9 @@ journalFileToJournal journalFile = do
 
   -- Read the accounts files and check for errors
   let accountPath = dir </> jfAccountFile journalFile
-  acc <- decodeAccountsFile accountPath csvSeparator >>= validateAccounts journalFile
+  acc <- decodeAccountsFile accountPath csvSeparator 
+         >>= validateAccounts (jfOpeningBalanceAccount journalFile)
+              (jfEarningsAccount journalFile)
 
   -- txns <- fmap concat $ traverse (decodeJTransactionsFile) (map (dir </>) ti)
   -- bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)

@@ -1,5 +1,5 @@
 module Journal.JournalFile.JournalFile (
-  journalFileTestTree
+  journalFileTestTree,
   )where
 
 import Test.Tasty
@@ -7,6 +7,7 @@ import Test.Tasty.HUnit
 import Plainledger.Journal
 import Plainledger.Error
 import Control.Monad.Except
+
 
 journalFileTestTree :: TestTree
 journalFileTestTree =
