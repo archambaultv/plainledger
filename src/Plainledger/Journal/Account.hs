@@ -200,31 +200,48 @@ validateEarningsAccount accounts config =
 decodeAccounts :: forall m . (MonadError Errors m) 
                => Char -> ByteString -> m [Account]
 decodeAccounts csvSeparator bs = do
+  -- Read the CSV file as vector of T.Text
   let opts = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord csvSeparator)
                 }
   csv <- either (throwError . mkErrorNoPos . ErrorMessage) return 
       $ C.decodeWith opts C.NoHeader bs
-  (csvData, columnIndexes) <- processColumnIndexes csv
-                              ["Id", "Nom", "Numéro", "Type", "Groupe","Sous-groupe"]
+
+  -- Decode the header to know the index of columns
+  (csvData, indexes) <- processColumnIndexes csv
+                              ["Id", "Numéro", "Type"]
+                              ["Nom", "Groupe","Sous-groupe"]
+
+  let idIdx = indexes !! 0
+  let numberIdx = indexes !! 1
+  let typeIdx = indexes !! 2
+  let nameIdx = indexes !! 3
+  let groupIdx = indexes!! 4
+  let subGroupIdx = indexes !! 5
+
+ -- Add row information to the CSV line
   let csvWithRowNumber = zip [2..] $ V.toList csvData
-  accs <- mapM (parseLine columnIndexes) csvWithRowNumber
+  
+  -- Function to parse a line into an Account                            
+  let parseLine (row, line) = 
+          let p = do
+                id' <- findColumn idIdx line "Id"
+                name <- findColumnDefault id' nameIdx line
+                number <- findColumnM numberIdx line parseInt "Numéro"
+                type1 <- findColumnM typeIdx line decodeAccountType "Type"
+                group <- findColumnDefault "" groupIdx line
+                subgroup <- findColumnDefault "" subGroupIdx line
+                return $ Account id' name number type1 group subgroup
+          in p `catchError` (throwError . setSourcePosRowIfNull row)
+  
+
+  accs <- mapM parseLine csvWithRowNumber
+
+  -- Fill DisplayName if it was missing
   let accWithNames = map
                      (\a -> if T.null (aDisplayName a) then a{aDisplayName = aId a} else a)
                      accs
   return accWithNames
-
-  where parseLine :: V.Vector Int -> (Int, V.Vector T.Text) -> m Account
-        parseLine idx (row, line) = 
-          let p = do
-                id' <- findColumn (idx V.! 0) line "Id"
-                name <- findColumnDefault id' (idx V.! 1) line
-                number <- findColumnM (idx V.! 2) line parseInt "Numéro"
-                type1 <- findColumnM (idx V.! 3) line decodeAccountType "Type"
-                group <- findColumnDefault "" (idx V.! 4) line
-                subgroup <- findColumnDefault "" (idx V.! 5) line
-                return $ Account id' name number type1 group subgroup
-          in p `catchError` (throwError . setSourcePosRowIfNull row)
 
 decodeAccountsFile :: FilePath -> Char -> ExceptT Errors IO  [(SourcePos, Account)]
 decodeAccountsFile filePath csvSeparator = 

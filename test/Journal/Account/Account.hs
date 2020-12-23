@@ -37,8 +37,10 @@ accountTestTree =
       -- With BOM, semicolon for csv, 
       okAccount "Account-02.csv" ';' accounts,
       -- Without BOM, comma for csv, 
-      okAccount "Account-03.csv" ',' accounts
-     
+      okAccount "Account-03.csv" ',' accounts,
+      -- With BOM, semicolon, only essential columns
+      okAccount "Account-04.csv" ';' 
+      $ map (\a -> a{aDisplayName = aId a, aGroup = "", aSubGroup = ""}) accounts
     ]
 
 okAccount :: String -> Char -> [Account] -> TestTree

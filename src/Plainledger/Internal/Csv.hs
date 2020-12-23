@@ -32,23 +32,27 @@ import Control.Monad.Except
 processColumnIndexes :: forall m . (MonadError Errors m) 
                      => V.Vector (V.Vector T.Text)
                      -> [T.Text]
-                     -> m (V.Vector (V.Vector T.Text), V.Vector Int)
-processColumnIndexes csv _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
-processColumnIndexes csv columns = 
+                     -> [T.Text]
+                     -> m (V.Vector (V.Vector T.Text), [Int])
+processColumnIndexes csv _ _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
+processColumnIndexes csv columns optionalColumns = 
   let header = V.head csv
       csvData = V.tail csv
-      indexes = fmap (V.fromList . reverse) 
-              $ foldM (findColumn1 header) [] columns
-  in indexes >>= (return . (csvData,))
+      indexes = mapM (findColumn1 False header) columns
 
-  where findColumn1 :: V.Vector T.Text -> [Int] -> T.Text -> m [Int]
-        findColumn1 header x column =
+      optIndexes = mapM (findColumn1 True header) optionalColumns
+  in ((++) <$> indexes <*> optIndexes) >>= (return . (csvData,))
+
+  where findColumn1 :: Bool -> V.Vector T.Text -> T.Text -> m Int
+        findColumn1 isOptional header column =
           let is = V.findIndices ((==) column) header
           in case V.length is of
-               0 -> throwError
-                  $ mkError (SourcePos "" 1 0) 
-                  $ MissingCsvColumn (T.unpack column)
-               1 -> return $ V.head is : x
+               0 -> if isOptional
+                    then return (-1)
+                    else throwError
+                          $ mkError (SourcePos "" 1 0) 
+                          $ MissingCsvColumn (T.unpack column)
+               1 -> return $ V.head is
                _ -> throwError
                   $ mkError (SourcePos "" 1 0)
                   $ DuplicateCsvColumn (T.unpack column)
@@ -75,6 +79,7 @@ findColumnDefaultM d i v f = findColumnBase i v f (return d)
 
 findColumnBase :: (MonadError Errors m) 
                 => Int -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a
+findColumnBase (-1) _ _ notFound = notFound
 findColumnBase i v found notFound =
   case v V.!? i of
     Nothing -> notFound
