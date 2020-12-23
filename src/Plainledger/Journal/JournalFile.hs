@@ -46,22 +46,25 @@ data JournalFile = JournalFile {
    jfFirstFiscalMonth :: Int,
    jfAccountFile :: String,
    jfTransactionFiles :: [String],
-   jfBalanceFiles :: [String]
+   jfBalanceFiles :: [String],
+   -- | The file path to the Journal File
+   jfFilePath :: String
   }
   deriving (Eq, Show) 
 
 emptyJournalFile :: JournalFile
-emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] []
+emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] ""
 
 csvSeparator :: [Char] 
 csvSeparator = [',', ';', '\t']
 
-decodeJournalFileIO :: FilePath -> ExceptT Error IO JournalFile
+decodeJournalFileIO :: FilePath -> ExceptT Errors IO JournalFile
 decodeJournalFileIO filePath = withExceptT (setSourcePosFileIfNull filePath) $ do
   csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-  decodeJournalFile (BL.fromStrict csvBS)
+  journalFile <- decodeJournalFile (BL.fromStrict csvBS)
+  return journalFile{jfFilePath = filePath}
 
-decodeJournalFile :: forall m . (MonadError Error m) => BL.ByteString -> m JournalFile
+decodeJournalFile :: forall m . (MonadError Errors m) => BL.ByteString -> m JournalFile
 decodeJournalFile bs = do
   (sep, csvData) <- processHeader csvSeparator
   let csvWithRowNumber = V.map (\(x, y) -> (x + 2, y)) $ V.indexed csvData
@@ -81,10 +84,10 @@ decodeJournalFile bs = do
           in case csv >>= inferLanguage of
               Right x -> return (c, x)
               Left EmptyJournalFile 
-                -> throwError $ mkError (SourcePos "" 0 0) EmptyJournalFile
+                -> throwError $ mkErrorNoPos EmptyJournalFile
               Left InvalidHeaderJournalFile 
                 -> if null cs 
-                   then throwError $ mkError (SourcePos "" 1 0) InvalidHeaderJournalFile
+                   then throwError $ mkErrorNoPos InvalidHeaderJournalFile
                    else processHeader cs
               Left _ -> processHeader cs
 
@@ -179,7 +182,7 @@ decodeJournalFile bs = do
         manyTextFields _ _ xs f = return $ f $ filter (not . T.null) $ V.toList xs
 
 
-checkRawJournal :: (MonadError Error m) => JournalFile -> m JournalFile
+checkRawJournal :: (MonadError Errors m) => JournalFile -> m JournalFile
 checkRawJournal x | T.null (jfOpeningBalanceAccount x ) = throwError $ mkError (SourcePos "" 0 0) $ MissingFieldinJournalFile "Compte pour les soldes d'ouverture"
 checkRawJournal x | T.null (jfEarningsAccount x ) = throwError $ mkError (SourcePos "" 0 0) $ MissingFieldinJournalFile "Compte pour les bénéfices"
 checkRawJournal x | T.null (jfCompanyName x ) = throwError $ mkError (SourcePos "" 0 0) $ MissingFieldinJournalFile "Nom"

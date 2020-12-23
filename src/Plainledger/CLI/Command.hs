@@ -15,9 +15,6 @@ module Plainledger.CLI.Command
 ) where
 
 import Control.Monad.Except
-import qualified Data.Csv as C
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Text.IO as T
 import Plainledger.Journal
 import Plainledger.Report
 
@@ -30,14 +27,12 @@ data Command = Command {
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
 runCommand (Command journalPath outputPath report) = do
-       -- Reads the Journal file
-       journalFile <- runExceptT $ decodeJournalFileIO journalPath
-       putStrLn (show journalFile)
-       -- Create the journal object
-       -- journal <- runExceptT $ journalFileToJournal journalPath journalFile
-       -- -- Check for internal errors in the journal and proceed with the report
-       -- case journal >>= journalToLedger of
-       --   Left err -> putStrLn err
-       --   Right l -> do
-       --      let reportBS = computeReport journal report >>= C.encode
-       --      maybe (putStrLn . BL.pack) (BL.writeFile outputPath) reportBS
+       -- Reads the Journal file and create the journal object
+       journal <- runExceptT 
+                $ decodeJournalFileIO journalPath >>= journalFileToJournal
+       -- Check for internal errors in the journal and proceed with the report
+       case journal of
+         Left err -> putStrLn (show err)
+         Right l -> putStrLn (show l) --do
+            -- let reportBS = computeReport journal report >>= C.encode
+            -- maybe (putStrLn . BL.pack) (BL.writeFile outputPath) reportBS

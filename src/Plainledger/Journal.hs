@@ -12,52 +12,51 @@
 module Plainledger.Journal 
 (
   Journal,
-  -- JournalFile(..),
-  -- journalFileToJournal,
-  -- yamlPrettyConfig,
+  journalFileToJournal,
   -- module Plainledger.Journal.Posting,
   -- module Plainledger.Journal.Transaction,
   -- module Plainledger.Journal.Balance,
   module Plainledger.Journal.JournalFile,
-  -- module Plainledger.Journal.Account,
-  -- module Plainledger.Journal.Amount,
-  -- module Plainledger.Journal.Tag,
-  -- module Plainledger.Journal.Day
+  module Plainledger.Journal.Account,
+  module Plainledger.Journal.Amount,
+  module Plainledger.Journal.Day
   )
 where
 
-import Data.Maybe
-import Data.Ord
+
+import System.FilePath
 import Control.Monad.Except
 import Plainledger.Error
-import qualified Data.Text as T
-import Plainledger.Journal.Posting
-import Plainledger.Journal.Transaction
-import Plainledger.Journal.Balance
+--import Plainledger.Journal.Posting
+--import Plainledger.Journal.Transaction
+--import Plainledger.Journal.Balance
 import Plainledger.Journal.JournalFile
 import Plainledger.Journal.Account
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
-import System.FilePath
 
-data Journal t  = Journal
+data Journal = Journal
   {
-    jJournalFile :: JournalFile
-   -- jAccounts   :: [Account],
+    jJournalFile :: JournalFile,
+    jAccounts   :: [Account]
    -- jTransactions :: [Transaction],
    -- jBalances :: [Balance]
   }
   deriving (Eq, Show)
 
 
--- -- Reads the include files in the journal file
--- journalFileToJournal :: FilePath -> JournalFile -> ExceptT Error IO Journal
--- journalFileToJournal path (JournalFile c ai ti bi tbi) = do
---   let dir = takeDirectory path
---   acc <- fmap concat $ traverse (decodeAccountsFile) (map (dir </>) ai)
---   txns <- fmap concat $ traverse (decodeJTransactionsFile) (map (dir </>) ti)
---   bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
---   trialbals <- fmap concat $ traverse (decodeTrialBalanceAssertionFile) (map (dir </>) tbi)
---   return $ Journal c acc txns bals trialbals
+-- Reads the include files in the journal file
+journalFileToJournal :: JournalFile -> ExceptT Errors IO Journal
+journalFileToJournal journalFile = do  
+  let dir = takeDirectory $ jfFilePath journalFile
+  let csvSeparator = jfCsvSeparator journalFile
+
+  -- Read the accounts files and check for errors
+  let accountPath = dir </> jfAccountFile journalFile
+  acc <- decodeAccountsFile accountPath csvSeparator >>= validateAccounts journalFile
+
+  -- txns <- fmap concat $ traverse (decodeJTransactionsFile) (map (dir </>) ti)
+  -- bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
+  return $ Journal journalFile acc -- txns bals
 
 

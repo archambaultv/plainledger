@@ -14,70 +14,74 @@
 
 module Plainledger.Internal.Csv
 (
-  -- recordToHashMap,
-  -- csvToData,
-  -- findColumn,
-  -- findColumnM,
-  -- findColumnDefault,
-  -- findColumnDefaultM
+  findColumn,
+  findColumnM,
+  findColumnDefault,
+  findColumnDefaultM,
+  processColumnIndexes,
+  parseInt
 ) where
 
--- import Data.List (sort)
--- import Data.Maybe (fromMaybe)
--- import qualified Data.HashMap.Strict as HM
--- import Data.HashMap.Strict (HashMap)
--- import qualified Data.HashSet as HS
--- import Data.HashSet (HashSet)
--- import qualified Data.Vector as V
--- import qualified Data.ByteString as BS
--- import Plainledger.Error
--- import Data.Csv
--- import Control.Monad.Except
+import qualified Data.Vector as V
+import qualified Data.Text as T
+import qualified Data.Text.Read as T
+import Plainledger.Error
+import Control.Monad.Except
 
 
--- -- / 'recordToHashMap header record' translate a record to hashMap using the
--- -- provided header
--- recordToHashMap :: Record -> Record -> HashMap Field Field
--- recordToHashMap h l = HM.fromList $ V.toList $ V.zip h l
+processColumnIndexes :: forall m . (MonadError Errors m) 
+                     => V.Vector (V.Vector T.Text)
+                     -> [T.Text]
+                     -> m (V.Vector (V.Vector T.Text), V.Vector Int)
+processColumnIndexes csv _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
+processColumnIndexes csv columns = 
+  let header = V.head csv
+      csvData = V.tail csv
+      indexes = fmap (V.fromList . reverse) 
+              $ foldM (findColumn1 header) [] columns
+  in indexes >>= (return . (csvData,))
 
--- -- / Takes a CSV where the first line is the header, a function that can convert
--- -- a line from a HashMap to an object and returns the list of objects
--- csvToData :: (MonadError Error m) =>
---              Csv ->
---              (HashMap Field Field -> m a) ->
---              m [a]
--- csvToData csv foo
---   | V.null csv = return []
---   | otherwise =
---     let headerRecord = csv V.! 0
---     in V.toList <$> traverse (foo . recordToHashMap headerRecord) (V.tail csv)
+  where findColumn1 :: V.Vector T.Text -> [Int] -> T.Text -> m [Int]
+        findColumn1 header x column =
+          let is = V.findIndices ((==) column) header
+          in case V.length is of
+               0 -> throwError
+                  $ mkError (SourcePos "" 1 0) 
+                  $ MissingCsvColumn (T.unpack column)
+               1 -> return $ V.head is : x
+               _ -> throwError
+                  $ mkError (SourcePos "" 1 0)
+                  $ DuplicateCsvColumn (T.unpack column)
+                         
+findColumn :: (MonadError Errors m) =>
+              Int -> V.Vector T.Text -> String -> m T.Text
+findColumn i v c = findColumnM i v return c
 
--- -- / Find the value in the HashMap or prints an friendly error message
--- findColumn :: (MonadError Error m, FromField a) =>
---               Field -> HashMap Field Field -> m a
--- findColumn x m = findColumnM x m return
+findColumnM :: (MonadError Errors m) =>
+               Int -> V.Vector T.Text -> (T.Text -> m a) -> String -> m a
+findColumnM i v f c =
+  let err = throwError
+            $ mkErrorNoPos 
+            $ MissingCsvColumnData c
+  in findColumnBase i v f err
 
--- findColumnM :: (MonadError Error m, FromField b) =>
---                Field -> HashMap Field Field -> (b -> m a) -> m a
--- findColumnM x m f =
---   case HM.lookup x m of
---     Nothing -> throwError
---                $ "Field "
---                ++ (show x)
---                ++ " is not in the CSV header."
---     Just v -> do
---       b <- either throwError return $ runParser $ parseField v
---       f b
+findColumnDefault :: (MonadError Errors m) =>
+                    T.Text -> Int -> V.Vector T.Text -> m T.Text
+findColumnDefault d i v = findColumnDefaultM d i v return
 
--- findColumnDefault :: (MonadError Error m, FromField a) =>
---                      a -> Field -> HashMap Field Field -> m a
--- findColumnDefault v x m = findColumnDefaultM v x m return
+findColumnDefaultM :: (MonadError Errors m) =>
+                    a -> Int -> V.Vector T.Text -> (T.Text -> m a) -> m a
+findColumnDefaultM d i v f = findColumnBase i v f (return d)
 
--- findColumnDefaultM :: (MonadError Error m, FromField b) =>
---                      a -> Field -> HashMap Field Field -> (b -> m a) -> m a
--- findColumnDefaultM v x m f =
---   case HM.lookup x m of
---     Nothing -> return v
---     Just v2 -> do
---       b <- either throwError return $ runParser $ parseField v2
---       f b
+findColumnBase :: (MonadError Errors m) 
+                => Int -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a
+findColumnBase i v found notFound =
+  case v V.!? i of
+    Nothing -> notFound
+    Just x -> found x `catchError` (throwError . setSourcePosColIfNull i)
+
+parseInt ::  (MonadError Errors m) => T.Text -> m Int
+parseInt x =
+  case T.decimal x of
+    Right (n, "") -> return n
+    _ -> throwError $ mkErrorNoPos $ ParseIntErr (T.unpack x)

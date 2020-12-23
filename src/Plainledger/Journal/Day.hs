@@ -22,7 +22,7 @@ import Control.Monad.Except
 toISO8601 :: Day -> String
 toISO8601 = formatTime defaultTimeLocale (iso8601DateFormat Nothing)
 
-parseISO8601M :: (MonadError Error m) => String -> m Day
+parseISO8601M :: (MonadError Errors m) => String -> m Day
 parseISO8601M s =
   let d = parseTimeM False defaultTimeLocale
           (iso8601DateFormat Nothing) s
