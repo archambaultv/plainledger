@@ -30,7 +30,6 @@ dependencies:
 - bytestring
 - containers
 - unordered-containers
-- utf8-string
 - hashable
 - mtl
 - optparse-applicative
