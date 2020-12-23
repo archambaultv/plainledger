@@ -83,7 +83,7 @@ findColumnBase (-1) _ _ notFound = notFound
 findColumnBase i v found notFound =
   case v V.!? i of
     Nothing -> notFound
-    Just x -> found x `catchError` (throwError . setSourcePosColIfNull i)
+    Just x -> found x `catchError` (throwError . setSourcePosColIfNull (i + 1))
 
 parseInt ::  (MonadError Errors m) => T.Text -> m Int
 parseInt x =
