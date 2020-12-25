@@ -14,73 +14,100 @@
 
 module Plainledger.Internal.Csv
 (
-  findColumn,
-  findColumnM,
-  findColumnDefault,
-  findColumnDefaultM,
+  columnData,
+  columnDataM,
+  optionalColumnData,
+  optionalColumnDataM,
   processColumnIndexes,
+  ColumnIndex,
+  ColumnIndexes,
+  columnIndex,
+  optionalColumnIndex,
   parseInt
 ) where
 
+import Data.List
+import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
 import qualified Data.Text as T
 import qualified Data.Text.Read as T
 import Plainledger.Error
 import Control.Monad.Except
 
+-- Column name and column number (zero based)
+type ColumnIndex = (T.Text, Int)
+type ColumnIndexes = M.HashMap T.Text Int
 
+
+columnIndex :: (MonadError Errors m) =>
+                     ColumnIndexes ->
+                     T.Text -> 
+                     m ColumnIndex
+columnIndex m key =
+  let err = throwError
+          $ mkError (SourcePos "" 1 0) 
+          $ MissingCsvColumn (T.unpack key)
+  in fmap (key,) $ maybe err return $ M.lookup key m
+
+optionalColumnIndex :: ColumnIndexes ->
+                     T.Text -> 
+                     Maybe ColumnIndex
+optionalColumnIndex m key = fmap (key,) $ M.lookup key m
+
+-- Return a map where the zero based index represents the position
+-- in the V.Vector T.Text line
 processColumnIndexes :: forall m . (MonadError Errors m) 
                      => V.Vector (V.Vector T.Text)
-                     -> [T.Text]
-                     -> [T.Text]
-                     -> m (V.Vector (V.Vector T.Text), [Int])
-processColumnIndexes csv _ _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
-processColumnIndexes csv columns optionalColumns = 
-  let header = V.head csv
+                     -> (T.Text -> Bool)
+                     -> m (V.Vector (V.Vector T.Text), ColumnIndexes)
+processColumnIndexes csv _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
+processColumnIndexes csv keepF  = 
+  let header = filter keepF $ V.toList $ V.head csv
       csvData = V.tail csv
-      indexes = mapM (findColumn1 False header) columns
+      dup = filter (not . null . tail)
+          $ groupBy (==)
+          $ sortBy compare
+          $ header
+      indexes = M.fromList $ zip header [0..]
+      mkErrorDup x = mkError (SourcePos "" 1 0) (DuplicateCsvColumn $ T.unpack $ head x)
+  in case dup of
+        [] -> return (csvData, indexes)
+        xs -> throwError $ concatMap mkErrorDup xs
 
-      optIndexes = mapM (findColumn1 True header) optionalColumns
-  in ((++) <$> indexes <*> optIndexes) >>= (return . (csvData,))
+  -- where columnData1 :: Bool -> V.Vector T.Text -> T.Text -> m Int
+  --       columnData1 isOptional header column =
+  --         let is = V.findIndices ((==) column) header
+  --         in case V.length is of
+  --              0 -> if isOptional
+  --                   then return (-1)
+  --                   else throwError
+  --                         $ mkError (SourcePos "" 1 0) 
+  --                         $ MissingCsvColumn (T.unpack column)
 
-  where findColumn1 :: Bool -> V.Vector T.Text -> T.Text -> m Int
-        findColumn1 isOptional header column =
-          let is = V.findIndices ((==) column) header
-          in case V.length is of
-               0 -> if isOptional
-                    then return (-1)
-                    else throwError
-                          $ mkError (SourcePos "" 1 0) 
-                          $ MissingCsvColumn (T.unpack column)
-               1 -> return $ V.head is
-               _ -> throwError
-                  $ mkError (SourcePos "" 1 0)
-                  $ DuplicateCsvColumn (T.unpack column)
-                         
-findColumn :: (MonadError Errors m) =>
-              Int -> V.Vector T.Text -> String -> m T.Text
-findColumn i v c = findColumnM i v return c
+columnData :: (MonadError Errors m) =>
+              ColumnIndex -> V.Vector T.Text -> m T.Text
+columnData i v = columnDataM i v return
 
-findColumnM :: (MonadError Errors m) =>
-               Int -> V.Vector T.Text -> (T.Text -> m a) -> String -> m a
-findColumnM i v f c =
+columnDataM :: (MonadError Errors m) =>
+               ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a
+columnDataM i v f =
   let err = throwError
             $ mkErrorNoPos 
-            $ MissingCsvColumnData c
-  in findColumnBase i v f err
+            $ MissingCsvColumnData (T.unpack $ fst i)
+  in columnDataBase (Just i) v f err
 
-findColumnDefault :: (MonadError Errors m) =>
-                    T.Text -> Int -> V.Vector T.Text -> m T.Text
-findColumnDefault d i v = findColumnDefaultM d i v return
+optionalColumnData :: (MonadError Errors m) =>
+                    T.Text -> Maybe ColumnIndex -> V.Vector T.Text -> m T.Text
+optionalColumnData d i v = optionalColumnDataM d i v return
 
-findColumnDefaultM :: (MonadError Errors m) =>
-                    a -> Int -> V.Vector T.Text -> (T.Text -> m a) -> m a
-findColumnDefaultM d i v f = findColumnBase i v f (return d)
+optionalColumnDataM :: (MonadError Errors m) =>
+                    a -> Maybe ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a
+optionalColumnDataM d i v f = columnDataBase i v f (return d)
 
-findColumnBase :: (MonadError Errors m) 
-                => Int -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a
-findColumnBase (-1) _ _ notFound = notFound
-findColumnBase i v found notFound =
+columnDataBase :: (MonadError Errors m) 
+                => (Maybe ColumnIndex) -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a
+columnDataBase Nothing _ _ notFound = notFound
+columnDataBase (Just (_,i)) v found notFound =
   case v V.!? i of
     Nothing -> notFound
     Just x -> found x `catchError` (throwError . setSourcePosColIfNull (i + 1))

@@ -10,58 +10,52 @@
 
 module Plainledger.Journal.Transaction 
 (
-  -- TransactionF(..),
-  -- JTransaction,
-  -- decodeJTransactionsFile,
-  -- encodeTransactions,
-  -- decodeTransactions,
-  -- CsvRecordOptions(..)
+  TransactionF(..),
+  JTransaction,
+  Transaction,
+  decodeJTransactionsFile,
+  decodeTransactions,
 )
 where
 
--- import Data.Function
--- import Data.List hiding (lines)
--- import Data.Maybe
--- import Control.Monad.Except
--- import Data.ByteString.Lazy (ByteString)
--- import Data.Csv (Record, Field, ToField(..),toRecord)
--- import Data.Ord (comparing)
--- import Data.Scientific
--- import Data.Time
--- import Plainledger.Error
--- import Plainledger.Internal.Csv
--- import Plainledger.Journal.Posting
--- import Plainledger.Journal.Amount
--- import Plainledger.Journal.Day
--- import Plainledger.Internal.Utils
--- import GHC.Generics hiding (to, from)
--- import qualified Data.ByteString.Lazy as BL
--- import Prelude hiding (lines)
--- import qualified Data.Csv as C
--- import qualified Data.Set as S
--- import qualified Data.HashSet as HS
--- import qualified Data.HashMap.Strict as HM
--- import qualified Data.Text as T
--- import qualified Data.Vector as V
+import Data.Char (ord)
+import Data.Function
+import Data.List hiding (lines)
+import Data.Maybe
+import Control.Monad.Except
+import Data.ByteString.Lazy (ByteString)
+import Data.Csv (Record, Field, ToField(..),toRecord)
+import Data.Ord (comparing)
+import Data.Scientific
+import Data.Time
+import Plainledger.Error
+import Plainledger.Internal.Csv
+import Plainledger.Journal.Posting
+import Plainledger.Journal.Amount
+import Plainledger.Journal.Day
+import Plainledger.Internal.Utils
+import GHC.Generics hiding (to, from)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+import Prelude hiding (lines)
+import qualified Data.Csv as C
+import qualified Data.Set as S
+import qualified Data.HashSet as HS
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Text as T
+import qualified Data.Vector as V
 
--- data TransactionF p = Transaction
---   {
---     tDate :: Day,
---     tTransactionId :: T.Text,
---     tPostings :: [p],
---     tTags :: [Tag]
---   } deriving (Show, Generic, Functor)
+data TransactionF p = Transaction
+  {
+    tDate :: Day,
+    tComment :: T.Text,
+    tCounterParty :: T.Text,
+    tTag :: T.Text,
+    tPostings :: [p]
+  } deriving (Eq, Show)
 
--- -- / We sort the tags when comparing two TransactionF
--- -- The Eq instance is mainly used in the unittests. In a validated ledger,
--- -- you can rely on the aId to identify an account.
--- instance (Eq p) => Eq (TransactionF p) where
---   a1 == a2 =  tDate a1 == tDate a2
---            && tTransactionId a1 == tTransactionId a2
---            && tPostings a1 == tPostings a2
---            && sortBy (comparing tagId) (tTags a1) ==
---               sortBy (comparing tagId) (tTags a2)
--- type JTransaction = TransactionF JPosting
+type JTransaction = TransactionF JPosting
+type Transaction = TransactionF Posting
 
 -- postingToLine :: JPosting -> [Field]
 -- postingToLine p = [toField $ pAccount p,
@@ -145,153 +139,153 @@ where
 --             else throwError "Expecting \"account id\" or \"account id (1)\" \
 --                             \in the CSV header"
 
--- -- | The first line is the header
--- decodeTransactions :: (MonadError Error m) =>
---                       CsvRecordOptions ->
---                       ByteString ->
---                       m [JTransaction]
--- decodeTransactions SingleRecord bs = do
---   csv <- either throwError return $ C.decode C.NoHeader bs
---   if V.null csv
---   then return []
---   else
---     let notTags = HS.fromList
---                   $ ["date", "transaction id"]
---                   ++ postingHeader (HS.fromList $ V.toList $ csv V.! 0) 1
---         headerDup :: String
---         headerDup = intercalate ", "
---                   $ findDuplicates
---                   $ map show
---                   $ V.toList
---                   $ csv V.! 0
---     in if null headerDup
---        then csvToData (csv :: C.Csv) (fromLine notTags)
---        else throwError $ "Two or more column with the same header (" ++
---                          headerDup ++ ")"
-
-
---   where fromLine :: (MonadError Error m) =>
---                     HS.HashSet Field ->
---                     HM.HashMap Field Field -> m JTransaction
---         fromLine notTags m = do
---           date <- findColumnM "date" m parseISO8601M
---           tId <- findColumnDefault "" "transaction id" m
---           ps <- lineToPostings m 1
---           tags <- recordToTags m  notTags
---           return $ Transaction date tId ps tags
-
---         postingHeader :: HS.HashSet Field -> Int -> [Field]
---         postingHeader m n =
---           let accountKey =  toField $ "account id (" ++ show n ++ ")"
---               amountKey =  toField $ "amount (" ++ show n ++ ")"
---               balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
---           in case HS.member accountKey m of
---               False -> []
---               True ->
---                 let xs = postingHeader m (n + 1)
---                 in accountKey
---                    : amountKey
---                    : balanceDateKey
---                    : xs
-
---         lineToPostings :: (MonadError Error n) =>
---                           HM.HashMap Field Field -> Int -> n [JPosting]
---         lineToPostings m n =
---           let accountKey =  toField $ "account id (" ++ show n ++ ")"
---               amountKey =  toField $ "amount (" ++ show n ++ ")"
---               balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
---           in
---             case findColumn accountKey m of
---               Left _ -> return []
---               Right acc | acc == "" -> return []
---               Right acc -> do
---                 ps <- lineToPostings m (n + 1)
---                 amnt <- findColumnM amountKey m
---                         (\case  { Nothing -> return Nothing;
---                                   Just v -> return
---                                             $ Just
---                                             $ (realToFrac :: Scientific -> Quantity)
---                                              v})
---                 bal <- findColumnDefaultM Nothing balanceDateKey m
---                         (\case  {"" -> return Nothing;
---                                  v -> Just <$> parseISO8601M v})
-
---                 let p = Posting bal acc amnt
---                 return $ p : ps
-
--- decodeTransactions MultipleRecords bs = do
---   csv <- either throwError return $ C.decode C.NoHeader bs
---   let  headerDup = intercalate ", "
---                  $ findDuplicates
---                  $ map show
---                  $ V.toList
---                  $ csv V.! 0
---   if null headerDup
---     then return ()
---     else throwError $ "Two or more column with the same header (" ++
---                       headerDup ++ ")"
---   txns <- csvToData (csv :: C.Csv) fromLine
---   let txnsGroup = groupBy ((==) `on` tTransactionId)
---                 $ sortBy (comparing tTransactionId) txns
---   traverse regroupTransactions txnsGroup
-
---   where fromLine :: (MonadError Error m) =>
---                     HM.HashMap Field Field -> m JTransaction
---         fromLine m = do
---           date <- findColumnM "date" m parseISO8601M
---           tId <- findColumn "transaction id" m
---           when (T.null tId) (throwError
---                 $ "Unexpected null transaction id. \
---                   \All lines must have a transaction id.")
---           acc <- findColumn "account id" m
---           amnt <- findColumnM "amount" m
---                   (\case  { Nothing -> return Nothing;
---                             Just v -> return
---                                       $ Just
---                                       $ (realToFrac :: Scientific -> Quantity)
---                                        v})
---           bal <- findColumnDefaultM Nothing "balance date" m
---                   (\case  {"" -> return Nothing;
---                            v -> Just <$> parseISO8601M v})
---           tags <- recordToTags m  (HS.fromList multipleRecordsHeader)
---           return $ Transaction date tId [Posting bal acc amnt] tags
-
---         regroupTransactions :: (MonadError Error m) =>
---                                [JTransaction] -> m JTransaction
---         regroupTransactions [] = error "regroupTransactions empty list"
---         regroupTransactions [x] =
---             throwError $ "Expecting at least two postings for transaction id \""
---                        ++ T.unpack (tTransactionId x)
---                        ++ "\"."
---         regroupTransactions xs = do
---           let nbDates = S.size $ S.fromList $ map tDate xs
---           when (nbDates > 1) (throwError
---                   $ "Expecting the same date for all postings of transaction id \""
---                   ++ T.unpack (tTransactionId $ head xs)
---                   ++ "\".")
---           let ps = concatMap tPostings xs
---           (_, tags) <- validateTags $ map (\x -> (tTransactionId x, tTags x)) xs
---           return $ Transaction
---                    (tDate $ head xs)
---                    (tTransactionId $ head xs)
---                    ps
---                    tags
-
---         validateTags :: (MonadError Error m) =>
---                      [(T.Text, [Tag])] -> m (T.Text, [Tag])
---         validateTags xs =
---           foldM (\t1  t2 -> if snd t1 == snd t2
---                              then return t1
---                              else throwError
---                                  $ "Expecting the same tag values for all \
---                                    \postings of transaction id\""
---                                  ++ T.unpack (fst t1)
---                                  ++ "\".")
---                  (head xs)
---                  (tail xs)
 
 -- decodeJTransactionsFile :: String -> ExceptT Error IO [JTransaction]
 -- decodeJTransactionsFile f = do
 --         csvBS <- liftIO $ BL.readFile f
 --         h <- decodeHeader csvBS
 --         decodeTransactions h csvBS
+
+
+decodeJTransactionsFile :: Char -> 
+                           Char -> 
+                           FilePath -> 
+                           ExceptT Errors IO [(SourcePos, JTransaction)]
+decodeJTransactionsFile csvSeparator decimalSeparator filePath = 
+  withExceptT (setSourcePosFileIfNull filePath) $ do
+      csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+      accs <- decodeTransactions csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      let pos = map (\i -> SourcePos filePath i 0) [2..]
+      return $ zip pos accs
+
+
+-- | The first line is the header
+decodeTransactions :: forall m . (MonadError Errors m) =>
+                      Char ->
+                      Char -> 
+                      ByteString ->
+                      m [JTransaction]
+decodeTransactions csvSeparator decimalSeparator bs = do
+  -- Read the CSV file as vector of T.Text
+  let opts = C.defaultDecodeOptions {
+                C.decDelimiter = fromIntegral (ord csvSeparator)
+                }
+  csv <- either (throwError . mkErrorNoPos . ErrorMessage) return 
+      $ C.decodeWith opts C.NoHeader bs
+
+
+  -- Decode the header to know the index of columns
+  let myFilter t
+        = t `elem` ["Date", "Commentaire", "Contrepartie", "Étiquette"]
+        || T.isPrefixOf "Compte " t
+        || T.isPrefixOf "Montant " t
+        || T.isPrefixOf "Date sur le relevé " t
+  (csvData, indexes) <- processColumnIndexes csv myFilter
+
+  dateIdx <- columnIndex indexes "Date"
+  commentIdx <- columnIndex indexes "Commentaire"
+  counterPartyIdx <- columnIndex indexes "Contrepartie"
+  tagIdx <- columnIndex indexes "Étiquette"
+
+  -- Check for postings columns based on the account column
+  let accSufix = filter (T.isPrefixOf "Compte " . fst)
+               $ HM.toList indexes
+  let postingIdx = map (postingIndexes 
+                      ("Compte ", "Montant ", "Date sur le relevé ")
+                       indexes)
+                   accSufix
+
+  -- Add row information to the CSV line
+  let csvWithRowNumber = zip [2..] $ V.toList csvData
+  
+  -- Function to parse a line into a JTransaction                            
+  let parseLine (row, line) =
+          let p = do
+                 date <- columnDataM dateIdx line (parseISO8601M . T.unpack)
+                 comment <- columnData commentIdx line 
+                 counterParty <- columnData counterPartyIdx line 
+                 tag <- columnData tagIdx line
+
+                 ps <- fmap catMaybes $ mapM (postingColumns date line) postingIdx
+                 if null ps || null (tail ps)
+                  then throwError $ mkErrorNoPos $ ZeroOrOnePostingOnly
+                  else 
+                   return $ Transaction date comment counterParty tag ps
+
+          in p `catchError` (throwError . setSourcePosRowIfNull row)
+
+  mapM parseLine csvWithRowNumber
+
+  where postingIndexes :: (T.Text, T.Text, T.Text) -> 
+                          ColumnIndexes ->
+                          ColumnIndex -> 
+                          (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex)
+        postingIndexes (accPrefix, amntPrefix, balPrefix) m acc = 
+          let keySuf = T.drop (T.length accPrefix) (fst acc)
+              am = T.append amntPrefix keySuf
+              bl = T.append balPrefix keySuf
+          in (acc, optionalColumnIndex m am, optionalColumnIndex m bl)
+
+        postingColumns :: Day -> 
+                          V.Vector T.Text -> 
+                          (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex) -> 
+                          m (Maybe JPosting)
+        postingColumns d l (aIdx, amIdx, bIdx) = do
+          acc <- optionalColumnData "" (Just aIdx) l
+          if T.null acc
+           then return Nothing
+           else do
+               amount <- optionalColumnDataM Nothing amIdx l 
+                        (fmap Just . parseAmount decimalSeparator)
+               balanceDate <- optionalColumnDataM d bIdx l (parseISO8601M . T.unpack)
+               return $ Just $ Posting balanceDate acc amount
+
+ --  where fromLine :: (MonadError Error m) =>
+ --                    HS.HashSet Field ->
+ --                    HM.HashMap Field Field -> m JTransaction
+ --        fromLine notTags m = do
+ --          date <- columnDataM "date" m parseISO8601M
+ --          tId <- optionalColumnData "" "transaction id" m
+ --          ps <- lineToPostings m 1
+ --          tags <- recordToTags m  notTags
+ --          return $ Transaction date tId ps tags
+
+ --        postingHeader :: HS.HashSet Field -> Int -> [Field]
+ --        postingHeader m n =
+ --          let accountKey =  toField $ "account id (" ++ show n ++ ")"
+ --              amountKey =  toField $ "amount (" ++ show n ++ ")"
+ --              balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
+ --          in case HS.member accountKey m of
+ --              False -> []
+ --              True ->
+ --                let xs = postingHeader m (n + 1)
+ --                in accountKey
+ --                   : amountKey
+ --                   : balanceDateKey
+ --                   : xs
+
+ --        lineToPostings :: (MonadError Error n) =>
+ --                          HM.HashMap Field Field -> Int -> n [JPosting]
+ --        lineToPostings m n =
+ --          let accountKey =  toField $ "account id (" ++ show n ++ ")"
+ --              amountKey =  toField $ "amount (" ++ show n ++ ")"
+ --              balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
+ --          in
+ --            case columnData accountKey m of
+ --              Left _ -> return []
+ --              Right acc | acc == "" -> return []
+ --              Right acc -> do
+ --                ps <- lineToPostings m (n + 1)
+ --                amnt <- columnDataM amountKey m
+ --                        (\case  { Nothing -> return Nothing;
+ --                                  Just v -> return
+ --                                            $ Just
+ --                                            $ (realToFrac :: Scientific -> Quantity)
+ --                                             v})
+ --                bal <- optionalColumnDataM Nothing balanceDateKey m
+ --                        (\case  {"" -> return Nothing;
+ --                                 v -> Just <$> parseISO8601M v})
+
+ --                let p = Posting bal acc amnt
+ --                return $ p : ps
+

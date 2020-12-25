@@ -38,6 +38,8 @@ data ErrorType
   | ParseDateErr String
   | ParseIntErr String
   | ParseCharErr String
+  | ParseAmountErr String
+  | ParseAmountExponentErr String
 
   | EmptyJournalFile
   | EmptyFieldInJournalFile String
@@ -56,6 +58,8 @@ data ErrorType
   | EmptyCsvFile
 
   | UnknownAccountType String
+
+  | ZeroOrOnePostingOnly
 
   deriving (Eq, Show)
 

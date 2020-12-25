@@ -34,7 +34,6 @@ where
 -- import Control.Monad.Except
 -- import Data.Bifunctor
 
--- type Transaction = TransactionF Posting
 
 -- transactionToJTransaction :: Transaction -> JTransaction
 -- transactionToJTransaction t = fmap postingToJPosting t

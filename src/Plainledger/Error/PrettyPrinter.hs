@@ -46,6 +46,11 @@ printErrorType (ParseIntErr s)
   = "Cannot parse \"" ++ s ++ "\" as an integer."
 printErrorType (ParseCharErr s)
   = "Cannot parse \"" ++ s ++ "\" as a character."
+printErrorType (ParseAmountErr s)
+  = "Cannot parse \"" ++ s ++ "\" as a number."
+printErrorType (ParseAmountExponentErr s)
+  = printErrorType (ParseAmountErr s)
+  ++ "\nToo many decimals (max 256)"
 
 printErrorType (EmptyFieldInJournalFile s)
   = "Parameter \"" ++ s ++ "\" value is empty."
@@ -96,6 +101,9 @@ printErrorType (UnknownAccountType s)
   = "Unknown account type \""
   ++ s
   ++ "\".\nMust be one of the following : Actif, Passif, Capital, Revenu, Dépense"
+
+printErrorType ZeroOrOnePostingOnly
+  = "Transaction does not have at least two postings.\n"
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
