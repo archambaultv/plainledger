@@ -8,12 +8,13 @@ import Test.Tasty
 --import Plainledger.Error
 import Journal.JournalFile.JournalFile
 import Journal.Account.Account
+import Journal.Amount.Amount
 --import Control.Monad.Except
 
 
 journalTestTree :: TestTree
 journalTestTree = testGroup "Journal tests"
-              [journalFileTestTree, accountTestTree]
+              [journalFileTestTree, accountTestTree, amountTestTree]
 
 
 

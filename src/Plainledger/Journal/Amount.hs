@@ -34,20 +34,18 @@ type Quantity = Decimal
 -- 123.456
 -- 0.578
 -- -1.234
--- .246
--- -.24
 -- 12e12
 -- 12.10E12
 -- 16e-24
 -- 16e+24
 -- 45.24e48
--- .246E7
 -- -2e5
--- -.24e4
 -- The decimal separator can be specified
 parseAmount :: forall m . (MonadError Errors m) => Char -> T.Text -> m Quantity
 parseAmount sep x = do
   let err = (throwError $ mkErrorNoPos $ ParseAmountErr $ T.unpack x)
+  when (T.null x) err
+  
   (coeffSign, x1) <- parseSign x
   (coeff, x2) <- parseCoeff x1
   (frac, x3) <- parseFractional x2
@@ -55,7 +53,6 @@ parseAmount sep x = do
 
   when (not $ T.null x4) err
   let nText = T.append coeff frac
-  when (T.null nText) err
   let n = applySign coeffSign $ strToInt nText
   -- e means the number of decimal digits
   -- negative value means we need to add some zeros to n
@@ -68,6 +65,7 @@ parseAmount sep x = do
 
 
   where parseSign :: T.Text -> m (Bool, T.Text)
+        parseSign "" = return (True, "")
         parseSign y | T.head y == '-' = return (False, T.drop 1 y)
         parseSign y | T.head y == '+' = return (True, T.drop 1 y)
         parseSign y = return (True, y)
@@ -76,24 +74,22 @@ parseAmount sep x = do
         parseCoeff y = 
           let n = T.takeWhile isDigit y
               r = T.drop (T.length n) y
-          in return (n, r)
+          in notNull n >> return (n, r)
 
         parseFractional :: T.Text -> m (T.Text, T.Text)
+        parseFractional "" = return ("","")
         parseFractional y | T.head y == sep =
           let n = T.takeWhile isDigit (T.drop 1 y)
               r = T.drop (T.length n + 1) y
-          in if T.length n == 0
-             then throwError $ mkErrorNoPos $ ParseAmountErr $ T.unpack x
-             else return (n, r)
+          in notNull n >> return (n, r)
         parseFractional y = return ("", y)
 
         parseExponent :: T.Text -> m (T.Text, Bool, T.Text)
+        parseExponent "" = return ("", True, "")
         parseExponent y | T.head y == 'e' || T.head y == 'E' = do
           (isPos, x1) <- parseSign (T.drop 1 y)
           (n, x2) <- parseCoeff x1
-          if T.length n == 0
-             then throwError $ mkErrorNoPos $ ParseAmountErr $ T.unpack x
-             else return (n, isPos, x2)
+          notNull n >> return (n, isPos, x2)
         parseExponent y = return ("", True, y)
 
         strToInt :: (Integral n) => T.Text -> n
@@ -105,3 +101,8 @@ parseAmount sep x = do
         applySign :: (Integral n) => Bool -> n -> n
         applySign True n = n
         applySign False n = negate n
+
+        notNull :: T.Text -> m ()
+        notNull n
+          | T.length n == 0 = throwError $ mkErrorNoPos $ ParseAmountErr $ T.unpack x
+          | otherwise = return ()
