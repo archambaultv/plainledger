@@ -77,7 +77,13 @@ transactions =
 transactionTestTree :: TestTree
 transactionTestTree =
   testGroup "Transaction"
-    [ okTransaction "Transaction-01.csv" ';' '.' transactions
+    [ okTransaction "Transaction-01.csv" ';' '.' transactions,
+      -- Like Transaction-01, but with a dummy column
+      okTransaction "Transaction-02.csv" ';' '.' transactions,
+      -- Second posting suffix is not numeric
+      okTransaction "Transaction-03.csv" ';' '.' transactions,
+      -- Extra posting column names for amount and balance date
+      okTransaction "Transaction-04.csv" ';' '.' transactions
     ]
 
 
