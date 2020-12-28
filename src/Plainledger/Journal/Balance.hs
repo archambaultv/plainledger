@@ -8,60 +8,83 @@
 --
 -- This module defines the Balance data type representing balance assertions.
 
-module Plainledger.Journal.Balance (
-  -- Balance(..),
-  -- decodeBalanceFile,
-  -- decodeTrialBalanceAssertionFile
+module Plainledger.Journal.Balance 
+(
+  Balance(..),
+  decodeBalanceFile,
+  decodeBalances
   )
 where
 
--- import Data.Time
--- import Data.Scientific
--- import qualified Data.ByteString.Lazy as BL
--- import qualified Data.Vector as V
--- import qualified Data.Csv as C
--- import Data.Csv (FromNamedRecord(..),
---                  ToNamedRecord(..),
---                  record,
---                  namedRecord,
---                  DefaultOrdered)
--- import qualified Data.Text as T
--- import Plainledger.Journal.Amount
--- import Plainledger.Journal.Day
--- import Control.Monad.Except
--- import Plainledger.Error
+import Data.Time
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector as V
+import qualified Data.Csv as C
+import qualified Data.Text as T
+import Plainledger.Journal.Amount
+import Plainledger.Journal.Day
+import Plainledger.Internal.Csv
+import Plainledger.Internal.Utils
+import Control.Monad.Except
+import Plainledger.Error
+import qualified Data.ByteString as BS
+import Data.ByteString.Lazy (ByteString)
+import Data.Char (ord)
 
--- -- | The Balance data type reprensents an assertion about the total of an
--- -- account at a particular date. Used for bank reconciliation
--- data Balance = Balance
---   {bDate :: Day,
---    bAccount   :: T.Text,
---    bAmount :: Quantity,
---    bStartDate :: Maybe Day
---   }
---   deriving (Eq, Show)
+-- | The Balance data type reprensents an assertion about the total of an
+-- account at a particular date. Used for bank reconciliation
+data Balance = Balance
+  {bDate :: Day,
+   bAccount   :: T.Text,
+   bAmount :: Quantity,
+   bStartDate :: Maybe Day
+  }
+  deriving (Eq, Show)
 
--- instance FromNamedRecord Balance where
---     parseNamedRecord m =
---       Balance
---       <$> (m C..: "Date" >>= either fail return . parseISO8601M)
---       <*> m C..: "Compte"
---       <*> (read <$> m C..: "Montant")
---       <*> (m C..: "Date de début" >>= either fail return . parseISO8601M)
+decodeBalanceFile :: Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
+decodeBalanceFile csvSeparator decimalSeparator filePath = 
+  withExceptT (setSourcePosFileIfNull filePath) $ do
+      csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+      accs <- decodeBalances csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      let pos = map (\i -> SourcePos filePath i 0) [2..]
+      return $ zip pos accs
 
--- instance ToNamedRecord Balance where
---     toNamedRecord (Balance d acc amnt) =
---       namedRecord [
---         "Date" C..= (toISO8601 d),
---         "Compte" C..= acc,
---         "Montant" C..= (realToFrac amnt :: Scientific),
---         "Date de début" C..= (toISO8601 startdate)]
+-- | The first line is the header
+decodeBalances :: forall m . (MonadError Errors m) 
+               => Char -> Char -> ByteString -> m [Balance]
+decodeBalances csvSeparator decimalSeparator bs = do
+  -- Read the CSV file as vector of T.Text
+  let opts = C.defaultDecodeOptions {
+                C.decDelimiter = fromIntegral (ord csvSeparator)
+                }
+  csv <- either (throwError . mkErrorNoPos . ErrorMessage) return 
+      $ C.decodeWith opts C.NoHeader bs
 
--- instance DefaultOrdered Balance where
---   headerOrder _ = record ["Date","Compte","Montant","Date de début"]
+  -- Decode the header to know the index of columns
+  let myFilter t = t `elem` ["Date", "Compte", "Montant", "Date de début"]
+  (csvData, indexes) <- processColumnIndexes csv myFilter
 
+  dateIdx <- columnIndex indexes "Date"
+  accountIdx <- columnIndex indexes "Compte"
+  amountIdx <- columnIndex indexes "Montant"
+  let startDateIdx = optionalColumnIndex indexes "Date de début"
 
--- decodeBalanceFile :: String -> ExceptT Error IO [Balance]
--- decodeBalanceFile f = do
---     csvBS <- liftIO $ BL.readFile f
---     either (throwError . mkCustomErr) (return . V.toList . snd) $ C.decodeByName csvBS
+ -- Add row information to the CSV line
+  let csvWithRowNumber = zip [2..] $ V.toList csvData
+  
+  -- Function to parse a line into an Account                            
+  let parseLine (row, line) = 
+          let p = do
+                date <- columnDataM dateIdx line (parseISO8601M . T.unpack)
+                acc <- columnData accountIdx line
+                amount <- columnDataM amountIdx line
+                        (parseAmount decimalSeparator)
+                sd <- optionalColumnDataM Nothing startDateIdx line
+                       (fmap Just . parseISO8601M . T.unpack)
+                return $ Balance date acc amount sd
+          in p `catchError` (throwError . setSourcePosRowIfNull row)
+  
+
+  bals <- mapM parseLine csvWithRowNumber
+
+  return bals

@@ -15,7 +15,7 @@ module Plainledger.Journal
   journalFileToJournal,
   module Plainledger.Journal.Posting,
   module Plainledger.Journal.Transaction,
-  -- module Plainledger.Journal.Balance,
+  module Plainledger.Journal.Balance,
   module Plainledger.Journal.JournalFile,
   module Plainledger.Journal.Account,
   module Plainledger.Journal.Amount,
@@ -30,7 +30,7 @@ import qualified Data.HashSet as HS
 import Plainledger.Error
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Transaction
---import Plainledger.Journal.Balance
+import Plainledger.Journal.Balance
 import Plainledger.Journal.JournalFile
 import Plainledger.Journal.Account
 import Plainledger.Journal.Amount
@@ -40,8 +40,8 @@ data Journal = Journal
   {
     jJournalFile :: JournalFile,
     jAccounts   :: [Account],
-    jTransactions :: [Transaction]
-   -- jBalances :: [Balance]
+    jTransactions :: [Transaction],
+    jBalances :: [Balance]
   }
   deriving (Eq, Show)
 
@@ -67,8 +67,9 @@ journalFileToJournal journalFile = do
         $ traverse (decodeJTransactionsFile csvSeparator decimalSeparator) txnPaths
   txns <- validateJTransactions accIds jtxns
         
-  -- bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
+  let balPaths = map (dir </>) $ jfBalanceFiles journalFile
+  bals <- fmap concat $ traverse (decodeBalanceFile csvSeparator decimalSeparator) balPaths
 
-  return $ Journal journalFile acc txns --bals
+  return $ Journal journalFile acc txns (map snd bals)
 
 
