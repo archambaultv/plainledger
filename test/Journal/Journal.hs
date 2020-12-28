@@ -9,12 +9,14 @@ import Test.Tasty
 import Journal.JournalFile.JournalFile
 import Journal.Account.Account
 import Journal.Amount.Amount
+import Journal.Transaction.Transaction
 --import Control.Monad.Except
 
 
 journalTestTree :: TestTree
 journalTestTree = testGroup "Journal tests"
-              [journalFileTestTree, accountTestTree, amountTestTree]
+              [journalFileTestTree, accountTestTree, amountTestTree,
+               transactionTestTree]
 
 
 

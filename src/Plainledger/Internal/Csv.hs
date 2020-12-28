@@ -62,13 +62,13 @@ processColumnIndexes :: forall m . (MonadError Errors m)
                      -> m (V.Vector (V.Vector T.Text), ColumnIndexes)
 processColumnIndexes csv _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
 processColumnIndexes csv keepF  = 
-  let header = filter keepF $ V.toList $ V.head csv
+  let header = filter (keepF . fst) $ flip zip [0..] $ V.toList $ V.head csv
       csvData = V.tail csv
       dup = filter (not . null . tail)
           $ groupBy (==)
           $ sortBy compare
-          $ header
-      indexes = M.fromList $ zip header [0..]
+          $ map fst header
+      indexes = M.fromList header
       mkErrorDup x = mkError (SourcePos "" 1 0) (DuplicateCsvColumn $ T.unpack $ head x)
   in case dup of
         [] -> return (csvData, indexes)
@@ -96,13 +96,16 @@ columnDataM i v f =
             $ MissingCsvColumnData (T.unpack $ fst i)
   in columnDataBase (Just i) v f err
 
+-- If the column is missing or if its value is null, then return the
+-- default value.
 optionalColumnData :: (MonadError Errors m) =>
                     T.Text -> Maybe ColumnIndex -> V.Vector T.Text -> m T.Text
 optionalColumnData d i v = optionalColumnDataM d i v return
 
 optionalColumnDataM :: (MonadError Errors m) =>
                     a -> Maybe ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a
-optionalColumnDataM d i v f = columnDataBase i v f (return d)
+optionalColumnDataM d i v f 
+  = columnDataBase i v (\t -> if T.null t then (return d) else f t) (return d)
 
 columnDataBase :: (MonadError Errors m) 
                 => (Maybe ColumnIndex) -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a

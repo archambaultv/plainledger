@@ -179,7 +179,7 @@ decodeTransactions csvSeparator decimalSeparator bs = do
         = t `elem` ["Date", "Commentaire", "Contrepartie", "Étiquette"]
         || T.isPrefixOf "Compte " t
         || T.isPrefixOf "Montant " t
-        || T.isPrefixOf "Date sur le relevé " t
+        || T.isPrefixOf "Date du relevé " t
   (csvData, indexes) <- processColumnIndexes csv myFilter
 
   dateIdx <- columnIndex indexes "Date"
@@ -191,8 +191,8 @@ decodeTransactions csvSeparator decimalSeparator bs = do
   let accSufix = filter (T.isPrefixOf "Compte " . fst)
                $ HM.toList indexes
   let postingIdx = map (postingIndexes 
-                      ("Compte ", "Montant ", "Date sur le relevé ")
-                       indexes)
+                        ("Compte ", "Montant ", "Date du relevé ")
+                        indexes)
                    accSufix
 
   -- Add row information to the CSV line
@@ -222,9 +222,9 @@ decodeTransactions csvSeparator decimalSeparator bs = do
                           (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex)
         postingIndexes (accPrefix, amntPrefix, balPrefix) m acc = 
           let keySuf = T.drop (T.length accPrefix) (fst acc)
-              am = T.append amntPrefix keySuf
+              amnt = T.append amntPrefix keySuf
               bl = T.append balPrefix keySuf
-          in (acc, optionalColumnIndex m am, optionalColumnIndex m bl)
+          in (acc, optionalColumnIndex m amnt, optionalColumnIndex m bl)
 
         postingColumns :: Day -> 
                           V.Vector T.Text -> 

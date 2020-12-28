@@ -13,7 +13,7 @@ module Plainledger.Journal
 (
   Journal,
   journalFileToJournal,
-  -- module Plainledger.Journal.Posting,
+  module Plainledger.Journal.Posting,
   module Plainledger.Journal.Transaction,
   -- module Plainledger.Journal.Balance,
   module Plainledger.Journal.JournalFile,
@@ -27,7 +27,7 @@ where
 import System.FilePath
 import Control.Monad.Except
 import Plainledger.Error
---import Plainledger.Journal.Posting
+import Plainledger.Journal.Posting
 import Plainledger.Journal.Transaction
 --import Plainledger.Journal.Balance
 import Plainledger.Journal.JournalFile
