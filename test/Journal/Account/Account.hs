@@ -1,5 +1,6 @@
 module Journal.Account.Account (
-  accountTestTree
+  accountTestTree,
+  accounts
   )where
 
 import Test.Tasty

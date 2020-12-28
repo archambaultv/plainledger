@@ -26,6 +26,7 @@ where
 
 import System.FilePath
 import Control.Monad.Except
+import qualified Data.HashSet as HS
 import Plainledger.Error
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Transaction
@@ -38,8 +39,8 @@ import Plainledger.Journal.Day
 data Journal = Journal
   {
     jJournalFile :: JournalFile,
-    jAccounts   :: [Account]
-   -- jTransactions :: [Transaction],
+    jAccounts   :: [Account],
+    jTransactions :: [Transaction]
    -- jBalances :: [Balance]
   }
   deriving (Eq, Show)
@@ -57,15 +58,17 @@ journalFileToJournal journalFile = do
   acc <- decodeAccountsFile accountPath csvSeparator 
          >>= validateAccounts (jfOpeningBalanceAccount journalFile)
               (jfEarningsAccount journalFile)
+  let accIds = HS.fromList $ map aId acc
 
   -- Read the transactions files and check for errors
-  let txnPaths = jfTransactionFiles journalFile
+  let txnPaths = map (dir </>) $ jfTransactionFiles journalFile
 
-  txns <- fmap concat 
-        $ traverse (decodeJTransactionsFile csvSeparator decimalSeparator) 
-          (map (dir </>) txnPaths)
+  jtxns <- fmap concat 
+        $ traverse (decodeJTransactionsFile csvSeparator decimalSeparator) txnPaths
+  txns <- validateJTransactions accIds jtxns
         
   -- bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
-  return $ Journal journalFile acc -- txns bals
+
+  return $ Journal journalFile acc txns --bals
 
 

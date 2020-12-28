@@ -20,8 +20,10 @@ module Plainledger.Error.Error
   setSourcePosFileIfNull,
   setSourcePosRowIfNull,
   setSourcePosColIfNull,
+  setSourcePosIfNull,
 ) where
 
+import Data.Decimal
 import Plainledger.Error.SourcePos
 
 type Errors = [Error]
@@ -61,6 +63,10 @@ data ErrorType
 
   | ZeroOrOnePostingOnly
 
+  | UnbalancedTransaction Decimal
+  | TwoOrMorePostingsWithoutAmount
+  | AccountIdNotInAccountFile String
+
   deriving (Eq, Show)
 
 mkError :: SourcePos -> ErrorType -> Errors
@@ -71,6 +77,11 @@ mkErrorNoPos e = [Error [] e]
 
 mkErrorMultiPos :: [SourcePos] -> ErrorType -> Errors
 mkErrorMultiPos pos e = [Error pos e]
+
+setSourcePosIfNull :: SourcePos -> Errors -> Errors
+setSourcePosIfNull pos xs = map f xs
+  where f (Error [] e) = Error [pos] e
+        f x = x
 
 setSourcePosFileIfNull :: String -> Errors -> Errors
 setSourcePosFileIfNull f xs = map (setSourcePosFileIfNull' f) xs

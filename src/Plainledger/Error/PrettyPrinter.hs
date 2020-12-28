@@ -105,6 +105,16 @@ printErrorType (UnknownAccountType s)
 printErrorType ZeroOrOnePostingOnly
   = "Transaction does not have at least two postings.\n"
 
+printErrorType (UnbalancedTransaction q)
+  = "Unbalanced transaction. The total is " ++ show q
+
+printErrorType TwoOrMorePostingsWithoutAmount
+  = "Two or more postings with unspecified amount for this transaction.\n"
+  ++ "We can only infer the amount for one posting only."
+
+printErrorType (AccountIdNotInAccountFile s)
+  = "Account \"" ++ s ++ "\" is not declared in the account file."
+
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
 showSourcePos (SourcePos f r c) | c <= 0

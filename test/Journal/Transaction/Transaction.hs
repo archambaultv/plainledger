@@ -1,12 +1,19 @@
-module Journal.Transaction.Transaction (
+module Journal.Transaction.Transaction 
+(
   transactionTestTree
-  )where
+)where
 
 import Test.Tasty
 import Test.Tasty.HUnit
 import Plainledger.Journal
 import Plainledger.Error
 import Control.Monad.Except
+import Journal.Account.Account
+import qualified Data.HashSet as HS
+import qualified Data.Text as T
+
+accs :: HS.HashSet T.Text
+accs = HS.fromList $ map aId accounts
 
 transactions :: [JTransaction]
 transactions = 
@@ -83,7 +90,23 @@ transactionTestTree =
       -- Second posting suffix is not numeric
       okTransaction "Transaction-03.csv" ';' '.' transactions,
       -- Extra posting column names for amount and balance date
-      okTransaction "Transaction-04.csv" ';' '.' transactions
+      okTransaction "Transaction-04.csv" ';' '.' transactions,
+
+      koTransaction "Transaction-05.csv" ';' '.' 
+      $ mkError (SourcePos "test/Journal/Transaction/Transaction-05.csv" 3 0) 
+        ZeroOrOnePostingOnly,
+
+      koValidateTransaction "Transaction-06.csv" ';' '.' 
+      $ mkError (SourcePos "test/Journal/Transaction/Transaction-06.csv" 4 0) 
+        (AccountIdNotInAccountFile "Wrong Name"),
+
+      koValidateTransaction "Transaction-07.csv" ';' '.' 
+      $ mkError (SourcePos "test/Journal/Transaction/Transaction-07.csv" 3 0) 
+        (UnbalancedTransaction $ read "-10"),
+
+      koValidateTransaction "Transaction-08.csv" ';' '.' 
+      $ mkError (SourcePos "test/Journal/Transaction/Transaction-08.csv" 9 0) 
+        TwoOrMorePostingsWithoutAmount
     ]
 
 
@@ -108,17 +131,17 @@ koTransaction filename sep decimal expectedErr =
 --   testCase ("Validation of " ++ filename) $ do
 --        transaction <- runExceptT 
 --                 $ decodeJTransactionsFile sep decimal ("test/Journal/Transaction/" ++ filename) 
---                 >>= validateTransactions "Solde d'ouverture" "Bénéfice"
+--                 >>= validateJTransactions "Solde d'ouverture" "Bénéfice"
 --        case transaction of
 --          Left err -> assertFailure $ printErrors err
 --          Right actual -> assertEqual "" expectedTransaction actual
 
 
--- koValidateTransaction :: String -> Char -> Char -> Errors -> TestTree
--- koValidateTransaction filename sep decimal expectedErr =
---    testCase ("Assert error for " ++ filename) $ do
---        transaction <- runExceptT $ decodeJTransactionsFile sep decimal ("test/Journal/Transaction/" ++ filename) 
---                    >>= validateTransactions "Solde d'ouverture" "Bénéfice"
---        case transaction of
---          Left actual -> assertEqual "" expectedErr actual
---          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
+koValidateTransaction :: String -> Char -> Char -> Errors -> TestTree
+koValidateTransaction filename sep decimal expectedErr =
+   testCase ("Assert error for " ++ filename) $ do
+       transaction <- runExceptT $ decodeJTransactionsFile sep decimal ("test/Journal/Transaction/" ++ filename) 
+                   >>= validateJTransactions accs
+       case transaction of
+         Left actual -> assertEqual "" expectedErr actual
+         Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"

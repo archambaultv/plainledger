@@ -15,6 +15,7 @@ module Plainledger.Journal.Transaction
   Transaction,
   decodeJTransactionsFile,
   decodeTransactions,
+  validateJTransactions,
 )
 where
 
@@ -24,9 +25,6 @@ import Data.List hiding (lines)
 import Data.Maybe
 import Control.Monad.Except
 import Data.ByteString.Lazy (ByteString)
-import Data.Csv (Record, Field, ToField(..),toRecord)
-import Data.Ord (comparing)
-import Data.Scientific
 import Data.Time
 import Plainledger.Error
 import Plainledger.Internal.Csv
@@ -34,12 +32,10 @@ import Plainledger.Journal.Posting
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
 import Plainledger.Internal.Utils
-import GHC.Generics hiding (to, from)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Prelude hiding (lines)
 import qualified Data.Csv as C
-import qualified Data.Set as S
 import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
@@ -240,52 +236,33 @@ decodeTransactions csvSeparator decimalSeparator bs = do
                balanceDate <- optionalColumnDataM d bIdx l (parseISO8601M . T.unpack)
                return $ Just $ Posting balanceDate acc amount
 
- --  where fromLine :: (MonadError Error m) =>
- --                    HS.HashSet Field ->
- --                    HM.HashMap Field Field -> m JTransaction
- --        fromLine notTags m = do
- --          date <- columnDataM "date" m parseISO8601M
- --          tId <- optionalColumnData "" "transaction id" m
- --          ps <- lineToPostings m 1
- --          tags <- recordToTags m  notTags
- --          return $ Transaction date tId ps tags
+--  Asserts all transactions have valid postings
+--  Asserts all transactions balance to zero
+validateJTransactions :: (MonadError Errors m) =>
+                      HS.HashSet T.Text ->
+                      [(SourcePos, JTransaction)] ->
+                      m [Transaction]
+validateJTransactions accs jtransactions = do
+    transactions <- traverse balanceTransaction jtransactions
+    _ <- traverse (checkTxnAccount accs) transactions
+    return $ map snd transactions
 
- --        postingHeader :: HS.HashSet Field -> Int -> [Field]
- --        postingHeader m n =
- --          let accountKey =  toField $ "account id (" ++ show n ++ ")"
- --              amountKey =  toField $ "amount (" ++ show n ++ ")"
- --              balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
- --          in case HS.member accountKey m of
- --              False -> []
- --              True ->
- --                let xs = postingHeader m (n + 1)
- --                in accountKey
- --                   : amountKey
- --                   : balanceDateKey
- --                   : xs
+-- Balance postings
+balanceTransaction :: (MonadError Errors m) =>
+                             (SourcePos , JTransaction) -> 
+                             m (SourcePos, Transaction)
+balanceTransaction (pos, t) = do
+    ps2 <- (balancePostings $ tPostings $ t)
+           `catchError` (throwError . setSourcePosIfNull pos)
+    return $ (pos, t{tPostings = ps2})
 
- --        lineToPostings :: (MonadError Error n) =>
- --                          HM.HashMap Field Field -> Int -> n [JPosting]
- --        lineToPostings m n =
- --          let accountKey =  toField $ "account id (" ++ show n ++ ")"
- --              amountKey =  toField $ "amount (" ++ show n ++ ")"
- --              balanceDateKey =  toField $ "balance date ("++ show n ++ ")"
- --          in
- --            case columnData accountKey m of
- --              Left _ -> return []
- --              Right acc | acc == "" -> return []
- --              Right acc -> do
- --                ps <- lineToPostings m (n + 1)
- --                amnt <- columnDataM amountKey m
- --                        (\case  { Nothing -> return Nothing;
- --                                  Just v -> return
- --                                            $ Just
- --                                            $ (realToFrac :: Scientific -> Quantity)
- --                                             v})
- --                bal <- optionalColumnDataM Nothing balanceDateKey m
- --                        (\case  {"" -> return Nothing;
- --                                 v -> Just <$> parseISO8601M v})
-
- --                let p = Posting bal acc amnt
- --                return $ p : ps
-
+checkTxnAccount :: (MonadError Errors m) =>
+                    HS.HashSet T.Text -> (SourcePos, Transaction) -> m ()
+checkTxnAccount s (pos, t) = traverse foo (tPostings t) >> return ()
+  where foo p = if HS.member (pAccount p) s
+                then return ()
+                else throwError 
+                      $ mkError pos
+                      $ AccountIdNotInAccountFile
+                      $ T.unpack 
+                      $ pAccount p
