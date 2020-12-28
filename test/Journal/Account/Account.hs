@@ -94,7 +94,7 @@ koAccount filename sep expectedErr =
 
 okValidateAccount :: String -> Char -> [Account] -> TestTree
 okValidateAccount filename sep expectedAccount = 
-  testCase ("Decode " ++ filename) $ do
+  testCase ("Validation of " ++ filename) $ do
        account <- runExceptT 
                 $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
                 >>= validateAccounts "Solde d'ouverture" "Bénéfice"

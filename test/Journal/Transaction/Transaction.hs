@@ -105,7 +105,7 @@ koTransaction filename sep decimal expectedErr =
 
 -- okValidateTransaction :: String -> Char -> Char ->[Transaction] -> TestTree
 -- okValidateTransaction filename sep decimal expectedTransaction = 
---   testCase ("Decode " ++ filename) $ do
+--   testCase ("Validation of " ++ filename) $ do
 --        transaction <- runExceptT 
 --                 $ decodeJTransactionsFile sep decimal ("test/Journal/Transaction/" ++ filename) 
 --                 >>= validateTransactions "Solde d'ouverture" "Bénéfice"
