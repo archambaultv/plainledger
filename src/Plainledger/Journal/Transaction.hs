@@ -48,7 +48,7 @@ data TransactionF p = Transaction
     tCounterParty :: T.Text,
     tTag :: T.Text,
     tPostings :: [p]
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Functor)
 
 type JTransaction = TransactionF JPosting
 type Transaction = TransactionF Posting

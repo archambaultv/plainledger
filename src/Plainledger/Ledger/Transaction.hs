@@ -40,38 +40,7 @@ where
 
 
 
--- -- Compute the balance from postings, assuming they are all from the same
--- -- accounts
--- computeBalance :: [PostingF Day Quantity] -> M.Map Day Quantity
--- computeBalance ps =
---   let
---     deltaMap :: M.Map Day Quantity
---     deltaMap = M.fromListWith (+) $
---                map (\p -> (pBalanceDate p, pAmount p)) ps
 
---     deltaList :: [(Day, Quantity)]
---     deltaList = M.toAscList deltaMap
-
---     balanceList :: [Quantity]
---     balanceList = scanl1 (+)
---                 $ map snd deltaList
-
---   in M.fromList $ zip (map fst deltaList) balanceList
-
--- -- Sorts the postings by accounts and compute the balance map
--- computeBalancePs :: [PostingF Day Quantity] -> BalanceMap
--- computeBalancePs ps =
---   let byId :: [[PostingF Day Quantity]]
---       byId = groupBy ((==) `on` pAccount)
---            $ sortOn pAccount ps
-
---       accounts :: [T.Text]
---       accounts = map (pAccount . head) byId
-
---       balance1 :: [M.Map Day Quantity]
---       balance1 = map computeBalance byId
-
---   in HM.fromList $ zip accounts balance1
 
 -- -- Computes a balanceMap from the transaction date and the balance date
 -- computeBalanceTx :: [T.Text] -> [Transaction] -> (BalanceMap, BalanceMap)

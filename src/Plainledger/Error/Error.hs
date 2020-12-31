@@ -24,6 +24,7 @@ module Plainledger.Error.Error
 ) where
 
 import Data.Decimal
+import Data.Time
 import Plainledger.Error.SourcePos
 
 type Errors = [Error]
@@ -67,6 +68,9 @@ data ErrorType
   | TwoOrMorePostingsWithoutAmount
   | AccountIdNotInAccountFile String
 
+  | WrongBalance String Day Decimal (Maybe Decimal)
+  | MissingStartDateInBalance String
+  
   deriving (Eq, Show)
 
 mkError :: SourcePos -> ErrorType -> Errors

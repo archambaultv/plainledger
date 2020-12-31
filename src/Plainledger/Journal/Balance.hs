@@ -12,7 +12,8 @@ module Plainledger.Journal.Balance
 (
   Balance(..),
   decodeBalanceFile,
-  decodeBalances
+  decodeBalances,
+  validateBalances
   )
 where
 
@@ -23,13 +24,18 @@ import qualified Data.Csv as C
 import qualified Data.Text as T
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
+import Plainledger.Journal.BalanceMap
 import Plainledger.Internal.Csv
 import Plainledger.Internal.Utils
+import Plainledger.Journal.Account
+import Plainledger.Journal.Transaction
 import Control.Monad.Except
 import Plainledger.Error
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (ByteString)
 import Data.Char (ord)
+import qualified Data.HashSet as HS
+import qualified Data.HashMap.Strict as HM
 
 -- | The Balance data type reprensents an assertion about the total of an
 -- account at a particular date. Used for bank reconciliation
@@ -88,3 +94,81 @@ decodeBalances csvSeparator decimalSeparator bs = do
   bals <- mapM parseLine csvWithRowNumber
 
   return bals
+
+-- Balances :
+--  Asserts all balance have a valid account field
+--  Asserts all balance assertions are correct
+validateBalances :: forall m . (MonadError Errors m) =>
+                      HS.HashSet T.Text ->
+                      (T.Text -> AccountType) ->
+                      T.Text ->
+                      [Transaction] ->
+                      [(SourcePos, Balance)] ->
+                      m ()
+validateBalances accSet accType openAcc txns bs = do
+    _ <- traverse (checkBalanceAccount accSet) bs
+    let balMap = postingsToBalanceMap $ concatMap tPostings txns
+    _ <- traverse (checkBalanceAmount accType openAcc balMap) bs
+    return ()
+
+
+checkBalanceAmount :: forall m . (MonadError Errors m) =>
+                      (T.Text -> AccountType) -> 
+                      T.Text ->
+                      BalanceMap -> 
+                      (SourcePos, Balance) -> 
+                      m ()
+checkBalanceAmount accTypef openAcc balMap (pos, b) =
+  let endDate = bDate b
+      acc = bAccount b
+      mustHaveStartDate = acc == openAcc 
+                        || isIncomeStatementType (accTypef acc)
+      startDateM = 
+        case (bStartDate b, mustHaveStartDate) of
+          (Nothing, True) -> throwError 
+                          $ mkError pos
+                          $ MissingStartDateInBalance
+                          $ T.unpack 
+                          $ acc
+          _ -> return $ maybe endDate id $ bStartDate b
+
+      computeAmount sd =
+        if HM.member acc balMap
+        then Just $ trialBalanceQuantity openAcc accTypef balMap 
+                             acc (sd, endDate)
+        else Nothing
+  in do
+    startDate <- startDateM
+    let computedAmount = computeAmount startDate
+    checkBalance pos acc endDate (computedAmount, bAmount b)
+
+checkBalance :: forall m . (MonadError Errors m) =>
+                SourcePos -> 
+                T.Text -> 
+                Day -> 
+                (Maybe Quantity, Quantity) -> m ()
+checkBalance pos accId date z =
+  case z of
+       (Nothing, 0) -> return ()
+       (Nothing, x) ->
+              throwError
+              $ mkError pos
+              $ WrongBalance (T.unpack accId) date x Nothing
+       (Just y, x) | y /= x ->
+              throwError
+              $ mkError pos
+              $ WrongBalance (T.unpack accId) date x (Just y)
+       _ -> return ()
+
+checkBalanceAccount :: (MonadError Errors m) => 
+                       HS.HashSet T.Text -> 
+                       (SourcePos, Balance) -> 
+                       m ()
+checkBalanceAccount accSet (pos, b) = foo (bAccount b)
+  where foo x = if HS.member x accSet
+                then return ()
+                else throwError 
+                      $ mkError pos
+                      $ AccountIdNotInAccountFile
+                      $ T.unpack 
+                      $ x

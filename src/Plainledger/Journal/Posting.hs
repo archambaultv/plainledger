@@ -12,7 +12,8 @@ module Plainledger.Journal.Posting (
   PostingF(..),
   JPosting,
   Posting,
-  balancePostings
+  balancePostings,
+  changePostingDate
   )
 where
 
@@ -36,6 +37,9 @@ data PostingF q = Posting
 
 type JPosting = PostingF (Maybe Quantity)
 type Posting = PostingF Quantity
+
+changePostingDate :: Day -> PostingF a -> PostingF a
+changePostingDate d (Posting _ acc amnt) = (Posting d acc amnt)
 
 -- | Updates the amount if it is Nothing
 setAmount :: Quantity -> PostingF (Maybe Quantity) -> PostingF Quantity

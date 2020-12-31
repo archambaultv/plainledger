@@ -27,6 +27,7 @@ where
 import System.FilePath
 import Control.Monad.Except
 import qualified Data.HashSet as HS
+import qualified Data.HashMap.Strict as HM
 import Plainledger.Error
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Transaction
@@ -67,8 +68,12 @@ journalFileToJournal journalFile = do
         $ traverse (decodeJTransactionsFile csvSeparator decimalSeparator) txnPaths
   txns <- validateJTransactions accIds jtxns
         
+  -- Read the balance assertion files and validate them
   let balPaths = map (dir </>) $ jfBalanceFiles journalFile
   bals <- fmap concat $ traverse (decodeBalanceFile csvSeparator decimalSeparator) balPaths
+  let accMaps = HM.fromList $ map (\a -> (aId a, aType a)) acc
+  let accTypef = \a -> accMaps HM.! a
+  _ <- validateBalances accIds accTypef (jfOpeningBalanceAccount journalFile) txns bals
 
   return $ Journal journalFile acc txns (map snd bals)
 

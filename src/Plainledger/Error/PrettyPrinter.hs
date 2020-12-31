@@ -115,6 +115,25 @@ printErrorType TwoOrMorePostingsWithoutAmount
 printErrorType (AccountIdNotInAccountFile s)
   = "Account \"" ++ s ++ "\" is not declared in the account file."
 
+printErrorType (WrongBalance accId date bal amnt)
+  = "Balance assertion failed for account \""
+  ++ accId
+  ++ "\" on date "
+  ++ show date
+  ++ ".\nAsserted balance : "
+  ++ show bal
+  ++ "\nComputed balance : " ++ showAmnt amnt
+
+  where showAmnt Nothing = "0 (no transaction for this account)"
+        showAmnt (Just x) = show x
+                          ++ "\nDifference       : "
+                          ++ show (bal - x)
+printErrorType (MissingStartDateInBalance s)
+  = "Account \""
+  ++ s
+  ++ "\" must have a start date in the balance file.\n"
+  ++ "All revenue and expense accounts and the opening account must have a start date.  "
+
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
 showSourcePos (SourcePos f r c) | c <= 0
