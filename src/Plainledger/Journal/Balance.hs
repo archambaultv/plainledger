@@ -11,9 +11,11 @@
 module Plainledger.Journal.Balance 
 (
   Balance(..),
-  decodeBalanceFile,
+  decodeStatementBalanceFile,
+  decodeTrialBalanceFile,
   decodeBalances,
-  validateBalances
+  validateTrialBalances,
+  validateStatementBalances,
   )
 where
 
@@ -38,7 +40,8 @@ import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 
 -- | The Balance data type reprensents an assertion about the total of an
--- account at a particular date. Used for bank reconciliation
+-- account at a particular date. Used for bank statement assertion and trial
+-- balance assertion
 data Balance = Balance
   {bDate :: Day,
    bAccount   :: T.Text,
@@ -47,18 +50,28 @@ data Balance = Balance
   }
   deriving (Eq, Show)
 
-decodeBalanceFile :: Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
-decodeBalanceFile csvSeparator decimalSeparator filePath = 
+
+decodeStatementBalanceFile :: Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
+decodeStatementBalanceFile csvSeparator decimalSeparator filePath = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-      accs <- decodeBalances csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      bals <- decodeBalances True csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      let bals1 = map (\b -> b{bStartDate = Nothing}) bals
       let pos = map (\i -> SourcePos filePath i 0) [2..]
-      return $ zip pos accs
+      return $ zip pos bals1
+
+decodeTrialBalanceFile :: Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
+decodeTrialBalanceFile csvSeparator decimalSeparator filePath = 
+  withExceptT (setSourcePosFileIfNull filePath) $ do
+      csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+      bals <- decodeBalances False csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      let pos = map (\i -> SourcePos filePath i 0) [2..]
+      return $ zip pos bals
 
 -- | The first line is the header
 decodeBalances :: forall m . (MonadError Errors m) 
-               => Char -> Char -> ByteString -> m [Balance]
-decodeBalances csvSeparator decimalSeparator bs = do
+               => Bool -> Char -> Char -> ByteString -> m [Balance]
+decodeBalances statementBalance csvSeparator decimalSeparator bs = do
   -- Read the CSV file as vector of T.Text
   let opts = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord csvSeparator)
@@ -67,10 +80,11 @@ decodeBalances csvSeparator decimalSeparator bs = do
       $ C.decodeWith opts C.NoHeader bs
 
   -- Decode the header to know the index of columns
-  let myFilter t = t `elem` ["Date", "Compte", "Montant", "Date de début"]
+  let mainDate = if statementBalance then "Date" else "Date de fin"
+  let myFilter t = t `elem` [mainDate, "Compte", "Montant", "Date de début"]
   (csvData, indexes) <- processColumnIndexes csv myFilter
 
-  dateIdx <- columnIndex indexes "Date"
+  dateIdx <- columnIndex indexes mainDate
   accountIdx <- columnIndex indexes "Compte"
   amountIdx <- columnIndex indexes "Montant"
   let startDateIdx = optionalColumnIndex indexes "Date de début"
@@ -95,30 +109,43 @@ decodeBalances csvSeparator decimalSeparator bs = do
 
   return bals
 
+validateStatementBalances :: forall m . (MonadError Errors m) =>
+                      HS.HashSet T.Text ->
+                      [Transaction] ->
+                      [(SourcePos, Balance)] ->
+                      m ()
+validateStatementBalances accSet txns bs = do
+    _ <- traverse (checkBalanceAccount accSet) bs
+    -- Using the balance date
+    let balMap = postingsToBalanceMap $ concatMap tPostings txns
+    _ <- traverse (checkStatementBalanceAmount balMap) bs
+    return ()
+
 -- Balances :
 --  Asserts all balance have a valid account field
 --  Asserts all balance assertions are correct
-validateBalances :: forall m . (MonadError Errors m) =>
+validateTrialBalances :: forall m . (MonadError Errors m) =>
                       HS.HashSet T.Text ->
                       (T.Text -> AccountType) ->
                       T.Text ->
                       [Transaction] ->
                       [(SourcePos, Balance)] ->
                       m ()
-validateBalances accSet accType openAcc txns bs = do
+validateTrialBalances accSet accType openAcc txns bs = do
     _ <- traverse (checkBalanceAccount accSet) bs
-    let balMap = postingsToBalanceMap $ concatMap tPostings txns
-    _ <- traverse (checkBalanceAmount accType openAcc balMap) bs
+    -- Using the transaction date
+    let balMap = transactionsToBalanceMap $ txns
+    _ <- traverse (checkTrialBalanceAmount accType openAcc balMap) bs
     return ()
 
 
-checkBalanceAmount :: forall m . (MonadError Errors m) =>
+checkTrialBalanceAmount :: forall m . (MonadError Errors m) =>
                       (T.Text -> AccountType) -> 
                       T.Text ->
                       BalanceMap -> 
                       (SourcePos, Balance) -> 
                       m ()
-checkBalanceAmount accTypef openAcc balMap (pos, b) =
+checkTrialBalanceAmount accTypef openAcc balMap (pos, b) =
   let endDate = bDate b
       acc = bAccount b
       mustHaveStartDate = acc == openAcc 
@@ -141,6 +168,17 @@ checkBalanceAmount accTypef openAcc balMap (pos, b) =
     startDate <- startDateM
     let computedAmount = computeAmount startDate
     checkBalance pos acc endDate (computedAmount, bAmount b)
+
+checkStatementBalanceAmount :: forall m . (MonadError Errors m) =>
+                      BalanceMap -> 
+                      (SourcePos, Balance) -> 
+                      m ()
+checkStatementBalanceAmount balMap (pos, b) =
+  let date = bDate b
+      acc = bAccount b
+      computedAmount = snd <$> balanceAtDate balMap acc date
+  in 
+    checkBalance pos acc date (computedAmount, bAmount b)
 
 checkBalance :: forall m . (MonadError Errors m) =>
                 SourcePos -> 

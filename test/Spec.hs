@@ -1,7 +1,7 @@
 module Main where
 
 import Test.Tasty
-import Journal.Journal
+import Journal.JournalTests
 import Report.Report
 
 main :: IO ()

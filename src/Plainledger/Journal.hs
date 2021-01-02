@@ -69,11 +69,16 @@ journalFileToJournal journalFile = do
   txns <- validateJTransactions accIds jtxns
         
   -- Read the balance assertion files and validate them
-  let balPaths = map (dir </>) $ jfBalanceFiles journalFile
-  bals <- fmap concat $ traverse (decodeBalanceFile csvSeparator decimalSeparator) balPaths
   let accMaps = HM.fromList $ map (\a -> (aId a, aType a)) acc
   let accTypef = \a -> accMaps HM.! a
-  _ <- validateBalances accIds accTypef (jfOpeningBalanceAccount journalFile) txns bals
+
+  let balPaths = map (dir </>) $ jfStatementBalanceFiles journalFile
+  bals <- fmap concat $ traverse (decodeStatementBalanceFile csvSeparator decimalSeparator) balPaths
+  _ <- validateStatementBalances accIds txns bals
+
+  let tbalPaths = map (dir </>) $ jfTrialBalanceFiles journalFile
+  tbals <- fmap concat $ traverse (decodeTrialBalanceFile csvSeparator decimalSeparator) tbalPaths
+  _ <- validateTrialBalances accIds accTypef (jfOpeningBalanceAccount journalFile) txns tbals
 
   return $ Journal journalFile acc txns (map snd bals)
 

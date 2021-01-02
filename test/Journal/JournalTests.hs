@@ -1,4 +1,4 @@
-module Journal.Journal (
+module Journal.JournalTests (
   journalTestTree
   )where
 
@@ -11,13 +11,14 @@ import Journal.Account.Account
 import Journal.Amount.Amount
 import Journal.Transaction.Transaction
 import Journal.Balance.Balance
+import Journal.Journal.Journal
 --import Control.Monad.Except
 
 
 journalTestTree :: TestTree
 journalTestTree = testGroup "Journal tests"
               [journalFileTestTree, accountTestTree, amountTestTree,
-               transactionTestTree, balanceTestTree]
+               transactionTestTree, balanceTestTree, journalJournalTestTree]
 
 
 

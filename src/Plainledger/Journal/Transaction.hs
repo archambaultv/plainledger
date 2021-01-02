@@ -179,9 +179,9 @@ decodeTransactions csvSeparator decimalSeparator bs = do
   (csvData, indexes) <- processColumnIndexes csv myFilter
 
   dateIdx <- columnIndex indexes "Date"
-  commentIdx <- columnIndex indexes "Commentaire"
-  counterPartyIdx <- columnIndex indexes "Contrepartie"
-  tagIdx <- columnIndex indexes "Étiquette"
+  let commentIdx = optionalColumnIndex indexes "Commentaire"
+  let counterPartyIdx = optionalColumnIndex indexes "Contrepartie"
+  let tagIdx = optionalColumnIndex indexes "Étiquette"
 
   -- Check for postings columns based on the account column
   let accSufix = filter (T.isPrefixOf "Compte " . fst)
@@ -198,9 +198,9 @@ decodeTransactions csvSeparator decimalSeparator bs = do
   let parseLine (row, line) =
           let p = do
                  date <- columnDataM dateIdx line (parseISO8601M . T.unpack)
-                 comment <- columnData commentIdx line 
-                 counterParty <- columnData counterPartyIdx line 
-                 tag <- columnData tagIdx line
+                 comment <- optionalColumnData "" commentIdx line 
+                 counterParty <- optionalColumnData "" counterPartyIdx line 
+                 tag <- optionalColumnData "" tagIdx line
 
                  ps <- fmap catMaybes $ mapM (postingColumns date line) postingIdx
                  if null ps || null (tail ps)

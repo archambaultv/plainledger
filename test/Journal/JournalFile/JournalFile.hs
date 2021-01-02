@@ -15,28 +15,28 @@ journalFileTestTree =
     [ -- With BOM, comma for csv, period for decimal
       okConfig "Journal-01.csv" 
         $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' ',' 7 "comptes.csv" 
-          ["transactions.csv"] ["vérification de soldes.csv"] 
+          ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-01.csv",
       -- With BOM, semicolon for csv, comma for decimal
       okConfig "Journal-02.csv" 
         $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" ',' ';' 1 "comptes.csv" 
-          ["transactions.csv"] ["vérification de soldes.csv"] 
+          ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-02.csv",
       -- Without BOM, comma for csv, period for decimal
       okConfig "Journal-03.csv" 
         $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' ',' 7 "comptes.csv" 
-          ["transactions.csv"] ["vérification de soldes.csv"] 
+          ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-03.csv",
       -- Without BOM, comma for csv, period for decimal, multiple files
       okConfig "Journal-04.csv" 
         $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company, Inc." '.' ',' 1 "comptes.csv" 
           ["transactions 1.csv", "transactions 2.csv", "transactions 3.csv"] 
-          ["soldes 1.csv", "soldes 2.csv"]
+          ["soldes 1.csv", "soldes 2.csv"] []
           "test/Journal/JournalFile/Journal-04.csv",
       -- With BOM, tab for csv, period for decimal
       okConfig "Journal-05.csv"
         $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' '\t' 7 "comptes.csv" 
-          ["transactions.csv"] ["vérification de soldes.csv"]
+          ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-05.csv",
 
       koConfig "Journal-06.csv"

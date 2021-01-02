@@ -5,4 +5,4 @@ Nom;My Company
 Séparateur de décimale;,
 Fichier des comptes;comptes.csv
 Fichiers des transactions;transactions.csv
-Fichiers des soldes;vérification de soldes.csv
+Assertion des soldes;vérification de soldes.csv

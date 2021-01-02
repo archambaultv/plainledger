@@ -1,6 +1,5 @@
 module Journal.Balance.Balance (
-  balanceTestTree,
-  balances
+  balanceTestTree
   )where
 
 import Test.Tasty
@@ -9,8 +8,22 @@ import Plainledger.Journal
 import Plainledger.Error
 import Control.Monad.Except
 
-balances :: [Balance]
-balances = 
+statementBalances :: [Balance]
+statementBalances = 
+  [
+    Balance (read "2018-01-31") "Compte chèque" (read "5834.84") Nothing,
+    Balance (read "2018-01-31") "Marge de crédit" (read "-5563.45") Nothing,
+    Balance (read "2018-01-31") "Carte de crédit" (read "-335") Nothing,
+    Balance (read "2018-02-28") "Compte chèque" (read "9835.68") Nothing,
+    Balance (read "2018-02-28") "Marge de crédit" (read "-5963.45") Nothing,
+    Balance (read "2018-02-28") "Carte de crédit" (read "508") Nothing,
+    Balance (read "2019-05-31") "Compte chèque" (read "12386.1") Nothing,
+    Balance (read "2019-05-31") "Carte de crédit" (read "358") Nothing,
+    Balance (read "2019-05-31") "Marge de crédit" (read "-6183.45") Nothing
+  ]
+
+trialBalances :: [Balance]
+trialBalances = 
   [
     Balance (read "2018-01-31") "Compte chèque" (read "5834.84") Nothing,
     Balance (read "2018-01-31") "Marge de crédit" (read "-5563.45") Nothing,
@@ -42,43 +55,41 @@ balances =
 balanceTestTree :: TestTree
 balanceTestTree =
   testGroup "Balance"
-    [ okBalance "Balance-01.csv" ';' ',' balances
+    [ okBalance True "StatementBalance-01.csv" ';' ',' statementBalances,
+      okBalance True "StatementBalance-02.csv" ';' ',' statementBalances,
+      koBalance True "StatementBalance-03.csv" ';' ',' 
+      $ mkError (SourcePos "test/Journal/Balance/StatementBalance-03.csv" 1 0 ) 
+        (MissingCsvColumn "Compte"),
+
+      okBalance False "TrialBalance-01.csv" ';' ',' trialBalances,
+      okBalance False "TrialBalance-02.csv" ';' ','
+      $ map (\t -> t{bStartDate = Nothing}) trialBalances
       
     ]
 
 
-okBalance :: String -> Char -> Char -> [Balance] -> TestTree
-okBalance filename sep decimal expectedBalance = 
+okBalance :: Bool -> String -> Char -> Char -> [Balance] -> TestTree
+okBalance isStatementBalance filename sep decimal expectedBalance = 
   testCase ("Decode " ++ filename) $ do
-       balance <- runExceptT $ decodeBalanceFile sep decimal ("test/Journal/Balance/" ++ filename)
+       let f = decodeFunction isStatementBalance
+       balance <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
        case balance of
          Left err -> assertFailure $ printErrors err
          Right actual -> assertEqual "" expectedBalance (map snd actual)
 
-koBalance :: String -> Char -> Char -> Errors -> TestTree
-koBalance filename sep decimal expectedErr =
+koBalance :: Bool -> String -> Char -> Char -> Errors -> TestTree
+koBalance isStatementBalance filename sep decimal expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       balance <- runExceptT $ decodeBalanceFile sep decimal ("test/Journal/Balance/" ++ filename)
+       let f = decodeFunction isStatementBalance
+       balance <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
        case balance of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
 
--- okValidateBalance :: String -> Char -> Char -> [Balance] -> TestTree
--- okValidateBalance filename sep decimal expectedErr = 
---   testCase ("Validation of " ++ filename) $ do
---        balance <- runExceptT 
---                 $ decodeBalanceFile sep decimal ("test/Journal/Balance/" ++ filename)
---                 >>= validateBalances "Solde d'ouverture" "Bénéfice"
---        case balance of
---          Left err -> assertFailure $ printErrors err
---          Right actual -> assertEqual "" expectedBalance actual
-
-
--- koValidateBalance :: String -> Char -> Char -> Errors -> TestTree
--- koValidateBalance filename sep decimal expectedErr =
---    testCase ("Assert error for " ++ filename) $ do
---        balance <- runExceptT $ decodeBalanceFile sep decimal ("test/Journal/Balance/" ++ filename)
---                 >>= validateBalances "Solde d'ouverture" "Bénéfice"
---        case balance of
---          Left actual -> assertEqual "" expectedErr actual
---          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
+decodeFunction :: Bool 
+                -> Char
+                -> Char
+                -> FilePath
+                -> ExceptT Errors IO [(SourcePos, Balance)]
+decodeFunction True = decodeStatementBalanceFile
+decodeFunction False = decodeTrialBalanceFile

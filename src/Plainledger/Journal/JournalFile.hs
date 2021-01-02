@@ -46,14 +46,15 @@ data JournalFile = JournalFile {
    jfFirstFiscalMonth :: Int,
    jfAccountFile :: String,
    jfTransactionFiles :: [String],
-   jfBalanceFiles :: [String],
+   jfStatementBalanceFiles :: [String],
+   jfTrialBalanceFiles :: [String],
    -- | The file path to the Journal File
    jfFilePath :: String
   }
   deriving (Eq, Show) 
 
 emptyJournalFile :: JournalFile
-emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] ""
+emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] [] ""
 
 csvSeparator :: [Char] 
 csvSeparator = [',', ';', '\t']
@@ -133,9 +134,13 @@ decodeJournalFile bs = do
           manyTextFields i "Fichiers des transactions" (V.tail x) 
           (\y -> c{jfTransactionFiles = (jfTransactionFiles c) ++ (map T.unpack y)})
         
-        parseConfig c (i, x) | V.head x == "Fichiers des soldes" = 
-          manyTextFields i "Fichiers des soldes" (V.tail x) 
-          (\y -> c{jfBalanceFiles = (jfBalanceFiles c) ++ (map T.unpack y)})
+        parseConfig c (i, x) | V.head x == "Assertion des soldes" = 
+          manyTextFields i "Assertion des soldes" (V.tail x) 
+          (\y -> c{jfStatementBalanceFiles = (jfStatementBalanceFiles c) ++ (map T.unpack y)})
+
+        parseConfig c (i, x) | V.head x == "Assertion des balances de vérification" = 
+          manyTextFields i "Assertion des balances de vérification" (V.tail x) 
+          (\y -> c{jfTrialBalanceFiles = (jfTrialBalanceFiles c) ++ (map T.unpack y)})
 
         parseConfig _ (i, x) = throwError 
                              $ mkError (SourcePos "" i 0)
