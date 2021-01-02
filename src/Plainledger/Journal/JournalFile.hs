@@ -77,29 +77,29 @@ processHeader bs (c:cs) =
         C.decDelimiter = fromIntegral (ord c)
         }
   in do 
-    csv <- either (throwError . mkErrorNoPos . ErrorMessage) return
-            $ C.decodeWith csvOptions C.NoHeader bs
+    let csv = either (const Nothing) Just $ C.decodeWith csvOptions C.NoHeader bs
     case csv of
-      x | V.null x -> throwError $ mkErrorNoPos EmptyJournalFile
-      x | V.null (V.head x) -> throwError $ mkErrorNoPos InvalidHeaderJournalFile
-      x | V.null (V.tail (V.head x)) -> processHeader bs cs
-      x -> let p = V.head $ V.head x
-               v = V.head $ V.tail $ V.head x
-           in case inferLanguage (p, v) of
-                Nothing -> processHeader bs cs
-                Just l -> return (l, c, V.drop 1 csv)
+      Nothing -> processHeader bs cs
+      (Just x) | V.null x -> throwError $ mkErrorNoPos EmptyJournalFile
+      (Just x) | V.null (V.head x) -> throwError $ mkErrorNoPos InvalidHeaderJournalFile
+      (Just x) | V.null (V.tail (V.head x)) -> processHeader bs cs
+      (Just x) -> let p = V.head $ V.head x
+                      v = V.head $ V.tail $ V.head x
+                  in case inferLanguage (p, v) of
+                        Nothing -> processHeader bs cs
+                        Just l -> return (l, c, V.drop 1 x)
 
 decodeJournalFile :: forall m . (MonadError Errors m) => 
                       String ->
                       (Language, Char, V.Vector (V.Vector T.Text)) -> m JournalFile
-decodeJournalFile filePath (lang, sep, csvData) = do
-  let csvWithRowNumber = V.map (\(x, y) -> (x + 2, y)) $ V.indexed csvData
-  rawJournal <- V.foldM parseConfig
-                 emptyJournalFile{jfCsvSeparator = sep, 
-                                  jfLanguage = lang,
-                                  jfFilePath = filePath} 
-                 csvWithRowNumber
-  checkRawJournal rawJournal
+decodeJournalFile filePath (lang, sep, csvData) = (do
+    let csvWithRowNumber = V.map (\(x, y) -> (x + 2, y)) $ V.indexed csvData
+    rawJournal <- V.foldM parseConfig
+                   emptyJournalFile{jfCsvSeparator = sep, 
+                                    jfLanguage = lang,
+                                    jfFilePath = filePath} 
+                   csvWithRowNumber
+    checkRawJournal rawJournal) `catchError` (throwError . setSourcePosFileIfNull filePath)
 
   where 
 

@@ -39,6 +39,11 @@ journalFileTestTree =
         $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' '\t' 7 "comptes.csv" 
           ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-05.csv" Fr_CA,
+      -- Without BOM, semicolon, comma for decimal, comma in field
+      okConfig "Journal-13.csv" 
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company, Inc" ',' ';' 1 "comptes.csv" 
+          ["transactions.csv"] ["vérification de soldes.csv"] []
+          "test/Journal/JournalFile/Journal-13.csv" Fr_CA,
 
       koConfig "Journal-06.csv"
         $ mkError (SourcePos "test/Journal/JournalFile/Journal-06.csv" 1 0 ) InvalidHeaderJournalFile,
