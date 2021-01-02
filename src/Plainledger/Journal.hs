@@ -11,7 +11,7 @@
 
 module Plainledger.Journal 
 (
-  Journal,
+  Journal(..),
   journalFileToJournal,
   module Plainledger.Journal.Posting,
   module Plainledger.Journal.Transaction,
@@ -53,19 +53,19 @@ journalFileToJournal journalFile = do
   let dir = takeDirectory $ jfFilePath journalFile
   let csvSeparator = jfCsvSeparator journalFile
   let decimalSeparator = jfDecimalSeparator journalFile
+  let lang = jfLanguage journalFile
 
   -- Read the accounts files and check for errors
   let accountPath = dir </> jfAccountFile journalFile
-  acc <- decodeAccountsFile accountPath csvSeparator 
+  acc <- decodeAccountsFile lang accountPath csvSeparator 
          >>= validateAccounts (jfOpeningBalanceAccount journalFile)
               (jfEarningsAccount journalFile)
   let accIds = HS.fromList $ map aId acc
 
   -- Read the transactions files and check for errors
   let txnPaths = map (dir </>) $ jfTransactionFiles journalFile
-
   jtxns <- fmap concat 
-        $ traverse (decodeJTransactionsFile csvSeparator decimalSeparator) txnPaths
+        $ traverse (decodeJTransactionsFile lang csvSeparator decimalSeparator) txnPaths
   txns <- validateJTransactions accIds jtxns
         
   -- Read the balance assertion files and validate them
@@ -73,11 +73,11 @@ journalFileToJournal journalFile = do
   let accTypef = \a -> accMaps HM.! a
 
   let balPaths = map (dir </>) $ jfStatementBalanceFiles journalFile
-  bals <- fmap concat $ traverse (decodeStatementBalanceFile csvSeparator decimalSeparator) balPaths
+  bals <- fmap concat $ traverse (decodeStatementBalanceFile lang csvSeparator decimalSeparator) balPaths
   _ <- validateStatementBalances accIds txns bals
 
   let tbalPaths = map (dir </>) $ jfTrialBalanceFiles journalFile
-  tbals <- fmap concat $ traverse (decodeTrialBalanceFile csvSeparator decimalSeparator) tbalPaths
+  tbals <- fmap concat $ traverse (decodeTrialBalanceFile lang csvSeparator decimalSeparator) tbalPaths
   _ <- validateTrialBalances accIds accTypef (jfOpeningBalanceAccount journalFile) txns tbals
 
   return $ Journal journalFile acc txns (map snd bals)

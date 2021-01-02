@@ -11,16 +11,16 @@
 module Plainledger.Journal.JournalFile 
 (
   JournalFile(..),
-  decodeJournalFileIO,
+  processJournalFileHeader,
   decodeJournalFile
 )
 where
 
 import Control.Monad.Except
+import Plainledger.I18n.I18n
 import Plainledger.Error
 import Plainledger.Internal.Utils (removeBom)
 import Data.Char (ord)
-import Data.Bifunctor
 import qualified Data.Vector as V
 import qualified Data.Csv as C
 import qualified Data.ByteString as BS
@@ -49,97 +49,95 @@ data JournalFile = JournalFile {
    jfStatementBalanceFiles :: [String],
    jfTrialBalanceFiles :: [String],
    -- | The file path to the Journal File
-   jfFilePath :: String
+   jfFilePath :: String,
+
+   jfLanguage :: Language
   }
   deriving (Eq, Show) 
 
 emptyJournalFile :: JournalFile
-emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] [] ""
+emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] [] "" En_CA
 
 csvSeparator :: [Char] 
 csvSeparator = [',', ';', '\t']
 
-decodeJournalFileIO :: FilePath -> ExceptT Errors IO JournalFile
-decodeJournalFileIO filePath = withExceptT (setSourcePosFileIfNull filePath) $ do
+processJournalFileHeader :: FilePath -> 
+                            ExceptT Errors IO (Language, Char, V.Vector (V.Vector T.Text))
+processJournalFileHeader filePath = withExceptT (setSourcePosFileIfNull filePath) $ do
   csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-  journalFile <- decodeJournalFile (BL.fromStrict csvBS)
-  return journalFile{jfFilePath = filePath}
+  processHeader (BL.fromStrict csvBS) csvSeparator
 
-decodeJournalFile :: forall m . (MonadError Errors m) => BL.ByteString -> m JournalFile
-decodeJournalFile bs = do
-  (sep, csvData) <- processHeader csvSeparator
+processHeader :: (MonadError Errors m) => 
+                 BL.ByteString ->
+                 [Char] -> 
+                 m (Language, Char, V.Vector (V.Vector T.Text))
+processHeader _ [] = throwError $ mkError (SourcePos "" 1 0) InvalidHeaderJournalFile
+processHeader bs (c:cs) =
+  let csvOptions = C.defaultDecodeOptions {
+        C.decDelimiter = fromIntegral (ord c)
+        }
+  in do 
+    csv <- either (throwError . mkErrorNoPos . ErrorMessage) return
+            $ C.decodeWith csvOptions C.NoHeader bs
+    case csv of
+      x | V.null x -> throwError $ mkErrorNoPos EmptyJournalFile
+      x | V.null (V.head x) -> throwError $ mkErrorNoPos InvalidHeaderJournalFile
+      x | V.null (V.tail (V.head x)) -> processHeader bs cs
+      x -> let p = V.head $ V.head x
+               v = V.head $ V.tail $ V.head x
+           in case inferLanguage (p, v) of
+                Nothing -> processHeader bs cs
+                Just l -> return (l, c, V.drop 1 csv)
+
+decodeJournalFile :: forall m . (MonadError Errors m) => 
+                      String ->
+                      (Language, Char, V.Vector (V.Vector T.Text)) -> m JournalFile
+decodeJournalFile filePath (lang, sep, csvData) = do
   let csvWithRowNumber = V.map (\(x, y) -> (x + 2, y)) $ V.indexed csvData
-  rawJournal <- V.foldM parseConfig 
-                 emptyJournalFile{jfCsvSeparator = sep} 
+  rawJournal <- V.foldM parseConfig
+                 emptyJournalFile{jfCsvSeparator = sep, 
+                                  jfLanguage = lang,
+                                  jfFilePath = filePath} 
                  csvWithRowNumber
   checkRawJournal rawJournal
 
-
-  where processHeader :: [Char] -> m (Char, V.Vector (V.Vector T.Text))
-        processHeader [] = throwError $ mkError (SourcePos "" 1 0) InvalidHeaderJournalFile
-        processHeader (c:cs) =
-          let csvOptions = C.defaultDecodeOptions {
-                C.decDelimiter = fromIntegral (ord c)
-                }
-              csv = first ErrorMessage $ C.decodeWith csvOptions C.NoHeader bs
-          in case csv >>= inferLanguage of
-              Right x -> return (c, x)
-              Left EmptyJournalFile 
-                -> throwError $ mkErrorNoPos EmptyJournalFile
-              Left InvalidHeaderJournalFile 
-                -> if null cs 
-                   then throwError $ mkErrorNoPos InvalidHeaderJournalFile
-                   else processHeader cs
-              Left _ -> processHeader cs
-
-        inferLanguage :: V.Vector (V.Vector T.Text) 
-                      -> Either ErrorType (V.Vector (V.Vector T.Text))
-        inferLanguage x | V.null x = Left EmptyJournalFile
-        inferLanguage x | V.null (V.head x) = Left InvalidHeaderJournalFile
-        inferLanguage x | V.null (V.tail (V.head x)) = Left InvalidHeaderJournalFile
-        inferLanguage x =
-          let p = V.head $ V.head x
-              v = V.head $ V.tail $ V.head x
-          in case (p, v) of 
-              ("Paramètre", "Valeur") -> return $ V.drop 1 x
-              _ -> Left $ ErrorMessage "Unknown language"
-
+  where 
 
         parseConfig :: JournalFile -> (Int, V.Vector T.Text) -> m JournalFile
         parseConfig c (_, x) | V.null x = return c
-        parseConfig c (i, x) | V.head x == "Compte pour les soldes d'ouverture"
-          = textField i "Compte pour les soldes d'ouverture" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileOpeningBalanceAccount)
+          = textField i (i18nString lang TJournalFileOpeningBalanceAccount) (V.tail x) 
           (\y -> c{jfOpeningBalanceAccount = y})
         
-        parseConfig c (i, x) | V.head x == "Compte pour les bénéfices"
-          = textField i "Compte pour les bénéfices" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileEarningsAccount)
+          = textField i (i18nString lang TJournalFileEarningsAccount) (V.tail x) 
           (\y -> c{jfEarningsAccount = y})
         
-        parseConfig c (i, x) | V.head x == "Nom" 
-          = textField i "Nom" (V.tail x) (\y -> c{jfCompanyName = y})
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileCompanyName)
+          = textField i (i18nString lang TJournalFileCompanyName) (V.tail x) (\y -> c{jfCompanyName = y})
         
-        parseConfig c (i, x) | V.head x == "Séparateur de décimale" 
-          = charField i "Séparateur de décimale" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileDecimalSeparator)
+          = charField i (i18nString lang TJournalFileDecimalSeparator) (V.tail x) 
           (\y -> c{jfDecimalSeparator = y})
         
-        parseConfig c (i, x) | V.head x == "Premier mois de l'exercice comptable" 
-          = intField i "Premier mois de l'exercice comptable" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileFirstFiscalMonth) 
+          = intField i (i18nString lang TJournalFileFirstFiscalMonth)  (V.tail x) 
           (\y -> c{jfFirstFiscalMonth = y})
         
-        parseConfig c (i, x) | V.head x == "Fichier des comptes" 
-          = textField i "Fichier des comptes" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileAccountFile) 
+          = textField i (i18nString lang TJournalFileAccountFile)  (V.tail x) 
           (\y -> c{jfAccountFile = T.unpack y})
         
-        parseConfig c (i, x) | V.head x == "Fichiers des transactions" = 
-          manyTextFields i "Fichiers des transactions" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileTransactionFiles)  = 
+          manyTextFields i (i18nString lang TJournalFileTransactionFiles) (V.tail x) 
           (\y -> c{jfTransactionFiles = (jfTransactionFiles c) ++ (map T.unpack y)})
         
-        parseConfig c (i, x) | V.head x == "Assertion des soldes" = 
-          manyTextFields i "Assertion des soldes" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileStatementBalanceFiles) = 
+          manyTextFields i (i18nString lang TJournalFileStatementBalanceFiles) (V.tail x) 
           (\y -> c{jfStatementBalanceFiles = (jfStatementBalanceFiles c) ++ (map T.unpack y)})
 
-        parseConfig c (i, x) | V.head x == "Assertion des balances de vérification" = 
-          manyTextFields i "Assertion des balances de vérification" (V.tail x) 
+        parseConfig c (i, x) | V.head x == (i18nText lang TJournalFileTrialBalanceFiles) = 
+          manyTextFields i (i18nString lang TJournalFileTrialBalanceFiles) (V.tail x) 
           (\y -> c{jfTrialBalanceFiles = (jfTrialBalanceFiles c) ++ (map T.unpack y)})
 
         parseConfig _ (i, x) = throwError 

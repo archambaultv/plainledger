@@ -1,4 +1,5 @@
-module Journal.Account.Account (
+module Journal.Account.Account 
+(
   accountTestTree,
   accounts
   )where
@@ -8,6 +9,8 @@ import Test.Tasty.HUnit
 import Plainledger.Journal
 import Plainledger.Error
 import Control.Monad.Except
+import Plainledger.I18n.I18n
+import qualified Data.Text as T
 
 accounts :: [Account]
 accounts = 
@@ -80,15 +83,15 @@ accountTestTree =
 okAccount :: String -> Char -> [Account] -> TestTree
 okAccount filename sep expectedAccount = 
   testCase ("Decode " ++ filename) $ do
-       account <- runExceptT $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
+       account <- runExceptT $ decodeAccountsFile Fr_CA ("test/Journal/Account/" ++ filename) sep
        case account of
-         Left err -> assertFailure $ printErrors err
+         Left err -> assertFailure $ printErr err
          Right actual -> assertEqual "" expectedAccount (map snd actual)
 
 koAccount :: String -> Char -> Errors -> TestTree
 koAccount filename sep expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       account <- runExceptT $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
+       account <- runExceptT $ decodeAccountsFile Fr_CA ("test/Journal/Account/" ++ filename) sep
        case account of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
@@ -97,18 +100,23 @@ okValidateAccount :: String -> Char -> [Account] -> TestTree
 okValidateAccount filename sep expectedAccount = 
   testCase ("Validation of " ++ filename) $ do
        account <- runExceptT 
-                $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
+                $ decodeAccountsFile Fr_CA ("test/Journal/Account/" ++ filename) sep
                 >>= validateAccounts "Solde d'ouverture" "Bénéfice"
        case account of
-         Left err -> assertFailure $ printErrors err
+         Left err -> assertFailure $ printErr err
          Right actual -> assertEqual "" expectedAccount actual
 
 
 koValidateAccount :: String -> Char -> Errors -> TestTree
 koValidateAccount filename sep expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       account <- runExceptT $ decodeAccountsFile ("test/Journal/Account/" ++ filename) sep
+       account <- runExceptT $ decodeAccountsFile Fr_CA ("test/Journal/Account/" ++ filename) sep
                 >>= validateAccounts "Solde d'ouverture" "Bénéfice"
        case account of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
+
+printErr :: [Error] -> String
+printErr err = T.unpack
+                       $ printErrors
+                       $ map (i18nText En_CA . TError ) err

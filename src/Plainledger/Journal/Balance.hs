@@ -24,6 +24,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Csv as C
 import qualified Data.Text as T
+import Plainledger.I18n.I18n
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
 import Plainledger.Journal.BalanceMap
@@ -51,27 +52,27 @@ data Balance = Balance
   deriving (Eq, Show)
 
 
-decodeStatementBalanceFile :: Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
-decodeStatementBalanceFile csvSeparator decimalSeparator filePath = 
+decodeStatementBalanceFile :: Language -> Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
+decodeStatementBalanceFile lang csvSeparator decimalSeparator filePath = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-      bals <- decodeBalances True csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      bals <- decodeBalances lang True csvSeparator decimalSeparator (BL.fromStrict csvBS)
       let bals1 = map (\b -> b{bStartDate = Nothing}) bals
       let pos = map (\i -> SourcePos filePath i 0) [2..]
       return $ zip pos bals1
 
-decodeTrialBalanceFile :: Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
-decodeTrialBalanceFile csvSeparator decimalSeparator filePath = 
+decodeTrialBalanceFile :: Language -> Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
+decodeTrialBalanceFile lang csvSeparator decimalSeparator filePath = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-      bals <- decodeBalances False csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      bals <- decodeBalances lang False csvSeparator decimalSeparator (BL.fromStrict csvBS)
       let pos = map (\i -> SourcePos filePath i 0) [2..]
       return $ zip pos bals
 
 -- | The first line is the header
 decodeBalances :: forall m . (MonadError Errors m) 
-               => Bool -> Char -> Char -> ByteString -> m [Balance]
-decodeBalances statementBalance csvSeparator decimalSeparator bs = do
+               => Language -> Bool -> Char -> Char -> ByteString -> m [Balance]
+decodeBalances lang statementBalance csvSeparator decimalSeparator bs = do
   -- Read the CSV file as vector of T.Text
   let opts = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord csvSeparator)
@@ -80,14 +81,19 @@ decodeBalances statementBalance csvSeparator decimalSeparator bs = do
       $ C.decodeWith opts C.NoHeader bs
 
   -- Decode the header to know the index of columns
-  let mainDate = if statementBalance then "Date" else "Date de fin"
-  let myFilter t = t `elem` [mainDate, "Compte", "Montant", "Date de début"]
+  let mainDate = if statementBalance 
+                  then i18nText lang TBalanceDate
+                  else i18nText lang TBalanceEndDate
+  let myFilter t = t `elem` [mainDate, 
+                             i18nText lang TBalanceAccount, 
+                             i18nText lang TBalanceAmount, 
+                             i18nText lang TBalanceStartDate]
   (csvData, indexes) <- processColumnIndexes csv myFilter
 
   dateIdx <- columnIndex indexes mainDate
-  accountIdx <- columnIndex indexes "Compte"
-  amountIdx <- columnIndex indexes "Montant"
-  let startDateIdx = optionalColumnIndex indexes "Date de début"
+  accountIdx <- columnIndex indexes (i18nText lang TBalanceAccount)
+  amountIdx <- columnIndex indexes (i18nText lang TBalanceAmount)
+  let startDateIdx = optionalColumnIndex indexes (i18nText lang TBalanceStartDate)
 
  -- Add row information to the CSV line
   let csvWithRowNumber = zip [2..] $ V.toList csvData

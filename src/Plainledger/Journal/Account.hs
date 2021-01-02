@@ -31,6 +31,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy (ByteString)
 import Data.List hiding (group, lines)
+import Plainledger.I18n.I18n
 import Plainledger.Error
 import Plainledger.Internal.Csv
 import Plainledger.Internal.Utils
@@ -152,8 +153,8 @@ validateEarningsAccount accounts earningAccount =
 
 -- | The first line is the header
 decodeAccounts :: forall m . (MonadError Errors m) 
-               => Char -> ByteString -> m [Account]
-decodeAccounts csvSeparator bs = do
+               => Language -> Char -> ByteString -> m [Account]
+decodeAccounts lang csvSeparator bs = do
   -- Read the CSV file as vector of T.Text
   let opts = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord csvSeparator)
@@ -162,15 +163,20 @@ decodeAccounts csvSeparator bs = do
       $ C.decodeWith opts C.NoHeader bs
 
   -- Decode the header to know the index of columns
-  let myFilter t = t `elem` ["Id", "Numéro", "Type", "Nom", "Groupe", "Sous-groupe"]
+  let myFilter t = t `elem` [i18nText lang TAccountId,
+                             i18nText lang TAccountNumber,
+                             i18nText lang TAccountType,
+                             i18nText lang TAccountName,
+                             i18nText lang TAccountGroup,
+                             i18nText lang TAccountSubGroup]
   (csvData, indexes) <- processColumnIndexes csv myFilter
 
-  idIdx <- columnIndex indexes "Id"
-  numberIdx <- columnIndex indexes "Numéro"
-  typeIdx <- columnIndex indexes "Type"
-  let nameIdx = optionalColumnIndex indexes "Nom"
-  let groupIdx = optionalColumnIndex indexes "Groupe"
-  let subGroupIdx = optionalColumnIndex indexes "Sous-groupe"
+  idIdx <- columnIndex indexes (i18nText lang TAccountId)
+  numberIdx <- columnIndex indexes (i18nText lang TAccountNumber)
+  typeIdx <- columnIndex indexes (i18nText lang TAccountType)
+  let nameIdx = optionalColumnIndex indexes (i18nText lang TAccountName)
+  let groupIdx = optionalColumnIndex indexes (i18nText lang TAccountGroup)
+  let subGroupIdx = optionalColumnIndex indexes (i18nText lang TAccountSubGroup)
 
  -- Add row information to the CSV line
   let csvWithRowNumber = zip [2..] $ V.toList csvData
@@ -196,10 +202,10 @@ decodeAccounts csvSeparator bs = do
                      accs
   return accWithNames
 
-decodeAccountsFile :: FilePath -> Char -> ExceptT Errors IO  [(SourcePos, Account)]
-decodeAccountsFile filePath csvSeparator = 
+decodeAccountsFile :: Language -> FilePath -> Char -> ExceptT Errors IO  [(SourcePos, Account)]
+decodeAccountsFile lang filePath csvSeparator = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-      accs <- decodeAccounts csvSeparator (BL.fromStrict csvBS)
+      accs <- decodeAccounts lang csvSeparator (BL.fromStrict csvBS)
       let pos = map (\i -> SourcePos filePath i 0) [2..]
       return $ zip pos accs

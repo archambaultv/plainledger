@@ -1,30 +1,62 @@
 -- |
--- Module      :  Plainledger.Error.Errors
+-- Module      :  Plainledger.I18n.En_CA
 -- Copyright   :  © 2020 Vincent Archambault
 -- License     :  0BSD
 --
 -- Maintainer  :  Vincent Archambault <archambault.v@gmail.com>
 -- Stability   :  experimental
 --
--- This module defines the Error data type
+-- This module defines the Canadian English texts
 
 
-module Plainledger.Error.PrettyPrinter
+module Plainledger.I18n.En_CA
 (
-  printErrors,
-  printError,
-  printErrorType
+  en_CAText,
 ) where
 
 import Data.List
-import Plainledger.Error.Error
-import Plainledger.Error.SourcePos
+import Plainledger.I18n.Data
+import Plainledger.Error
 
--- | Pretty print the first 10 error messages and add the source file information
-printErrors :: Errors -> String
-printErrors x = intercalate "\n"
-              $ map printError
-              $ take 10 x
+en_CAText :: I18nText -> String
+en_CAText (TError x) = printError x
+
+en_CAText TAsset = "Asset"
+en_CAText TLiability = "Liability"
+en_CAText TEquity = "Equity"
+en_CAText TRevenue = "Revenue"
+en_CAText TExpense = "Expense"
+
+en_CAText TAccountId = "Id"
+en_CAText TAccountNumber = "Number"
+en_CAText TAccountType = "Type"
+en_CAText TAccountName = "Name"
+en_CAText TAccountGroup = "Group"
+en_CAText TAccountSubGroup = "Subgroup"
+
+en_CAText TBalanceStartDate = "Start date"
+en_CAText TBalanceEndDate = "End date"
+en_CAText TBalanceAmount = "Amount"
+en_CAText TBalanceAccount = "Account"
+en_CAText TBalanceDate = "Date"
+
+en_CAText TJournalFileOpeningBalanceAccount = "Opening balance account"
+en_CAText TJournalFileEarningsAccount = "Earnings account"
+en_CAText TJournalFileCompanyName = "Name"
+en_CAText TJournalFileDecimalSeparator = "Decimal separator"
+en_CAText TJournalFileFirstFiscalMonth = "First month of fiscal year"
+en_CAText TJournalFileAccountFile = "Accounts file"
+en_CAText TJournalFileTransactionFiles = "Transactions files"
+en_CAText TJournalFileStatementBalanceFiles = "Statement balance assertions files"
+en_CAText TJournalFileTrialBalanceFiles = "Trial balance assertions files"
+
+en_CAText TTransactionDate = "Date"
+en_CAText TTransactionComment = "Comment"
+en_CAText TTransactionCounterparty = "Counterparty"
+en_CAText TTransactionTag = "Tag"
+en_CAText TTransactionAccountPrefix = "Account"
+en_CAText TTransactionAmountPrefix = "Amount"
+en_CAText TTransactionBalanceDatePrefix = "Date on statement"
 
 
 -- | Pretty print the error message and add the source file information

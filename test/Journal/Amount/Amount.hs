@@ -8,7 +8,7 @@ import Plainledger.Journal.Amount
 import Plainledger.Error
 import qualified Data.Text as T
 import Control.Monad.Except
-
+import Plainledger.I18n.I18n
 
 amountTestTree :: TestTree
 amountTestTree =
@@ -58,7 +58,8 @@ okAmountTest :: Char -> String -> Quantity -> IO ()
 okAmountTest sep t expectedAmount = do
        account <- runExceptT $ parseAmount sep (T.pack t)
        case account of
-         Left err -> assertFailure $ printErrors err
+         Left err -> assertFailure 
+                   $ printErr err
          Right actual -> assertEqual "" expectedAmount actual
 
 -- okAmount :: Char -> String -> Quantity -> TestTree
@@ -72,3 +73,8 @@ koAmount sep t expectedErr =
        case account of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ t ++ " should throw an error"
+
+printErr :: [Error] -> String
+printErr err = T.unpack
+                       $ printErrors
+                       $ map (i18nText En_CA . TError ) err

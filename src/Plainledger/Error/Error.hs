@@ -14,17 +14,19 @@ module Plainledger.Error.Error
   Errors,
   Error(..),
   ErrorType(..),
+  printErrors,
   mkError,
   mkErrorNoPos,
   mkErrorMultiPos,
   setSourcePosFileIfNull,
   setSourcePosRowIfNull,
   setSourcePosColIfNull,
-  setSourcePosIfNull,
+  setSourcePosIfNull
 ) where
 
 import Data.Decimal
 import Data.Time
+import qualified Data.Text as T
 import Plainledger.Error.SourcePos
 
 type Errors = [Error]
@@ -72,6 +74,11 @@ data ErrorType
   | MissingStartDateInBalance String
   
   deriving (Eq, Show)
+
+-- | Pretty print the first 10 error messages and add the source file information
+printErrors :: [T.Text] -> T.Text
+printErrors x = T.intercalate "\n"
+              $ take 10 x
 
 mkError :: SourcePos -> ErrorType -> Errors
 mkError pos e = [Error [pos] e]

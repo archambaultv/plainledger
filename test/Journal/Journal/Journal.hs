@@ -7,7 +7,8 @@ import Test.Tasty.HUnit
 import Plainledger.Journal
 import Plainledger.Error
 import Control.Monad.Except
-
+import Plainledger.I18n.I18n
+import qualified Data.Text as T
 
 journalJournalTestTree :: TestTree
 journalJournalTestTree =
@@ -22,18 +23,33 @@ journalJournalTestTree =
 
 validationOk :: String -> TestTree
 validationOk folder = testCase folder $ do
-  let journalPath = "test/Journal/Journal/" ++ folder ++ "/Journal.csv"
-  journal <- runExceptT 
-          $ decodeJournalFileIO journalPath >>= journalFileToJournal
-  case journal of
-   Left err -> assertFailure $ printErrors err
-   Right _ -> return ()
+ let journalPath = "test/Journal/Journal/" ++ folder ++ "/Journal.csv"
+ header <- runExceptT $ processJournalFileHeader journalPath
+ case header of
+   Left err -> assertFailure $ printErr err
+   Right x -> do
+    journal <- runExceptT 
+              $ decodeJournalFile journalPath x
+              >>= journalFileToJournal
+    case journal of
+     Left err -> assertFailure $ printErr err
+     Right _ -> return ()
 
 validationKO :: String -> Errors -> TestTree
 validationKO folder expectedErr = testCase folder $ do
-  let journalPath = "test/Journal/Journal/" ++ folder ++ "/Journal.csv"
-  journal <- runExceptT 
-          $ decodeJournalFileIO journalPath >>= journalFileToJournal
-  case journal of
+ let journalPath = "test/Journal/Journal/" ++ folder ++ "/Journal.csv"
+ header <- runExceptT $ processJournalFileHeader journalPath
+ case header of
    Left err -> assertEqual "" expectedErr err
-   Right _ -> assertFailure $ "Decoding " ++ folder ++ " should throw an error"
+   Right x -> do
+    journal <- runExceptT 
+              $ decodeJournalFile journalPath x
+              >>= journalFileToJournal
+    case journal of
+     Left err -> assertEqual "" expectedErr err
+     Right _ -> assertFailure $ "Decoding " ++ folder ++ " should throw an error"
+
+printErr :: [Error] -> String
+printErr err = T.unpack
+                       $ printErrors
+                       $ map (i18nText En_CA . TError ) err

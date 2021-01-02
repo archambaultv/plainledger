@@ -1,4 +1,5 @@
-module Journal.Balance.Balance (
+module Journal.Balance.Balance 
+(
   balanceTestTree
   )where
 
@@ -7,6 +8,8 @@ import Test.Tasty.HUnit
 import Plainledger.Journal
 import Plainledger.Error
 import Control.Monad.Except
+import Plainledger.I18n.I18n
+import qualified Data.Text as T
 
 statementBalances :: [Balance]
 statementBalances = 
@@ -74,7 +77,7 @@ okBalance isStatementBalance filename sep decimal expectedBalance =
        let f = decodeFunction isStatementBalance
        balance <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
        case balance of
-         Left err -> assertFailure $ printErrors err
+         Left err -> assertFailure $ printErr err
          Right actual -> assertEqual "" expectedBalance (map snd actual)
 
 koBalance :: Bool -> String -> Char -> Char -> Errors -> TestTree
@@ -91,5 +94,10 @@ decodeFunction :: Bool
                 -> Char
                 -> FilePath
                 -> ExceptT Errors IO [(SourcePos, Balance)]
-decodeFunction True = decodeStatementBalanceFile
-decodeFunction False = decodeTrialBalanceFile
+decodeFunction True = decodeStatementBalanceFile Fr_CA
+decodeFunction False = decodeTrialBalanceFile Fr_CA
+
+printErr :: [Error] -> String
+printErr err = T.unpack
+                       $ printErrors
+                       $ map (i18nText En_CA . TError ) err

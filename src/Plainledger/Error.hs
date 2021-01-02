@@ -11,10 +11,8 @@
 module Plainledger.Error
 (
   module Plainledger.Error.SourcePos,
-  module Plainledger.Error.Error,
-  module Plainledger.Error.PrettyPrinter
+  module Plainledger.Error.Error
 ) where
 
 import Plainledger.Error.SourcePos
 import Plainledger.Error.Error
-import Plainledger.Error.PrettyPrinter

@@ -14,7 +14,10 @@ module Plainledger.CLI.Command
   runCommand
 ) where
 
+import qualified Data.Text as T
 import Control.Monad.Except
+import Plainledger.I18n.I18n
+import Plainledger.Error
 import Plainledger.Journal
 import Plainledger.Report
 
@@ -27,12 +30,20 @@ data Command = Command {
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
 runCommand (Command journalPath outputPath report) = do
-       -- Reads the Journal file and create the journal object
-       journal <- runExceptT 
-                $ decodeJournalFileIO journalPath >>= journalFileToJournal
-       -- Check for internal errors in the journal and proceed with the report
-       case journal of
-         Left err -> putStrLn (show err)
-         Right l -> putStrLn (show l) --do
-            -- let reportBS = computeReport journal report >>= C.encode
-            -- maybe (putStrLn . BL.pack) (BL.writeFile outputPath) reportBS
+   -- Reads the Journal file header and infer language and separator
+   header <- runExceptT $ processJournalFileHeader journalPath
+   case header of
+     Left err -> printErr En_CA err
+     Right x@(lang, _, _) -> do
+      journal <- runExceptT 
+                $ decodeJournalFile journalPath x
+                >>= journalFileToJournal
+      case journal of
+         Left err -> printErr lang err
+         Right l -> putStrLn (show l)
+
+
+  where printErr lang err = putStrLn 
+                       $ T.unpack
+                       $ printErrors
+                       $ map (i18nText lang . TError ) err

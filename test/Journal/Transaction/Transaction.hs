@@ -11,6 +11,7 @@ import Control.Monad.Except
 import Journal.Account.Account
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
+import Plainledger.I18n.I18n
 
 accs :: HS.HashSet T.Text
 accs = HS.fromList $ map aId accounts
@@ -113,15 +114,15 @@ transactionTestTree =
 okTransaction :: String -> Char -> Char ->[JTransaction] -> TestTree
 okTransaction filename sep decimal expectedTransaction = 
   testCase ("Decode " ++ filename) $ do
-       transaction <- runExceptT $ decodeJTransactionsFile sep decimal ("test/Journal/Transaction/" ++ filename) 
+       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep decimal ("test/Journal/Transaction/" ++ filename) 
        case transaction of
-         Left err -> assertFailure $ printErrors err
+         Left err -> assertFailure $ printErr err
          Right actual -> assertEqual "" expectedTransaction (map snd actual)
 
 koTransaction :: String -> Char -> Char ->Errors -> TestTree
 koTransaction filename sep decimal expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       transaction <- runExceptT $ decodeJTransactionsFile sep decimal ("test/Journal/Transaction/" ++ filename) 
+       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep decimal ("test/Journal/Transaction/" ++ filename) 
        case transaction of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
@@ -140,8 +141,13 @@ koTransaction filename sep decimal expectedErr =
 koValidateTransaction :: String -> Char -> Char -> Errors -> TestTree
 koValidateTransaction filename sep decimal expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       transaction <- runExceptT $ decodeJTransactionsFile sep decimal ("test/Journal/Transaction/" ++ filename) 
+       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep decimal ("test/Journal/Transaction/" ++ filename) 
                    >>= validateJTransactions accs
        case transaction of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
+
+printErr :: [Error] -> String
+printErr err = T.unpack
+                       $ printErrors
+                       $ map (i18nText En_CA . TError ) err

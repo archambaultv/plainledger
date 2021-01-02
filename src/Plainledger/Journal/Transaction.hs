@@ -26,6 +26,7 @@ import Data.Maybe
 import Control.Monad.Except
 import Data.ByteString.Lazy (ByteString)
 import Data.Time
+import Plainledger.I18n.I18n
 import Plainledger.Error
 import Plainledger.Internal.Csv
 import Plainledger.Journal.Posting
@@ -143,25 +144,27 @@ type Transaction = TransactionF Posting
 --         decodeTransactions h csvBS
 
 
-decodeJTransactionsFile :: Char -> 
+decodeJTransactionsFile :: Language ->
+                           Char -> 
                            Char -> 
                            FilePath -> 
                            ExceptT Errors IO [(SourcePos, JTransaction)]
-decodeJTransactionsFile csvSeparator decimalSeparator filePath = 
+decodeJTransactionsFile lang csvSeparator decimalSeparator filePath = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-      accs <- decodeTransactions csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      accs <- decodeTransactions lang csvSeparator decimalSeparator (BL.fromStrict csvBS)
       let pos = map (\i -> SourcePos filePath i 0) [2..]
       return $ zip pos accs
 
 
 -- | The first line is the header
 decodeTransactions :: forall m . (MonadError Errors m) =>
+                      Language ->
                       Char ->
                       Char -> 
                       ByteString ->
                       m [JTransaction]
-decodeTransactions csvSeparator decimalSeparator bs = do
+decodeTransactions lang csvSeparator decimalSeparator bs = do
   -- Read the CSV file as vector of T.Text
   let opts = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord csvSeparator)
@@ -170,24 +173,31 @@ decodeTransactions csvSeparator decimalSeparator bs = do
       $ C.decodeWith opts C.NoHeader bs
 
 
+  let accPrefix = (T.append (i18nText lang TTransactionAccountPrefix) " ")
+  let amntPrefix = (T.append (i18nText lang TTransactionAmountPrefix) " ")
+  let datePrefix = (T.append (i18nText lang TTransactionBalanceDatePrefix) " ")
+
   -- Decode the header to know the index of columns
   let myFilter t
-        = t `elem` ["Date", "Commentaire", "Contrepartie", "Étiquette"]
-        || T.isPrefixOf "Compte " t
-        || T.isPrefixOf "Montant " t
-        || T.isPrefixOf "Date du relevé " t
+        = t `elem` [i18nText lang TTransactionDate, 
+                    i18nText lang TTransactionComment, 
+                    i18nText lang TTransactionCounterparty, 
+                    i18nText lang TTransactionTag]
+        || T.isPrefixOf accPrefix t
+        || T.isPrefixOf amntPrefix t
+        || T.isPrefixOf datePrefix t
   (csvData, indexes) <- processColumnIndexes csv myFilter
 
-  dateIdx <- columnIndex indexes "Date"
-  let commentIdx = optionalColumnIndex indexes "Commentaire"
-  let counterPartyIdx = optionalColumnIndex indexes "Contrepartie"
-  let tagIdx = optionalColumnIndex indexes "Étiquette"
+  dateIdx <- columnIndex indexes (i18nText lang TTransactionDate)
+  let commentIdx = optionalColumnIndex indexes (i18nText lang TTransactionComment)
+  let counterPartyIdx = optionalColumnIndex indexes (i18nText lang TTransactionCounterparty)
+  let tagIdx = optionalColumnIndex indexes (i18nText lang TTransactionTag)
 
   -- Check for postings columns based on the account column
-  let accSufix = filter (T.isPrefixOf "Compte " . fst)
+  let accSufix = filter (T.isPrefixOf accPrefix . fst)
                $ HM.toList indexes
   let postingIdx = map (postingIndexes 
-                        ("Compte ", "Montant ", "Date du relevé ")
+                        (accPrefix, amntPrefix, datePrefix)
                         indexes)
                    accSufix
 
