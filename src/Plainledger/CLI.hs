@@ -209,7 +209,7 @@ parseCommand :: Parser Command
 parseCommand = Command
   <$> journalFile
   <*> csvFile
-  <*> (pure $ Transactions True)
+  <*> (pure $ Transactions AllDates Nothing True)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

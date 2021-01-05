@@ -9,34 +9,18 @@
 
 module Plainledger.Report.Report 
 (
-  Report(..)
-  -- Report(..),
-  -- Period(..),
-  -- BalanceFormat(..),
-  -- computeTotal,
-  -- computeTotalDrCr,
-  -- isActive,
-  -- isReportActive,
-  -- reportCashFlow,
-  -- reportBalance,
-  -- amountTitle,
-  -- serializeAmount,
-  -- periodToText,
-  -- addList,
-  -- reportLedgerOpeningBalance,
-  -- reportEarnings,
-  -- totalText,
-  -- cataAccounts,
-  -- maxSpan,
-  -- flatReport,
-  -- periodToSpan,
-  -- FlatReportOption(..),
-  -- GroupReportOption(..),
-  -- groupReport
+  Report(..),
+  ReportPeriod(..),
+  reportPeriodToSpan,
+  CompareAnotherPeriod(..),
+  CompareExtraColumns(..),
+  ShowRow(..),
+  DisplayColumns(..),
+  PeriodSpan
   )
 where
 
--- import Data.Time
+import Data.Time
 -- import Data.Tree
 -- import Data.List
 -- import Data.Bifunctor
@@ -44,67 +28,156 @@ where
 -- import Data.Functor.Foldable
 -- import qualified Data.Text as T
 
-data Report = Transactions Bool
+type PeriodSpan = (Maybe Day, Maybe Day)
 
--- -- | Determines the start date and end date of the reports
--- data ReportPeriod
---   = AllDates
---   | CustomPeriod Date Date
---   | FromBeginningUntil Date
---   | ThisMonth
---   | ThisMonthToDate
---   | ThisCalendarQuarter
---   | ThisCalendarQuarterToDate
---   | ThisFiscalQuarter
---   | ThisFiscalQuarterToDate
---   | ThisCalendarYear
---   | ThisCalendarYearToDate
---   | ThisCalendarYearToLastMonth
---   | ThisFiscalYear
---   | ThisFiscalYearToDate
---   | ThisFiscalYearToLastMonth
---   | Since30DaysAgo
---   | Since60DaysAgo
---   | Since90DaysAgo
---   | Since365DaysAgo
---   | SinceDate Date
---   deriving (Eq, Show)
+data CompareExtraColumns 
+  = CompareExtraColumns {
+      showDiff :: Bool,
+      showPercent :: Bool,
+      showRowPercent :: Bool,
+      showColumnPercent :: Bool,
+      showRevenuePercent :: Bool,
+      showExpensePercent :: Bool
+      }
+  deriving (Eq, Show)
 
--- -- | Not all combinaison of CompareAnotherPeriod and Report Period are valid
--- data CompareAnotherPeriod
---   = PreviousPeriod Bool Bool Int -- | Sliding window. Show Diff, Show Percent
---   | PreviousYear Int Bool Bool Int-- | Substract X years to the period. Show Diff, Show Percent
---   | PreviousSameNumberOfDays Bool Bool Int
---   | CustomCompare Bool Bool [(Date, Date)] -- | A custom comparison
---   deriving (Eq, Show)
+data Report 
+  -- Single or multi line transactions format
+  = Transactions ReportPeriod (Maybe CompareAnotherPeriod) Bool
+  | TrialBalance ReportPeriod (Maybe CompareAnotherPeriod) ShowRow
+  -- Show Diff, Show Percent, % of Row, % of Column
+  | BalanceSheet ReportPeriod (Maybe CompareAnotherPeriod) ShowRow DisplayColumns 
+    CompareExtraColumns
+  -- Show Diff, Show Percent, % of Row, % of Column, % of revenue, % of expense
+  | IncomeStatement ReportPeriod (Maybe CompareAnotherPeriod) ShowRow DisplayColumns 
+    CompareExtraColumns
+  deriving (Eq, Show)
 
--- compareShowDiff :: CompareAnotherPeriod -> Bool
--- compareShowDiff (PreviousPeriod x _) = x
--- compareShowDiff (PreviousYear x _) = x
--- compareShowDiff (CustomCompare x _ _) = x
+-- | Not all combinaison of CompareAnotherPeriod and Report Period are valid
+-- | The two booleans are for show diff and show percent.
+data CompareAnotherPeriod
+  = PreviousPeriod Int -- Compute the dates according the the type of the period
+  | PreviousYear Int -- Simple substracts one year
+  | CustomCompare [(Day, Day)]
+  deriving (Eq, Show)
 
--- compareShowPercent :: CompareAnotherPeriod -> Bool
--- compareShowPercent (PreviousPeriod _ x) = x
--- compareShowPercent (PreviousYear _ x) = x
--- compareShowPercent (CustomCompare _ x _) = x
+-- | Determines the start date and end date of the reports
+data ReportPeriod
+  = AllDates
+  | CustomPeriod Day Day
+  | FromBeginningUntil Day
+  | ThisMonth
+  | ThisMonthToDate
+  | ThisCalendarQuarter
+  | ThisCalendarQuarterToDate
+  | ThisFiscalQuarter
+  | ThisFiscalQuarterToDate
+  | ThisCalendarYear
+  | ThisCalendarYearToDate
+  | ThisFiscalYear
+  | ThisFiscalYearToDate
+  | Since30DaysAgo
+  | Since60DaysAgo
+  | Since90DaysAgo
+  | Since365DaysAgo
+  | SinceDateUntilTheEnd Day
+  | SinceDateToDate Day
+  deriving (Eq, Show)
 
--- -- | Which row to show in the report
--- data ShowRow
---   = ShowActive
---   | ShowAll
---   | ShowNonZero
---   deriving (Eq, Show)
+reportPeriodToSpan :: ReportPeriod -> Day -> Int -> PeriodSpan
+reportPeriodToSpan AllDates _ _ = (Nothing, Nothing)
+reportPeriodToSpan (CustomPeriod d1 d2) _ _ = (Just d1, Just d2)
+reportPeriodToSpan (FromBeginningUntil d2) _ _= (Nothing, Just d2)
 
--- -- | Possible report columns
--- data DisplayColumns
---   = Months
---   | CalendarQuartesr
---   | FiscalQuarters
---   | CalendarYears
---   | FiscalYears
---   | Counterparty [String]
---   | Tag [String]
---   deriving (Eq, Show)
+reportPeriodToSpan ThisMonth today _ = 
+  let (y, m, _) = toGregorian today
+      d1 = fromGregorian y m 1
+  in (Just d1, Just $ toEndOfMonth d1)
+reportPeriodToSpan ThisMonthToDate today _ = 
+  let (y, m, _) = toGregorian today
+      d1 = fromGregorian y m 1
+  in (Just d1, Just today)
+
+reportPeriodToSpan ThisCalendarQuarter today _ =
+  let (y, m, _) = toGregorian today
+  in case ((m - 1) :: Int) `div` 3 of
+    0 -> (Just $ fromGregorian y 1 1, Just $ fromGregorian y 3 31)
+    1 -> (Just $ fromGregorian y 4 1, Just $ fromGregorian y 6 30)
+    2 -> (Just $ fromGregorian y 7 1, Just $ fromGregorian y 9 31)
+    _ -> (Just $ fromGregorian y 10 1, Just $ fromGregorian y 12 31)
+reportPeriodToSpan ThisCalendarQuarterToDate today x =
+  let (d1, _) = reportPeriodToSpan ThisCalendarQuarter today x
+  in (d1, Just today)
+
+reportPeriodToSpan ThisFiscalQuarter today firstFiscalMonth =
+  let (y, m, _) = toGregorian today
+      monthNumber = if m >= firstFiscalMonth
+                    then m - firstFiscalMonth
+                    else (m + 12 - firstFiscalMonth)
+      firstFiscalDay = if m >= firstFiscalMonth
+                       then fromGregorian y firstFiscalMonth 1
+                       else fromGregorian (y - 1) firstFiscalMonth 1
+  in case (monthNumber :: Int) `div` 3 of
+    0 -> (Just $ firstFiscalDay, 
+          Just $ toEndOfMonth $ addGregorianMonthsClip 2 firstFiscalDay)
+    1 -> (Just $ addGregorianMonthsClip 3 firstFiscalDay, 
+          Just $ toEndOfMonth $ addGregorianMonthsClip 5 firstFiscalDay)
+    2 -> (Just $ addGregorianMonthsClip 6 firstFiscalDay, 
+          Just $ toEndOfMonth $ addGregorianMonthsClip 8 firstFiscalDay)
+    _ -> (Just $ addGregorianMonthsClip 9 firstFiscalDay, 
+          Just $ toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
+reportPeriodToSpan ThisFiscalQuarterToDate today x =
+  let (d1, _) = reportPeriodToSpan ThisFiscalQuarter today x
+  in (d1, Just today)
+
+reportPeriodToSpan ThisCalendarYear today _ =
+  let (y, _, _) = toGregorian today
+  in (Just $ fromGregorian y 1 1, Just $ fromGregorian y 12 31)
+reportPeriodToSpan ThisCalendarYearToDate today x =
+  let (d1, _) = reportPeriodToSpan ThisCalendarYear today x
+  in (d1, Just today)
+
+reportPeriodToSpan ThisFiscalYear today firstFiscalMonth =
+  let (y, m, _) = toGregorian today
+      firstFiscalDay = if m >= firstFiscalMonth
+                       then fromGregorian y firstFiscalMonth 1
+                       else fromGregorian (y - 1) firstFiscalMonth 1
+  in (Just firstFiscalDay, 
+      Just $ toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
+reportPeriodToSpan ThisFiscalYearToDate today x =
+  let (d1, _) = reportPeriodToSpan ThisFiscalYear today x
+  in (d1, Just today)
+
+reportPeriodToSpan Since30DaysAgo today _ = (Just $ addDays (-30) today, Just today)
+reportPeriodToSpan Since60DaysAgo today _ = (Just $ addDays (-60) today, Just today)
+reportPeriodToSpan Since90DaysAgo today _ = (Just $ addDays (-90) today, Just today)
+reportPeriodToSpan Since365DaysAgo today _ = (Just $ addDays (-365) today, Just today)
+reportPeriodToSpan (SinceDateUntilTheEnd d1) _ _ = (Just d1, Nothing)
+reportPeriodToSpan (SinceDateToDate d1) today _ = (Just d1, Just today)
+
+
+toEndOfMonth :: Day -> Day
+toEndOfMonth date =
+  let (y, m , _) = toGregorian date
+  in fromGregorian y m $ gregorianMonthLength y m
+
+-- | Which row to show in the report
+data ShowRow
+  = ShowActive
+  | ShowAll
+  | ShowNonZero
+  deriving (Eq, Show)
+
+-- | Possible report columns
+data DisplayColumns
+  = Months
+  | CalendarQuarters
+  | FiscalQuarters
+  | CalendarYears
+  | FiscalYears
+  | Counterparty [String]
+  | Tag [String]
+  deriving (Eq, Show)
 
 -- -- Returns the list of Begin and Enddate for each period
 -- -- The first period is the most recent one

@@ -36,7 +36,10 @@ import Plainledger.Report.IncomeStatement
 import Plainledger.Report.Transactions
 
 runReport :: Report -> Journal -> V.Vector (V.Vector T.Text)
-runReport (Transactions b) j = transactionReport b j
+runReport (Transactions _ _ b) j = transactionReport b j
+runReport (TrialBalance _ _ _) _ = error "Not Implemented"
+runReport (BalanceSheet _ _ _ _ _) _ = error "Not Implemented"
+runReport (IncomeStatement _ _ _ _ _) _ = error "Not Implemented"
 
 encodeReport :: Journal -> V.Vector (V.Vector T.Text) -> BL.ByteString
 encodeReport j v =

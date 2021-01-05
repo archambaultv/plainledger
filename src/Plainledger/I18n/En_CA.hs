@@ -167,6 +167,13 @@ printErrorType (MissingStartDateInBalance s)
   ++ "\" must have a start date in the balance file.\n"
   ++ "All revenue and expense accounts and the opening account must have a start date.  "
 
+printErrorType (EndDateGreaterThanStartDate sd ed)
+  = "Start date \""
+  ++ show sd
+  ++ "\" is greater than the end date \""
+  ++ show ed
+  ++ "\""
+  
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
 showSourcePos (SourcePos f r c) | c <= 0
