@@ -44,7 +44,7 @@ where
 -- import Data.Functor.Foldable
 -- import qualified Data.Text as T
 
-data Report = MultilineTransactions
+data Report = Transactions Bool
 
 -- -- | Determines the start date and end date of the reports
 -- data ReportPeriod

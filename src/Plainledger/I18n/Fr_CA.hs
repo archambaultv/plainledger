@@ -50,6 +50,7 @@ fr_CAText TJournalFileTransactionFiles = "Fichiers des transactions"
 fr_CAText TJournalFileStatementBalanceFiles = "Assertion des soldes"
 fr_CAText TJournalFileTrialBalanceFiles = "Assertion des balances de vérification"
 
+fr_CAText TTransactionId = "Numéro de transaction"
 fr_CAText TTransactionDate = "Date"
 fr_CAText TTransactionComment = "Commentaire"
 fr_CAText TTransactionCounterparty = "Contrepartie"

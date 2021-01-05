@@ -30,20 +30,15 @@ data Command = Command {
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
 runCommand (Command journalPath outputPath report) = do
-   -- Reads the Journal file header and infer language and separator
-   header <- runExceptT $ processJournalFileHeader journalPath
-   case header of
-     Left err -> printErr En_CA err
-     Right x@(lang, _, _) -> do
-      journal <- runExceptT 
-                $ decodeJournalFile journalPath x
-                >>= journalFileToJournal
-      case journal of
-         Left err -> printErr lang err
-         Right l -> putStrLn (show l)
+  res <- runExceptT 
+         $ fmap (\j -> (j, runReport report j))
+         $ decodeJournal journalPath
+  case res of
+     Left (lang, err) -> printErr lang err
+     Right (j, r) -> writeReport outputPath j r
 
 
   where printErr lang err = putStrLn 
-                       $ T.unpack
-                       $ printErrors
-                       $ map (i18nText lang . TError ) err
+                         $ T.unpack
+                         $ printErrors
+                         $ map (i18nText lang . TError ) err

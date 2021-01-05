@@ -46,9 +46,11 @@ journalFileTestTree =
           "test/Journal/JournalFile/Journal-13.csv" Fr_CA,
 
       koConfig "Journal-06.csv"
-        $ mkError (SourcePos "test/Journal/JournalFile/Journal-06.csv" 1 0 ) InvalidHeaderJournalFile,
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-06.csv" 1 0 ) 
+        InvalidHeaderJournalFile,
       koConfig "Journal-07.csv"
-        $ mkError (SourcePos "test/Journal/JournalFile/Journal-07.csv" 1 0 ) InvalidHeaderJournalFile,
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-07.csv" 1 0 ) 
+        InvalidHeaderJournalFile,
       koConfig "Journal-08.csv"
         $ mkError (SourcePos "test/Journal/JournalFile/Journal-08.csv" 2 2 ) 
         (EmptyFieldInJournalFile "Compte pour les soldes d'ouverture"),
@@ -63,37 +65,41 @@ journalFileTestTree =
         (MissingFieldinJournalFile "Nom"),
       koConfig "Journal-12.csv"
         $ mkError (SourcePos "test/Journal/JournalFile/Journal-12.csv" 0 0 ) 
-        (MissingFieldinJournalFile "Fichier des comptes")
+        (MissingFieldinJournalFile "Fichier des comptes"),
+      -- Field starting with double quote but no double quote at the end
+      koConfig "Journal-14.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-14.csv" 0 0 ) 
+        (MissingFieldinJournalFile "Fichier des comptes"),
+      -- Invalid CSV syntax. Should not get InvalideHeaderJournalFile
+      koConfig "Journal-15.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-15.csv" 0 0 ) 
+        (ErrorMessage "parse error (Failed reading: satisfy) at \" Inc\nS\195\169parateur de d\195\169cimale;,\nFichier des comptes;comptes.csv\nFichiers des transactions;transacti (truncated)"),
+      -- Invalid CSV syntax in the header. Should not get InvalideHeaderJournalFile
+      koConfig "Journal-16.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-16.csv" 1 0 ) 
+        (ErrorMessage "parse error (Failed reading: satisfy) at \"\\\"eur\"")
     ]
 
 okConfig :: String -> JournalFile -> TestTree
 okConfig filename expectedJournal = 
   testCase ("Decode " ++ filename) $ do
        let path = "test/Journal/JournalFile/" ++ filename
-       header <- runExceptT $ processJournalFileHeader path
-       case header of
-         Left err -> assertFailure $ printErr err
-         Right x -> do
-          journal <- runExceptT $ decodeJournalFile path x
-          case journal of
-             Left err -> assertFailure $ printErr err
-             Right actual -> assertEqual "" expectedJournal actual
+       journal <- runExceptT $ decodeJournalFile path
+       case journal of
+         Left (_, err) -> assertFailure $ printErr err
+         Right actual -> assertEqual "" expectedJournal actual
 
 koConfig :: String -> Errors -> TestTree
 koConfig filename expectedErr =
    testCase ("Assert error for " ++ filename) $ do
        let path = ("test/Journal/JournalFile/" ++ filename)
-       header <- runExceptT $ processJournalFileHeader path
-       case header of
-         Left err -> assertEqual "" expectedErr err
-         Right x -> do
-          journal <- runExceptT $ decodeJournalFile path x
-          case journal of
-            Left actual -> assertEqual "" expectedErr actual
-            Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
+       journal <- runExceptT $ decodeJournalFile path
+       case journal of
+         Left (_, actual) -> assertEqual "" expectedErr actual
+         Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
 
 printErr :: [Error] -> String
 printErr err = T.unpack
-                       $ printErrors
-                       $ map (i18nText En_CA . TError ) err
+             $ printErrors
+             $ map (i18nText En_CA . TError ) err
 

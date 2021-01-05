@@ -24,32 +24,20 @@ journalJournalTestTree =
 validationOk :: String -> TestTree
 validationOk folder = testCase folder $ do
  let journalPath = "test/Journal/Journal/" ++ folder ++ "/Journal.csv"
- header <- runExceptT $ processJournalFileHeader journalPath
- case header of
-   Left err -> assertFailure $ printErr err
-   Right x -> do
-    journal <- runExceptT 
-              $ decodeJournalFile journalPath x
-              >>= journalFileToJournal
-    case journal of
-     Left err -> assertFailure $ printErr err
-     Right _ -> return ()
+ journal <- runExceptT $ decodeJournal journalPath
+ case journal of
+   Left (_, err) -> assertFailure $ printErr err
+   Right _ -> return ()
 
 validationKO :: String -> Errors -> TestTree
 validationKO folder expectedErr = testCase folder $ do
  let journalPath = "test/Journal/Journal/" ++ folder ++ "/Journal.csv"
- header <- runExceptT $ processJournalFileHeader journalPath
- case header of
-   Left err -> assertEqual "" expectedErr err
-   Right x -> do
-    journal <- runExceptT 
-              $ decodeJournalFile journalPath x
-              >>= journalFileToJournal
-    case journal of
-     Left err -> assertEqual "" expectedErr err
-     Right _ -> assertFailure $ "Decoding " ++ folder ++ " should throw an error"
+ journal <- runExceptT $ decodeJournal journalPath
+ case journal of
+   Left (_, err) -> assertEqual "" expectedErr err
+   Right _ -> assertFailure $ "Decoding " ++ folder ++ " should throw an error"
 
 printErr :: [Error] -> String
 printErr err = T.unpack
-                       $ printErrors
-                       $ map (i18nText En_CA . TError ) err
+             $ printErrors
+             $ map (i18nText En_CA . TError ) err

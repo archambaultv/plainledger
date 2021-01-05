@@ -50,6 +50,7 @@ en_CAText TJournalFileTransactionFiles = "Transactions files"
 en_CAText TJournalFileStatementBalanceFiles = "Statement balance assertions files"
 en_CAText TJournalFileTrialBalanceFiles = "Trial balance assertions files"
 
+en_CAText TTransactionId = "Transaction number"
 en_CAText TTransactionDate = "Date"
 en_CAText TTransactionComment = "Comment"
 en_CAText TTransactionCounterparty = "Counterparty"

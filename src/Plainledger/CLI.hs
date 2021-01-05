@@ -13,7 +13,7 @@ module Plainledger.CLI
   cli
 ) where
 
-import Data.Time
+-- import Data.Time
 import Options.Applicative
 import Plainledger.CLI.Command
 import Plainledger.Report
@@ -209,7 +209,7 @@ parseCommand :: Parser Command
 parseCommand = Command
   <$> journalFile
   <*> csvFile
-  <*> (pure MultilineTransactions)
+  <*> (pure $ Transactions True)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

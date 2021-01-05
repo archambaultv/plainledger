@@ -56,6 +56,7 @@ data I18nText
   | TJournalFileStatementBalanceFiles
   | TJournalFileTrialBalanceFiles
 
+  | TTransactionId
   | TTransactionDate
   | TTransactionComment
   | TTransactionCounterparty

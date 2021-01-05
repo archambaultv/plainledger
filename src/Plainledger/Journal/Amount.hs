@@ -11,7 +11,8 @@
 module Plainledger.Journal.Amount 
 (
   Quantity,
-  parseAmount
+  parseAmount,
+  writeAmount
   )
 where
 
@@ -26,7 +27,7 @@ import Data.Char (isDigit, ord)
 -- that no rounding error can occur.
 type Quantity = Decimal
 
--- Parses for amounts
+-- Parser for amounts
 -- Reads scientific number like :
 --
 -- 1
@@ -106,3 +107,8 @@ parseAmount sep x = do
         notNull n
           | T.length n == 0 = throwError $ mkErrorNoPos $ ParseAmountErr $ T.unpack x
           | otherwise = return ()
+
+writeAmount :: Char -> Quantity -> T.Text
+writeAmount c a = T.pack
+                $ map (\x -> if x == '.' then c else x) 
+                $ show a

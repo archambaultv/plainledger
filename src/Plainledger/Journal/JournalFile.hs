@@ -11,15 +11,16 @@
 module Plainledger.Journal.JournalFile 
 (
   JournalFile(..),
+  decodeJournalFile,
   processJournalFileHeader,
-  decodeJournalFile
+  processJournalFileBody
 )
 where
 
 import Control.Monad.Except
 import Plainledger.I18n.I18n
 import Plainledger.Error
-import Plainledger.Internal.Utils (removeBom)
+import Plainledger.Internal.Utils
 import Data.Char (ord)
 import qualified Data.Vector as V
 import qualified Data.Csv as C
@@ -61,38 +62,58 @@ emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] [] "" En_CA
 csvSeparator :: [Char] 
 csvSeparator = [',', ';', '\t']
 
-processJournalFileHeader :: FilePath -> 
-                            ExceptT Errors IO (Language, Char, V.Vector (V.Vector T.Text))
-processJournalFileHeader filePath = withExceptT (setSourcePosFileIfNull filePath) $ do
+decodeJournalFile :: FilePath -> 
+                     ExceptT (Language, Errors) IO JournalFile
+decodeJournalFile filePath = withFileName $ do
   csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
-  processHeader (BL.fromStrict csvBS) csvSeparator
+  let (csvHeader, csvData) = takeFirstLine csvBS
+  (lang, sep) <- withEnglishLang 
+              $ processJournalFileHeader (BL.fromStrict csvHeader) csvSeparator
+  withLang lang $ processJournalFileBody filePath lang sep csvData
 
-processHeader :: (MonadError Errors m) => 
+  where withEnglishLang = withExceptT (En_CA,)
+        withLang l = withExceptT (l,)
+
+        withFileName = 
+            withExceptT (\(l, x) -> (l, setSourcePosFileIfNull filePath x))
+
+processJournalFileHeader :: (MonadError Errors m) => 
                  BL.ByteString ->
                  [Char] -> 
-                 m (Language, Char, V.Vector (V.Vector T.Text))
-processHeader _ [] = throwError $ mkError (SourcePos "" 1 0) InvalidHeaderJournalFile
-processHeader bs (c:cs) =
+                 m (Language, Char)
+processJournalFileHeader _ [] = throwError $ mkError (SourcePos "" 1 0) InvalidHeaderJournalFile
+processJournalFileHeader bs (c:cs) =
   let csvOptions = C.defaultDecodeOptions {
         C.decDelimiter = fromIntegral (ord c)
         }
-  in do 
-    let csv = either (const Nothing) Just $ C.decodeWith csvOptions C.NoHeader bs
-    case csv of
-      Nothing -> processHeader bs cs
-      (Just x) | V.null x -> throwError $ mkErrorNoPos EmptyJournalFile
-      (Just x) | V.null (V.head x) -> throwError $ mkErrorNoPos InvalidHeaderJournalFile
-      (Just x) | V.null (V.tail (V.head x)) -> processHeader bs cs
-      (Just x) -> let p = V.head $ V.head x
-                      v = V.head $ V.tail $ V.head x
-                  in case inferLanguage (p, v) of
-                        Nothing -> processHeader bs cs
-                        Just l -> return (l, c, V.drop 1 x)
 
-decodeJournalFile :: forall m . (MonadError Errors m) => 
+  in do 
+    csv <- either (throwError . mkError (SourcePos "" 1 0) . ErrorMessage) return 
+           $ C.decodeWith csvOptions C.NoHeader bs
+    case csv of
+      x | V.null x -> throwError $ mkErrorNoPos EmptyJournalFile
+      x | V.null (V.head x) -> throwError $ mkErrorNoPos InvalidHeaderJournalFile
+      x | V.null (V.tail (V.head x)) -> processJournalFileHeader bs cs
+      x -> let p = V.head $ V.head x
+               v = V.head $ V.tail $ V.head x
+           in case inferLanguage (p, v) of
+                Nothing -> processJournalFileHeader bs cs
+                Just l -> return (l, c)
+
+-- The header must be stripped
+processJournalFileBody :: forall m . (MonadError Errors m) => 
                       String ->
-                      (Language, Char, V.Vector (V.Vector T.Text)) -> m JournalFile
-decodeJournalFile filePath (lang, sep, csvData) = (do
+                      Language ->
+                      Char ->
+                      BS.ByteString -> 
+                      m JournalFile
+processJournalFileBody filePath lang sep bs = (do
+    let csvOptions = C.defaultDecodeOptions {
+                        C.decDelimiter = fromIntegral (ord sep)
+                        }
+
+    csvData <- either (throwError . mkErrorNoPos . ErrorMessage) return 
+               $ C.decodeWith csvOptions C.NoHeader (BL.fromStrict bs)
     let csvWithRowNumber = V.map (\(x, y) -> (x + 2, y)) $ V.indexed csvData
     rawJournal <- V.foldM parseConfig
                    emptyJournalFile{jfCsvSeparator = sep, 

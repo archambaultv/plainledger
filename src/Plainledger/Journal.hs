@@ -13,6 +13,7 @@ module Plainledger.Journal
 (
   Journal(..),
   journalFileToJournal,
+  decodeJournal,
   module Plainledger.Journal.Posting,
   module Plainledger.Journal.Transaction,
   module Plainledger.Journal.Balance,
@@ -28,6 +29,7 @@ import System.FilePath
 import Control.Monad.Except
 import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
+import Plainledger.I18n.I18n
 import Plainledger.Error
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Transaction
@@ -83,3 +85,10 @@ journalFileToJournal journalFile = do
   return $ Journal journalFile acc txns (map snd bals)
 
 
+decodeJournal :: FilePath ->
+                 ExceptT (Language, Errors) IO Journal
+decodeJournal filePath = 
+  decodeJournalFile filePath 
+  >>= withLang journalFileToJournal 
+
+  where withLang foo jf = withExceptT (jfLanguage jf,) (foo jf)
