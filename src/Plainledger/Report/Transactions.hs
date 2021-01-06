@@ -18,8 +18,11 @@ import Plainledger.Journal
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
-transactionReport :: Bool -> Journal -> V.Vector (V.Vector T.Text)
-transactionReport printAsSingleTxns journal =
+transactionReport :: Maybe DateSpan ->
+                     Bool -> 
+                     Journal -> 
+                     V.Vector (V.Vector T.Text)
+transactionReport _ printAsSingleTxns journal =
   let txns = jTransactions journal
       lang = jfLanguage $ jJournalFile journal
       decimalSep = jfDecimalSeparator $ jJournalFile journal

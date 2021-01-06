@@ -12,11 +12,13 @@
 module Plainledger.Journal 
 (
   Journal(..),
+  journalDateSpan,
   journalFileToJournal,
   decodeJournal,
   module Plainledger.Journal.Posting,
   module Plainledger.Journal.Transaction,
   module Plainledger.Journal.Balance,
+  module Plainledger.Journal.BalanceMap,
   module Plainledger.Journal.JournalFile,
   module Plainledger.Journal.Account,
   module Plainledger.Journal.Amount,
@@ -34,6 +36,7 @@ import Plainledger.Error
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Transaction
 import Plainledger.Journal.Balance
+import Plainledger.Journal.BalanceMap
 import Plainledger.Journal.JournalFile
 import Plainledger.Journal.Account
 import Plainledger.Journal.Amount
@@ -48,6 +51,12 @@ data Journal = Journal
   }
   deriving (Eq, Show)
 
+journalDateSpan :: Journal -> Maybe DateSpan
+journalDateSpan journal =
+  case jTransactions journal of
+    [] -> Nothing
+    txns -> let dates = map tDate txns
+            in return (minimum dates, maximum dates)
 
 -- Reads the include files in the journal file
 journalFileToJournal :: JournalFile -> ExceptT Errors IO Journal

@@ -72,7 +72,7 @@ getTransactionReport :: String -> IO (Journal, V.Vector (V.Vector T.Text))
 getTransactionReport folder = do
  let journalPath = "test/Report/Transactions/" ++ folder ++ "/Journal.csv"
  journal <- runExceptT $ decodeJournal journalPath
- let report = fmap (\j -> (j, transactionReport True j)) journal
+ let report = fmap (\j -> (j, transactionReport Nothing True j)) journal
  case report of
      Left (_, err) -> assertFailure $ printErr err
      Right (j, txns) -> return (j, txns)

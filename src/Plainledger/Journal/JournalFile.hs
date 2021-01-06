@@ -11,6 +11,7 @@
 module Plainledger.Journal.JournalFile 
 (
   JournalFile(..),
+  emptyJournalFile,
   decodeJournalFile,
   processJournalFileHeader,
   processJournalFileBody

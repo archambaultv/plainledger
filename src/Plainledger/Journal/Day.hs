@@ -9,6 +9,9 @@
 -- This module defines helper functions for the Day data type
 
 module Plainledger.Journal.Day (
+  DateSpan,
+  spanStartDate,
+  spanEndDate,
   toISO8601,
   parseISO8601M
   )
@@ -18,6 +21,13 @@ import Data.Time
 import Plainledger.Error
 import Control.Monad.Except
 
+type DateSpan = (Day, Day)
+
+spanStartDate :: DateSpan -> Day
+spanStartDate = fst
+
+spanEndDate :: DateSpan -> Day
+spanEndDate = snd
 
 toISO8601 :: Day -> String
 toISO8601 = formatTime defaultTimeLocale (iso8601DateFormat Nothing)

@@ -11,8 +11,6 @@
 module Plainledger.Journal.BalanceMap
 (
   BalanceMap,
-  maxDate,
-  minDate,
   balanceAtDate,
   balance,
   openingBalance,
@@ -32,22 +30,11 @@ import Data.Maybe
 import qualified Data.Map.Strict as M
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
---import qualified Data.ByteString.Lazy as BL
---import qualified Data.Vector as V
---import qualified Data.Csv as C
 import qualified Data.Text as T
 import Plainledger.Journal.Amount
---import Plainledger.Journal.Day
---import Plainledger.Internal.Csv
---import Plainledger.Internal.Utils
 import Plainledger.Journal.Transaction
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Account
---import Control.Monad.Except
---import Plainledger.Error
---import qualified Data.ByteString as BS
---import Data.ByteString.Lazy (ByteString)
---import Data.Char (ord)
 
 
 
@@ -95,31 +82,16 @@ postingsToBalanceMap ps =
 
        in M.fromList $ zip (map fst deltaList) balanceList
 
--- The maximum date in the balance map
-maxDate :: BalanceMap -> Maybe Day
-maxDate m =
-  case map fst $ mapMaybe M.lookupMax $ HM.elems m of
-    [] -> Nothing
-    days -> Just (maximum days)
-
--- The minimum date in the balance map
-minDate :: BalanceMap -> Maybe Day
-minDate m =
-  case map fst $ mapMaybe M.lookupMax $ HM.elems m of
-    [] -> Nothing
-    days -> Just (minimum days)
-
-balanceDate :: BalanceMap ->
-                 T.Text ->
-                 (M.Map Day Quantity -> Maybe (Day, Quantity)) ->
-                 Maybe (Day, Quantity)
-balanceDate m acc f =
+getBalance :: BalanceMap ->
+             T.Text ->
+             M.Map Day Quantity 
+getBalance m acc =
   case HM.lookup acc m of
     Nothing -> error
                $ "balanceAtDate : Account \""
                ++ T.unpack acc
                ++ "\" is not in the balance map."
-    Just m2 -> f m2
+    Just m2 -> m2
 
 -- | balanceAtDate m d acc returns the balance of account acc at the date d. The
 -- balance is Nothing if the date is prior than any date in the map for this account.
@@ -128,7 +100,9 @@ balanceAtDate :: BalanceMap ->
                  T.Text ->
                  Day ->
                  Maybe (Day, Quantity)
-balanceAtDate m acc d = balanceDate m acc (M.lookupLE d)
+balanceAtDate m acc d = 
+  let m2 = getBalance m acc
+  in M.lookupLE d m2
 
 -- Computes the balance at the end of the day
 -- For the opening balance account see journalOpeningBalance
@@ -147,18 +121,19 @@ cashFlow :: BalanceMap -> T.Text -> (Day, Day) -> Quantity
 cashFlow m acc (d1, d2) = balance m acc d2 - openingBalance m acc d1
 
 -- | Computes the opening balance
+-- | Nothing means
 journalOpeningBalance :: (T.Text -> AccountType) -> BalanceMap -> Day -> Quantity
-journalOpeningBalance foo m d = 
+journalOpeningBalance accTypeF m d = 
   let incomeStatementBal = map snd
-                          $ filter (isIncomeStatementType . foo . fst) 
+                          $ filter (isIncomeStatementType . accTypeF . fst) 
                           $ HM.toList m
   in sum $ map snd $ mapMaybe (M.lookupLE d) incomeStatementBal
 
 -- | Computes the earnings
 earnings :: (T.Text -> AccountType) -> BalanceMap -> (Day, Day) -> Quantity
-earnings foo m (d1, d2) = 
+earnings accTypeF m (d1, d2) = 
   let incomeStatementBal = map snd
-                          $ filter (isIncomeStatementType . foo . fst) 
+                          $ filter (isIncomeStatementType . accTypeF . fst) 
                           $ HM.toList m
       end = sum $ map snd $ mapMaybe (M.lookupLE d2) incomeStatementBal
       start = sum $ map snd $ mapMaybe (M.lookupLE (addDays (-1) d1)) incomeStatementBal

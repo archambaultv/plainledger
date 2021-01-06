@@ -28,6 +28,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Csv as C
 import qualified Data.Vector as V
 import qualified Data.Text as T
+import Data.Time
 import Plainledger.Journal
 import Plainledger.Report.Report
 import Plainledger.Report.TrialBalance
@@ -35,11 +36,14 @@ import Plainledger.Report.BalanceSheet
 import Plainledger.Report.IncomeStatement
 import Plainledger.Report.Transactions
 
-runReport :: Report -> Journal -> V.Vector (V.Vector T.Text)
-runReport (Transactions _ _ b) j = transactionReport b j
-runReport (TrialBalance _ _ _) _ = error "Not Implemented"
-runReport (BalanceSheet _ _ _ _ _) _ = error "Not Implemented"
-runReport (IncomeStatement _ _ _ _ _) _ = error "Not Implemented"
+runReport :: ReportParams -> Day -> Journal -> V.Vector (V.Vector T.Text)
+runReport (Transactions period _ b) today j = 
+  let dateSpan = reportPeriodToSpan period today (journalToLedger j)
+  in transactionReport dateSpan b j
+runReport (TrialBalance period c showRow) today j = 
+  trialBalanceReport period c showRow j
+runReport (BalanceSheet _ _ _ _ _) _ _ = error "Not Implemented"
+runReport (IncomeStatement _ _ _ _ _) _ _ = error "Not Implemented"
 
 encodeReport :: Journal -> V.Vector (V.Vector T.Text) -> BL.ByteString
 encodeReport j v =

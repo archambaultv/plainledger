@@ -14,6 +14,7 @@ module Plainledger.CLI.Command
   runCommand
 ) where
 
+import Data.Time
 import qualified Data.Text as T
 import Control.Monad.Except
 import Plainledger.I18n.I18n
@@ -24,14 +25,15 @@ import Plainledger.Report
 data Command = Command {
   cJournalFile :: String,
   cOutputFile :: String,
-  cReport :: Report
+  cReport :: ReportParams
   }
 
 -- / How to execute the CLI commands
 runCommand :: Command -> IO ()
 runCommand (Command journalPath outputPath report) = do
+  today <- fmap utctDay getCurrentTime
   res <- runExceptT 
-         $ fmap (\j -> (j, runReport report j))
+         $ fmap (\j -> (j, runReport report today j))
          $ decodeJournal journalPath
   case res of
      Left (lang, err) -> printErr lang err

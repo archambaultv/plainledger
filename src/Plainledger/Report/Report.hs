@@ -9,18 +9,20 @@
 
 module Plainledger.Report.Report 
 (
-  Report(..),
+  Ledger(..),
+  journalToLedger,
+  ReportParams(..),
   ReportPeriod(..),
   reportPeriodToSpan,
   CompareAnotherPeriod(..),
   CompareExtraColumns(..),
   ShowRow(..),
-  DisplayColumns(..),
-  PeriodSpan
+  DisplayColumns(..)
   )
 where
 
 import Data.Time
+import Plainledger.Journal
 -- import Data.Tree
 -- import Data.List
 -- import Data.Bifunctor
@@ -28,7 +30,24 @@ import Data.Time
 -- import Data.Functor.Foldable
 -- import qualified Data.Text as T
 
-type PeriodSpan = (Maybe Day, Maybe Day)
+-- Ledger is like a journal, but with some precomputed informations
+-- usefull for reportings
+data Ledger = Ledger {
+  lJournalFile :: JournalFile,
+  lAccounts   :: [Account],
+  lTransactions :: [Transaction],
+  lDateSpan :: Maybe DateSpan,
+  lBalanceMap :: BalanceMap
+}
+
+journalToLedger :: Journal -> Ledger
+journalToLedger journal =
+  let jf = jJournalFile journal
+      accs = jAccounts journal
+      txns = jTransactions journal
+      balMap = transactionsToBalanceMap txns
+      dSpan = journalDateSpan journal
+  in Ledger jf accs txns dSpan balMap
 
 data CompareExtraColumns 
   = CompareExtraColumns {
@@ -41,7 +60,7 @@ data CompareExtraColumns
       }
   deriving (Eq, Show)
 
-data Report 
+data ReportParams 
   -- Single or multi line transactions format
   = Transactions ReportPeriod (Maybe CompareAnotherPeriod) Bool
   | TrialBalance ReportPeriod (Maybe CompareAnotherPeriod) ShowRow
@@ -84,32 +103,75 @@ data ReportPeriod
   | SinceDateToDate Day
   deriving (Eq, Show)
 
-reportPeriodToSpan :: ReportPeriod -> Day -> Int -> PeriodSpan
-reportPeriodToSpan AllDates _ _ = (Nothing, Nothing)
-reportPeriodToSpan (CustomPeriod d1 d2) _ _ = (Just d1, Just d2)
-reportPeriodToSpan (FromBeginningUntil d2) _ _= (Nothing, Just d2)
+-- Could fail to compute a DateSpan if there is no transactions
+-- or if the ReportPeriod is inconsistant
+reportPeriodToSpan :: ReportPeriod -> 
+                      Day -> 
+                      Ledger -> 
+                      Maybe DateSpan
+reportPeriodToSpan AllDates _ l = lDateSpan l
+reportPeriodToSpan (CustomPeriod d1 d2) _ _ = return (d1, d2)
+reportPeriodToSpan (FromBeginningUntil d2) _ l = 
+  lDateSpan l >>= (\(d1, _) -> return (d1, d2))
 
 reportPeriodToSpan ThisMonth today _ = 
   let (y, m, _) = toGregorian today
       d1 = fromGregorian y m 1
-  in (Just d1, Just $ toEndOfMonth d1)
+  in return (d1, toEndOfMonth d1)
 reportPeriodToSpan ThisMonthToDate today _ = 
   let (y, m, _) = toGregorian today
       d1 = fromGregorian y m 1
-  in (Just d1, Just today)
+  in return (d1, today)
 
 reportPeriodToSpan ThisCalendarQuarter today _ =
+  return $ computeThisCalendarQuarter today
+reportPeriodToSpan ThisCalendarQuarterToDate today _ =
+  let (d1, _) = computeThisCalendarQuarter today
+  in return (d1, today)
+
+reportPeriodToSpan ThisFiscalQuarter today l =
+  return $ computeThisFiscalQuarter today (jfFirstFiscalMonth $ lJournalFile l)
+
+reportPeriodToSpan ThisFiscalQuarterToDate today l =
+  let (d1, _) = computeThisFiscalQuarter today 
+                     (jfFirstFiscalMonth $ lJournalFile l)
+  in return (d1, today)
+
+reportPeriodToSpan ThisCalendarYear today _ =
+  let (y, _, _) = toGregorian today
+  in return (fromGregorian y 1 1, fromGregorian y 12 31)
+
+reportPeriodToSpan ThisCalendarYearToDate today _ =
+  let (y, _, _) = toGregorian today
+  in return (fromGregorian y 1 1, today)
+
+reportPeriodToSpan ThisFiscalYear today l =
+  let firstFiscalMonth = jfFirstFiscalMonth $ lJournalFile l
+  in return $ computeThisFiscalYear today firstFiscalMonth
+reportPeriodToSpan ThisFiscalYearToDate today l =
+  let firstFiscalMonth = jfFirstFiscalMonth $ lJournalFile l
+      (d1, _) = computeThisFiscalYear today firstFiscalMonth
+  in return (d1, today)
+
+reportPeriodToSpan Since30DaysAgo today _ = return (addDays (-30) today, today)
+reportPeriodToSpan Since60DaysAgo today _ = return (addDays (-60) today, today)
+reportPeriodToSpan Since90DaysAgo today _ = return (addDays (-90) today, today)
+reportPeriodToSpan Since365DaysAgo today _ = return (addDays (-365) today, today)
+reportPeriodToSpan (SinceDateUntilTheEnd d1) _ l = 
+  lDateSpan l >>= (\(_, d2) -> return (d1, d2))
+reportPeriodToSpan (SinceDateToDate d1) today _ = return (d1, today)
+
+computeThisCalendarQuarter :: Day -> (Day, Day)
+computeThisCalendarQuarter today =
   let (y, m, _) = toGregorian today
   in case ((m - 1) :: Int) `div` 3 of
-    0 -> (Just $ fromGregorian y 1 1, Just $ fromGregorian y 3 31)
-    1 -> (Just $ fromGregorian y 4 1, Just $ fromGregorian y 6 30)
-    2 -> (Just $ fromGregorian y 7 1, Just $ fromGregorian y 9 31)
-    _ -> (Just $ fromGregorian y 10 1, Just $ fromGregorian y 12 31)
-reportPeriodToSpan ThisCalendarQuarterToDate today x =
-  let (d1, _) = reportPeriodToSpan ThisCalendarQuarter today x
-  in (d1, Just today)
+    0 -> (fromGregorian y 1 1, fromGregorian y 3 31)
+    1 -> (fromGregorian y 4 1, fromGregorian y 6 30)
+    2 -> (fromGregorian y 7 1, fromGregorian y 9 31)
+    _ -> (fromGregorian y 10 1, fromGregorian y 12 31)
 
-reportPeriodToSpan ThisFiscalQuarter today firstFiscalMonth =
+computeThisFiscalQuarter :: Day -> Int -> (Day, Day)
+computeThisFiscalQuarter today firstFiscalMonth = 
   let (y, m, _) = toGregorian today
       monthNumber = if m >= firstFiscalMonth
                     then m - firstFiscalMonth
@@ -118,43 +180,23 @@ reportPeriodToSpan ThisFiscalQuarter today firstFiscalMonth =
                        then fromGregorian y firstFiscalMonth 1
                        else fromGregorian (y - 1) firstFiscalMonth 1
   in case (monthNumber :: Int) `div` 3 of
-    0 -> (Just $ firstFiscalDay, 
-          Just $ toEndOfMonth $ addGregorianMonthsClip 2 firstFiscalDay)
-    1 -> (Just $ addGregorianMonthsClip 3 firstFiscalDay, 
-          Just $ toEndOfMonth $ addGregorianMonthsClip 5 firstFiscalDay)
-    2 -> (Just $ addGregorianMonthsClip 6 firstFiscalDay, 
-          Just $ toEndOfMonth $ addGregorianMonthsClip 8 firstFiscalDay)
-    _ -> (Just $ addGregorianMonthsClip 9 firstFiscalDay, 
-          Just $ toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
-reportPeriodToSpan ThisFiscalQuarterToDate today x =
-  let (d1, _) = reportPeriodToSpan ThisFiscalQuarter today x
-  in (d1, Just today)
+    0 -> (firstFiscalDay, 
+          toEndOfMonth $ addGregorianMonthsClip 2 firstFiscalDay)
+    1 -> (addGregorianMonthsClip 3 firstFiscalDay, 
+          toEndOfMonth $ addGregorianMonthsClip 5 firstFiscalDay)
+    2 -> (addGregorianMonthsClip 6 firstFiscalDay, 
+          toEndOfMonth $ addGregorianMonthsClip 8 firstFiscalDay)
+    _ -> (addGregorianMonthsClip 9 firstFiscalDay, 
+          toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
 
-reportPeriodToSpan ThisCalendarYear today _ =
-  let (y, _, _) = toGregorian today
-  in (Just $ fromGregorian y 1 1, Just $ fromGregorian y 12 31)
-reportPeriodToSpan ThisCalendarYearToDate today x =
-  let (d1, _) = reportPeriodToSpan ThisCalendarYear today x
-  in (d1, Just today)
-
-reportPeriodToSpan ThisFiscalYear today firstFiscalMonth =
+computeThisFiscalYear :: Day -> Int -> (Day, Day)
+computeThisFiscalYear today firstFiscalMonth = 
   let (y, m, _) = toGregorian today
       firstFiscalDay = if m >= firstFiscalMonth
                        then fromGregorian y firstFiscalMonth 1
                        else fromGregorian (y - 1) firstFiscalMonth 1
-  in (Just firstFiscalDay, 
-      Just $ toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
-reportPeriodToSpan ThisFiscalYearToDate today x =
-  let (d1, _) = reportPeriodToSpan ThisFiscalYear today x
-  in (d1, Just today)
-
-reportPeriodToSpan Since30DaysAgo today _ = (Just $ addDays (-30) today, Just today)
-reportPeriodToSpan Since60DaysAgo today _ = (Just $ addDays (-60) today, Just today)
-reportPeriodToSpan Since90DaysAgo today _ = (Just $ addDays (-90) today, Just today)
-reportPeriodToSpan Since365DaysAgo today _ = (Just $ addDays (-365) today, Just today)
-reportPeriodToSpan (SinceDateUntilTheEnd d1) _ _ = (Just d1, Nothing)
-reportPeriodToSpan (SinceDateToDate d1) today _ = (Just d1, Just today)
-
+  in (firstFiscalDay, 
+      toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
 
 toEndOfMonth :: Day -> Day
 toEndOfMonth date =
