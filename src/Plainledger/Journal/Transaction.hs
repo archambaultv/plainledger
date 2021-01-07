@@ -61,7 +61,7 @@ decodeJTransactionsFile :: Language ->
                            ExceptT Errors IO [(SourcePos, JTransaction)]
 decodeJTransactionsFile lang csvSeparator decimalSeparator filePath = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       accs <- decodeTransactions lang csvSeparator decimalSeparator (BL.fromStrict csvBS)
       let pos = map (\i -> SourcePos filePath i 0) [2..]
       return $ zip pos accs

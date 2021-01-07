@@ -55,7 +55,7 @@ data Balance = Balance
 decodeStatementBalanceFile :: Language -> Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
 decodeStatementBalanceFile lang csvSeparator decimalSeparator filePath = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       bals <- decodeBalances lang True csvSeparator decimalSeparator (BL.fromStrict csvBS)
       let bals1 = map (\b -> b{bStartDate = Nothing}) bals
       let pos = map (\i -> SourcePos filePath i 0) [2..]
@@ -64,7 +64,7 @@ decodeStatementBalanceFile lang csvSeparator decimalSeparator filePath =
 decodeTrialBalanceFile :: Language -> Char -> Char -> FilePath ->  ExceptT Errors IO [(SourcePos, Balance)]
 decodeTrialBalanceFile lang csvSeparator decimalSeparator filePath = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       bals <- decodeBalances lang False csvSeparator decimalSeparator (BL.fromStrict csvBS)
       let pos = map (\i -> SourcePos filePath i 0) [2..]
       return $ zip pos bals

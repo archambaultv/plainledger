@@ -39,13 +39,18 @@ trialBalanceReport period _ showRow ledger today =
                             i18nText lang (TReportAccName),
                             i18nText lang (TReportDebit),
                             i18nText lang (TReportCredit)]
-      header :: V.Vector (V.Vector T.Text)
-      header = V.fromList [header1, header2, header3, V.empty, header4]
-  in case dateSpan of
-        Nothing -> header
-        Just x -> header V.++ trialBalanceBody showRow x ledger
+      footer = V.singleton $ i18nText lang (TReportGeneratedOn today)
+      header :: [V.Vector T.Text]
+      header = [header1, header2, header3, V.empty, header4]
+      body = case dateSpan of
+              Nothing -> []
+              Just x -> trialBalanceBody showRow x ledger
+  in V.fromList
+     $ header 
+     ++ body
+     ++ [V.empty, footer]
       
-trialBalanceBody :: ShowRow -> DateSpan -> Ledger -> V.Vector (V.Vector T.Text)
+trialBalanceBody :: ShowRow -> DateSpan -> Ledger -> [(V.Vector T.Text)]
 trialBalanceBody showRow dates ledger 
   = let lang = jfLanguage $ lJournalFile ledger
         lines1 = mapMaybe serialize 
@@ -58,20 +63,20 @@ trialBalanceBody showRow dates ledger
                             i18nText lang TReportTotal,
                             writeAmount decimalSep totalDebit, 
                             writeAmount decimalSep $ negate totalCredit]
-    in V.fromList $ body ++ [V.empty, total]
+    in body ++ [total]
   where serialize :: Account -> Maybe (Quantity, V.Vector T.Text)
         serialize acc =
           let number = T.pack $ show $ aNumber acc
               name = aDisplayName acc
               amnt = trialBalanceQty ledger dates acc
-              amntText = qtyToDebitCredit decimalSep (aType acc) 
-                       $ fromMaybe 0 amnt
+              amntText = qtyToDebitCredit decimalSep (aType acc) amnt
+              isActive = isAccountActive ledger dates acc
               line = V.fromList $ [number, name] ++ amntText
-          in case (amnt, showRow) of
-                (x, ShowAll) -> Just (fromMaybe 0 x, line)
-                (Nothing, _) -> Nothing
-                (Just x, ShowNonZero) | x == 0 -> Nothing
-                (Just x, _) -> Just (x, line)
+          in case (isActive, showRow) of
+                (_, ShowAll) -> Just (amnt, line)
+                (False, _) -> Nothing
+                (True, ShowNonZero) | amnt == 0 -> Nothing
+                (True, _) -> Just (amnt, line)
 
         decimalSep = jfDecimalSeparator $ lJournalFile ledger
 

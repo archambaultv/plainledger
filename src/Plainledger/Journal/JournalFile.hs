@@ -53,12 +53,14 @@ data JournalFile = JournalFile {
    -- | The file path to the Journal File
    jfFilePath :: String,
 
-   jfLanguage :: Language
+   jfLanguage :: Language,
+
+   jfHasBom :: Bool
   }
   deriving (Eq, Show) 
 
 emptyJournalFile :: JournalFile
-emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] [] "" En_CA
+emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] [] "" En_CA False
 
 csvSeparator :: [Char] 
 csvSeparator = [',', ';', '\t']
@@ -66,11 +68,12 @@ csvSeparator = [',', ';', '\t']
 decodeJournalFile :: FilePath -> 
                      ExceptT (Language, Errors) IO JournalFile
 decodeJournalFile filePath = withFileName $ do
-  csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+  (hasBom, csvBS) <- fmap removeBom $ liftIO $ BS.readFile filePath
   let (csvHeader, csvData) = takeFirstLine csvBS
   (lang, sep) <- withEnglishLang 
               $ processJournalFileHeader (BL.fromStrict csvHeader) csvSeparator
-  withLang lang $ processJournalFileBody filePath lang sep csvData
+  j <- withLang lang $ processJournalFileBody filePath lang sep csvData
+  return j{jfHasBom = hasBom}
 
   where withEnglishLang = withExceptT (En_CA,)
         withLang l = withExceptT (l,)

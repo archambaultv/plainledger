@@ -1,18 +1,19 @@
-Trial Balance
-Journal file,test/Journal/Journal.yaml
-Start date,2019-01-01,End date,2019-12-31
+La compagnie Plainledger
+Balance de vérification
+Du 2019-01-01 au 2019-12-31
 
-Account number,Account Name,Debit,Credit
-1001,Compte chèque,12386.10,
-1051,My House on ABC Street,275000,
-2001,My credit card,358,
-2002,Mortgage,,164375
-2051,Line of credit,,6183.45
-3001,Opening Balance,,115005.23
-4152,Company Foo,,2500
-4153,Rental,,1000
-5002,Food,220.00,
-5003,Taxes,649.58,
-5006,Clothes,450,
+Numéro;Compte;Débit;Crédit
+1001;Compte chèque;12386,10;
+1051;Maison 123 rue principale;275000;
+2001;Carte de crédit;358;
+2002;Hypothèque;;164375
+2051;Marge de crédit;;6183,45
+3001;Solde d'ouverture;;115005,23
+4152;Salaire compagnie Foo Bar;;2500
+4153;Revenu de location;;1000
+5002;Nourriture;220,00;
+5003;Taxes;649,58;
+5006;Vêtements;450;
+;Total;289063,68;289063,68
 
-,Total,289063.68,289063.68
+Rapport généré le 2019-12-31

@@ -73,3 +73,4 @@ data I18nText
   | TReportDebit 
   | TReportCredit
   | TReportTotal
+  | TReportGeneratedOn Day

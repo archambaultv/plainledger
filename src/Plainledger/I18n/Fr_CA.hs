@@ -71,6 +71,7 @@ fr_CAText TReportAccName = "Compte"
 fr_CAText TReportDebit  = "Débit"
 fr_CAText TReportCredit = "Crédit"
 fr_CAText TReportTotal = "Total"
+fr_CAText (TReportGeneratedOn d) = "Rapport généré le " ++ show d
 
 -- | Pretty print the error message and add the source file information
 printError :: Error -> String

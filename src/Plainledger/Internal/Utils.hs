@@ -10,6 +10,7 @@
 
 module Plainledger.Internal.Utils
 (
+  bom,
   removeBom,
   takeFirstLine
 ) where
@@ -17,10 +18,13 @@ module Plainledger.Internal.Utils
 import Data.Word
 import qualified Data.ByteString as BS
 
+bom :: BS.ByteString
+bom = BS.pack [0xEF,0xBB,0xBF]
+
 -- | Remove the UTF8 BOM if present
-removeBom :: BS.ByteString -> BS.ByteString
-removeBom bs | BS.take 3 bs == BS.pack [0xEF,0xBB,0xBF] = BS.drop 3 bs
-             | otherwise = bs
+removeBom :: BS.ByteString -> (Bool, BS.ByteString)
+removeBom bs | BS.take 3 bs == bom = (True, BS.drop 3 bs)
+             | otherwise = (False, bs)
 
 
 newline:: Word8

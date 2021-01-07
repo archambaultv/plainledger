@@ -84,14 +84,8 @@ postingsToBalanceMap ps =
 
 getBalance :: BalanceMap ->
              T.Text ->
-             M.Map Day Quantity 
-getBalance m acc =
-  case HM.lookup acc m of
-    Nothing -> error
-               $ "getBalance : Account \""
-               ++ T.unpack acc
-               ++ "\" is not in the balance map."
-    Just m2 -> m2
+             Maybe (M.Map Day Quantity)
+getBalance m acc = HM.lookup acc m
 
 -- | balanceAtDate m d acc returns the balance of account acc at the date d. The
 -- balance is Nothing if the date is prior than any date in the map for this account.
@@ -100,9 +94,7 @@ balanceAtDate :: BalanceMap ->
                  T.Text ->
                  Day ->
                  Maybe (Day, Quantity)
-balanceAtDate m acc d = 
-  let m2 = getBalance m acc
-  in M.lookupLE d m2
+balanceAtDate m acc d = getBalance m acc >>= M.lookupLE d
 
 -- Computes the balance at the end of the day
 -- For the opening balance account see journalOpeningBalance

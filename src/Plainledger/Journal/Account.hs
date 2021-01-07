@@ -205,7 +205,7 @@ decodeAccounts lang csvSeparator bs = do
 decodeAccountsFile :: Language -> FilePath -> Char -> ExceptT Errors IO  [(SourcePos, Account)]
 decodeAccountsFile lang filePath csvSeparator = 
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap removeBom $ liftIO $ BS.readFile filePath
+      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       accs <- decodeAccounts lang csvSeparator (BL.fromStrict csvBS)
       let pos = map (\i -> SourcePos filePath i 0) [2..]
       return $ zip pos accs

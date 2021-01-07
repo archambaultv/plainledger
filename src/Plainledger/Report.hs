@@ -35,6 +35,7 @@ import Plainledger.Report.TrialBalance
 import Plainledger.Report.BalanceSheet
 import Plainledger.Report.IncomeStatement
 import Plainledger.Report.Transactions
+import Plainledger.Internal.Utils
 
 runReport :: ReportParams -> Day -> Journal -> V.Vector (V.Vector T.Text)
 runReport (Transactions period _ b) today j = 
@@ -54,4 +55,9 @@ encodeReport j v =
   in C.encodeWith myOptions $ V.toList v
 
 writeReport :: FilePath -> Journal -> V.Vector (V.Vector T.Text) -> IO ()
-writeReport path j v = BS.writeFile path $ BL.toStrict $ encodeReport j v
+writeReport path j v = 
+  let report = encodeReport j v
+      bomReport = if jfHasBom $ jJournalFile j
+                  then BL.append (BL.fromStrict bom) report
+                  else report
+  in BS.writeFile path (BL.toStrict bomReport)
