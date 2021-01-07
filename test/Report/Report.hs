@@ -4,9 +4,10 @@ module Report.Report (
 
 import Test.Tasty
 import Report.Transactions.Transactions
+import Report.TrialBalance.TrialBalance
 import Report.Report.Report
 
 
 reportsTestTree :: TestTree
 reportsTestTree = testGroup "Report tests"
-              [reportTestTree, transactionsTestTree]
+              [reportTestTree, transactionsTestTree, trialBalanceTestTree]

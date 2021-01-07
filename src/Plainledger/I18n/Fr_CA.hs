@@ -59,6 +59,19 @@ fr_CAText TTransactionAccountPrefix = "Compte"
 fr_CAText TTransactionAmountPrefix = "Montant"
 fr_CAText TTransactionBalanceDatePrefix = "Date du relevé"
 
+fr_CAText TReportTrialBalanceName = "Balance de vérification"
+fr_CAText (TReportDateSpan Nothing) = ""
+fr_CAText (TReportDateSpan (Just (d1, d2))) = "Du "
+                                            ++ show d1
+                                            ++ " au "
+                                            ++ show d2
+
+fr_CAText TReportAccNumber = "Numéro"
+fr_CAText TReportAccName = "Compte"
+fr_CAText TReportDebit  = "Débit"
+fr_CAText TReportCredit = "Crédit"
+fr_CAText TReportTotal = "Total"
+
 -- | Pretty print the error message and add the source file information
 printError :: Error -> String
 printError (Error [] e) = "erreur:\n" ++ printErrorType e

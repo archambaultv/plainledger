@@ -32,23 +32,23 @@ transactionsTestTree :: TestTree
 transactionsTestTree =
    testGroup "Transactions"
     [ runReportOk "Journal-01",
-      transactionEncodeDecode Fr_CA ';' ',' "Journal-01"
+      transactionEncodeDecode "Journal-01"
     ]
 
 runReportOk :: String -> TestTree
 runReportOk folder = testCase ("Report for " ++ folder) $ do
  getTransactionReport folder >> return ()
 
-transactionEncodeDecode :: Language ->
-                            Char ->
-                            Char -> 
-                            String -> 
+transactionEncodeDecode ::  String -> 
                             TestTree
-transactionEncodeDecode lang csvSeparator decimalSeparator folder = 
+transactionEncodeDecode folder = 
   testCase ("Encode - decode for " ++ folder) $ do
     (journal, report) <- getTransactionReport folder
     -- Encode the report as csv and then decode the report back
     -- Ensures the decoded report is equal to the original transactions
+    let csvSeparator = jfCsvSeparator $ jJournalFile journal
+    let decimalSeparator = jfDecimalSeparator $ jJournalFile journal
+    let lang = jfLanguage $ jJournalFile journal
     let myOptions = C.defaultEncodeOptions {
                       C.encDelimiter = fromIntegral (ord csvSeparator)
                     }

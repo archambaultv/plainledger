@@ -75,8 +75,8 @@ okBalance :: Bool -> String -> Char -> Char -> [Balance] -> TestTree
 okBalance isStatementBalance filename sep decimal expectedBalance = 
   testCase ("Decode " ++ filename) $ do
        let f = decodeFunction isStatementBalance
-       balance <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
-       case balance of
+       balance1 <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
+       case balance1 of
          Left err -> assertFailure $ printErr err
          Right actual -> assertEqual "" expectedBalance (map snd actual)
 
@@ -84,8 +84,8 @@ koBalance :: Bool -> String -> Char -> Char -> Errors -> TestTree
 koBalance isStatementBalance filename sep decimal expectedErr =
    testCase ("Assert error for " ++ filename) $ do
        let f = decodeFunction isStatementBalance
-       balance <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
-       case balance of
+       balance1 <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
+       case balance1 of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
 

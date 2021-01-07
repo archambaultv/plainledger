@@ -59,6 +59,19 @@ en_CAText TTransactionAccountPrefix = "Account"
 en_CAText TTransactionAmountPrefix = "Amount"
 en_CAText TTransactionBalanceDatePrefix = "Date on statement"
 
+en_CAText TReportTrialBalanceName = "Trial Balance"
+en_CAText (TReportDateSpan Nothing) = ""
+en_CAText (TReportDateSpan (Just (d1, d2))) = "From "
+                                            ++ show d1
+                                            ++ " to "
+                                            ++ show d2
+
+
+en_CAText TReportAccNumber = "Number"
+en_CAText TReportAccName = "Account"
+en_CAText TReportDebit  = "Debit"
+en_CAText TReportCredit = "Credit"
+en_CAText TReportTotal = "Total"
 
 -- | Pretty print the error message and add the source file information
 printError :: Error -> String
@@ -173,7 +186,7 @@ printErrorType (EndDateGreaterThanStartDate sd ed)
   ++ "\" is greater than the end date \""
   ++ show ed
   ++ "\""
-  
+
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
 showSourcePos (SourcePos f r c) | c <= 0

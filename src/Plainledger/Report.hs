@@ -41,7 +41,7 @@ runReport (Transactions period _ b) today j =
   let dateSpan = reportPeriodToSpan period today (journalToLedger j)
   in transactionReport dateSpan b j
 runReport (TrialBalance period c showRow) today j = 
-  trialBalanceReport period c showRow j
+  trialBalanceReport period c showRow (journalToLedger j) today
 runReport (BalanceSheet _ _ _ _ _) _ _ = error "Not Implemented"
 runReport (IncomeStatement _ _ _ _ _) _ _ = error "Not Implemented"
 

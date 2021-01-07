@@ -154,6 +154,7 @@ checkTrialBalanceAmount :: forall m . (MonadError Errors m) =>
 checkTrialBalanceAmount accTypef openAcc balMap (pos, b) =
   let endDate = bDate b
       acc = bAccount b
+      accType = accTypef acc
       mustHaveStartDate = acc == openAcc 
                         || isIncomeStatementType (accTypef acc)
       startDateM = 
@@ -168,7 +169,7 @@ checkTrialBalanceAmount accTypef openAcc balMap (pos, b) =
       computeAmount sd =
         if HM.member acc balMap
         then Just $ trialBalanceQuantity openAcc accTypef balMap 
-                             acc (sd, endDate)
+                             acc accType (sd, endDate)
         else Nothing
   in do
     startDate <- startDateM

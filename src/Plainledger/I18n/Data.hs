@@ -15,6 +15,7 @@ module Plainledger.I18n.Data
   I18nText(..)
 ) where
 
+import Data.Time
 import Plainledger.Error
 
 -- Supported language by this application
@@ -64,3 +65,11 @@ data I18nText
   | TTransactionAccountPrefix
   | TTransactionAmountPrefix
   | TTransactionBalanceDatePrefix
+
+  | TReportTrialBalanceName
+  | TReportDateSpan (Maybe (Day, Day))
+  | TReportAccNumber
+  | TReportAccName
+  | TReportDebit 
+  | TReportCredit
+  | TReportTotal

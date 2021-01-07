@@ -17,12 +17,14 @@ module Plainledger.Report.Report
   CompareAnotherPeriod(..),
   CompareExtraColumns(..),
   ShowRow(..),
-  DisplayColumns(..)
+  DisplayColumns(..),
+  trialBalanceQty
   )
 where
 
 import Data.Time
 import Plainledger.Journal
+import qualified Data.HashMap.Strict as HM
 -- import Data.Tree
 -- import Data.List
 -- import Data.Bifunctor
@@ -48,6 +50,20 @@ journalToLedger journal =
       balMap = transactionsToBalanceMap txns
       dSpan = journalDateSpan journal
   in Ledger jf accs txns dSpan balMap
+
+-- Nothing means the account does not have any transactions
+trialBalanceQty :: Ledger -> DateSpan -> Account -> Maybe Quantity
+trialBalanceQty ledger dateSpan acc =
+  let openAcc = jfOpeningBalanceAccount $ lJournalFile ledger
+      accId = aId acc
+      balMap = lBalanceMap ledger
+      accMaps = HM.fromList $ map (\a -> (aId a, aType a)) $ lAccounts ledger
+      accTypef = \a -> accMaps HM.! a
+      testMember = if HM.member accId balMap
+                   then Just ()
+                   else Nothing
+      qty = trialBalanceQuantity openAcc accTypef balMap accId (aType acc) dateSpan 
+  in testMember >> Just qty
 
 data CompareExtraColumns 
   = CompareExtraColumns {

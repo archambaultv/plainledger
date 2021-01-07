@@ -13,8 +13,8 @@ module Plainledger.Journal.BalanceMap
   BalanceMap,
   balanceAtDate,
   balance,
-  openingBalance,
   cashFlow,
+  openingBalance,
   journalOpeningBalance,
   earnings,
   postingsToBalanceMap,
@@ -88,7 +88,7 @@ getBalance :: BalanceMap ->
 getBalance m acc =
   case HM.lookup acc m of
     Nothing -> error
-               $ "balanceAtDate : Account \""
+               $ "getBalance : Account \""
                ++ T.unpack acc
                ++ "\" is not in the balance map."
     Just m2 -> m2
@@ -144,9 +144,10 @@ trialBalanceQuantity :: T.Text ->
                         (T.Text -> AccountType) ->
                         BalanceMap -> 
                         T.Text -> 
+                        AccountType ->
                         (Day, Day) -> 
                         Quantity
-trialBalanceQuantity openAcc accTypef m acc (sd, ed)
+trialBalanceQuantity openAcc accTypef m acc accType (sd, ed)
   | openAcc == acc = balance m acc ed + journalOpeningBalance accTypef m sd
-  | isIncomeStatementType (accTypef acc) = cashFlow m acc (sd, ed)
+  | isIncomeStatementType accType = cashFlow m acc (sd, ed)
   | otherwise = balance m acc ed
