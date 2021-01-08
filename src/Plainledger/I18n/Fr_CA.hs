@@ -60,6 +60,8 @@ fr_CAText TTransactionAmountPrefix = "Montant"
 fr_CAText TTransactionBalanceDatePrefix = "Date du relevé"
 
 fr_CAText TReportTrialBalanceName = "Balance de vérification"
+fr_CAText TReportBalanceSheetName = "Bilan"
+fr_CAText TReportIncomeStatementName = "État des résultats"
 fr_CAText (TReportDateSpan Nothing) = ""
 fr_CAText (TReportDateSpan (Just (d1, d2))) = "Du "
                                             ++ show d1

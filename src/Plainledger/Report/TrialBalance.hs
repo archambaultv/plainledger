@@ -31,28 +31,20 @@ trialBalanceReport :: ReportPeriod ->
                       V.Vector (V.Vector T.Text)
 trialBalanceReport period _ showRow ledger today = 
   let lang = jfLanguage $ lJournalFile ledger
-      header1 = V.singleton $ jfCompanyName $ lJournalFile ledger
-      header2 = V.singleton $ i18nText lang TReportTrialBalanceName
+      reportName = i18nText lang TReportTrialBalanceName
       dateSpan = reportPeriodToSpan period today ledger
-      header3 = V.singleton $ i18nText lang (TReportDateSpan dateSpan)
-      header4 = V.fromList [i18nText lang (TReportAccNumber),
-                            i18nText lang (TReportAccName),
-                            i18nText lang (TReportDebit),
-                            i18nText lang (TReportCredit)]
-      footer = V.singleton $ i18nText lang (TReportGeneratedOn today)
-      header :: [V.Vector T.Text]
-      header = [header1, header2, header3, V.empty, header4]
       body = case dateSpan of
               Nothing -> []
               Just x -> trialBalanceBody showRow x ledger
-  in V.fromList
-     $ header 
-     ++ body
-     ++ [V.empty, footer]
+  in standardReport period ledger today reportName body
       
 trialBalanceBody :: ShowRow -> DateSpan -> Ledger -> [(V.Vector T.Text)]
 trialBalanceBody showRow dates ledger 
-  = let lang = jfLanguage $ lJournalFile ledger
+  = let header4 = V.fromList [i18nText lang (TReportAccNumber),
+                              i18nText lang (TReportAccName),
+                              i18nText lang (TReportDebit),
+                              i18nText lang (TReportCredit)]
+        lang = jfLanguage $ lJournalFile ledger
         lines1 = mapMaybe serialize 
               $ sortBy (comparing aNumber) 
               $ lAccounts ledger
@@ -63,7 +55,7 @@ trialBalanceBody showRow dates ledger
                             i18nText lang TReportTotal,
                             writeAmount decimalSep totalDebit, 
                             writeAmount decimalSep $ negate totalCredit]
-    in body ++ [total]
+    in (header4 : body) ++ [total]
   where serialize :: Account -> Maybe (Quantity, V.Vector T.Text)
         serialize acc =
           let number = T.pack $ show $ aNumber acc
@@ -79,10 +71,3 @@ trialBalanceBody showRow dates ledger
                 (True, _) -> Just (amnt, line)
 
         decimalSep = jfDecimalSeparator $ lJournalFile ledger
-
-qtyToDebitCredit :: Char -> AccountType -> Quantity -> [T.Text]
-qtyToDebitCredit _ accType 0 = if isCreditType accType
-                             then ["","0"]
-                             else ["0",""]
-qtyToDebitCredit c _ x | x < 0 = ["", writeAmount c $ negate x]
-qtyToDebitCredit c _ x = [writeAmount c x, ""]

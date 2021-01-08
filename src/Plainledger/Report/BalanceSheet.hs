@@ -8,48 +8,63 @@
 --
 
 module Plainledger.Report.BalanceSheet (
-  -- reportToBalanceSheet,
-  -- BalanceSheetOption
+  balanceSheetReport
   )
 where
 
--- import Plainledger.Ledger
--- import Plainledger.Reports.Report
--- import qualified Data.Text as T
+import Data.List
+import Data.Ord
+import Data.Maybe
+import Data.Time
+import Plainledger.I18n.I18n
+import Plainledger.Journal
+import Plainledger.Report.Report
+import qualified Data.Vector as V
+import qualified Data.Text as T
 
--- type BalanceSheetOption = TrialBalanceOption
 
--- reportToBalanceSheet :: BalanceSheetOption -> Report -> [[T.Text]]
--- reportToBalanceSheet opt r =
---     let
---       -- The opening and earning accounts from the configuration
---       rOpenBal = reportLedgerOpeningBalance r
---       openBalAcc = cOpeningBalanceAccount $ jConfiguration $ lJournal $ rLedger r
---       rEarnings = reportEarnings r
---       earningsAcc = cEarningsAccount $ jConfiguration $ lJournal $ rLedger r
+balanceSheetReport :: ReportPeriod -> 
+                      (Maybe CompareAnotherPeriod) -> 
+                      ShowRow -> 
+                      (Maybe DisplayColumns) ->
+                      CompareExtraColumns ->
+                      Ledger ->
+                      Day ->
+                      V.Vector (V.Vector T.Text)
+balanceSheetReport period _ showRow _ _ ledger today = 
+  let lang = jfLanguage $ lJournalFile ledger
+      reportName = i18nText lang TReportBalanceSheetName
+      dateSpan = reportPeriodToSpan period today ledger
+      body = case dateSpan of
+              Nothing -> []
+              Just x -> balanceSheetBody showRow x ledger
+  in standardReport period ledger today reportName body
+      
+balanceSheetBody :: ShowRow -> DateSpan -> Ledger -> [(V.Vector T.Text)]
+balanceSheetBody showRow dates ledger 
+  = let lang = jfLanguage $ lJournalFile ledger
+        header = V.fromList [i18nText lang (TReportAccName)]
+        lines1 = mapMaybe serialize 
+               $ sortBy (comparing aNumber) 
+               $ filter (isBalanceSheetType . aType)
+               $ lAccounts ledger
+        body = map snd lines1
 
---       accountAlg :: Account -> Maybe [Quantity]
---       accountAlg a
---         | isReportActive a r == False
---           && aId a /= openBalAcc
---           && aId a /= earningsAcc
---           && (all (== 0) (balanceQty a))
---           && not (grShowInactiveAccounts opt) = Nothing
---       accountAlg acc = Just (balanceQty acc)
+    in header : body
+  where serialize :: Account -> Maybe (Quantity, V.Vector T.Text)
+        serialize acc =
+          let number = T.pack $ show $ aNumber acc
+              name = T.concat [aDisplayName acc, " (", number, ")"]
+              amnt = balanceSheetQty ledger dates acc
+              amntText = qtyToNormallyPositive decimalSep (aType acc) amnt
+              isActive = isAccountActive ledger dates acc
+                       || aId acc == jfEarningsAccount (lJournalFile ledger)
+                       || aId acc == jfOpeningBalanceAccount (lJournalFile ledger)
+              line = V.fromList $ [name, amntText]
+          in case (isActive, showRow) of
+                (_, ShowAll) -> Just (amnt, line)
+                (False, _) -> Nothing
+                (True, ShowNonZero) | amnt == 0 -> Nothing
+                (True, _) -> Just (amnt, line)
 
---       balanceQty :: Account -> [Quantity]
---       balanceQty a =
---           if isIncomeStatementType $ aType a
---           then adjustBalance a $ reportCashFlow a r
---           else adjustBalance a $ reportBalance a r
-
---       -- Adjust the balance for the earnings and open balance
---       adjustBalance :: Account -> [Quantity] -> [Quantity]
---       adjustBalance acc xs =
---         if aId acc == openBalAcc
---         then addList rOpenBal xs
---         else if aId acc == earningsAcc
---              then addList rEarnings xs
---              else xs
-
---     in groupReport "Balance Sheet" accountAlg isBalanceSheetType r
+        decimalSep = jfDecimalSeparator $ lJournalFile ledger

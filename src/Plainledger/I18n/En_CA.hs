@@ -60,6 +60,8 @@ en_CAText TTransactionAmountPrefix = "Amount"
 en_CAText TTransactionBalanceDatePrefix = "Date on statement"
 
 en_CAText TReportTrialBalanceName = "Trial Balance"
+en_CAText TReportBalanceSheetName = "Balance Sheet"
+en_CAText TReportIncomeStatementName = "Income Statement"
 en_CAText (TReportDateSpan Nothing) = ""
 en_CAText (TReportDateSpan (Just (d1, d2))) = "From "
                                             ++ show d1

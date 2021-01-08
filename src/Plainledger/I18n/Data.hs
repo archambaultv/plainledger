@@ -67,6 +67,8 @@ data I18nText
   | TTransactionBalanceDatePrefix
 
   | TReportTrialBalanceName
+  | TReportBalanceSheetName
+  | TReportIncomeStatementName
   | TReportDateSpan (Maybe (Day, Day))
   | TReportAccNumber
   | TReportAccName

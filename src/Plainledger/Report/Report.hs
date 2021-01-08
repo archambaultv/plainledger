@@ -12,20 +12,76 @@ module Plainledger.Report.Report
   Ledger(..),
   journalToLedger,
   isAccountActive,
+  standardReport,
+  standardHeader,
+  standardFooter,
+  qtyToNormallyPositive,
+  qtyToDebitCredit,
   ReportParams(..),
   ReportPeriod(..),
   reportPeriodToSpan,
   CompareAnotherPeriod(..),
   CompareExtraColumns(..),
+  compareExtraColumnsDefault,
   ShowRow(..),
   DisplayColumns(..),
-  trialBalanceQty
+  trialBalanceQty,
+  balanceSheetQty
   )
 where
 
 import Data.Time
 import Plainledger.Journal
+import Plainledger.I18n.I18n
+import qualified Data.Vector as V
 import qualified Data.HashMap.Strict as HM
+import qualified Data.Text as T
+
+qtyToDebitCredit :: Char -> AccountType -> Quantity -> [T.Text]
+qtyToDebitCredit _ accType 0 = if isCreditType accType
+                             then ["","0"]
+                             else ["0",""]
+qtyToDebitCredit c _ x | x < 0 = ["", writeAmount c $ negate x]
+qtyToDebitCredit c _ x = [writeAmount c x, ""]
+
+qtyToNormallyPositive :: Char -> AccountType -> Quantity -> T.Text
+qtyToNormallyPositive c accType qty
+  | isCreditType accType = writeAmount c $ negate qty
+  | otherwise = writeAmount c qty
+
+standardReport :: ReportPeriod -> 
+                  Ledger ->
+                  Day ->
+                  T.Text ->
+                  [V.Vector T.Text] ->
+                  V.Vector (V.Vector T.Text)
+standardReport period ledger today reportName body = 
+  let header = standardHeader ledger period today reportName
+      footer = standardFooter ledger today
+      body1 = case body of
+              [] -> [V.empty]
+              xs -> V.empty 
+                    : xs
+                    ++ [V.empty]
+
+  in V.fromList
+     $ header 
+     ++ body1
+     ++ footer
+
+standardHeader :: Ledger -> ReportPeriod -> Day -> T.Text -> [V.Vector T.Text]
+standardHeader ledger period today reportName =
+  let lang = jfLanguage $ lJournalFile ledger
+      header1 = V.singleton $ jfCompanyName $ lJournalFile ledger
+      header2 = V.singleton $ reportName
+      dateSpan = reportPeriodToSpan period today ledger
+      header3 = V.singleton $ i18nText lang (TReportDateSpan dateSpan)
+  in [header1, header2, header3]
+
+standardFooter :: Ledger -> Day -> [V.Vector T.Text]
+standardFooter ledger today = 
+  let lang = jfLanguage $ lJournalFile ledger
+  in [V.singleton $ i18nText lang (TReportGeneratedOn today)]
 
 -- Ledger is like a journal, but with some precomputed informations
 -- usefull for reportings
@@ -34,7 +90,8 @@ data Ledger = Ledger {
   lAccounts   :: [Account],
   lTransactions :: [Transaction],
   lDateSpan :: Maybe DateSpan,
-  lBalanceMap :: BalanceMap
+  lBalanceMap :: BalanceMap,
+  lAccountMap :: HM.HashMap T.Text Account
 }
 
 journalToLedger :: Journal -> Ledger
@@ -44,16 +101,27 @@ journalToLedger journal =
       txns = jTransactions journal
       balMap = transactionsToBalanceMap txns
       dSpan = journalDateSpan journal
-  in Ledger jf accs txns dSpan balMap
+      accMap = HM.fromList $ map (\a -> (aId a, a)) accs
+  in Ledger jf accs txns dSpan balMap accMap
 
 trialBalanceQty :: Ledger -> DateSpan -> Account -> Quantity
 trialBalanceQty ledger dateSpan acc =
   let openAcc = jfOpeningBalanceAccount $ lJournalFile ledger
       accId = aId acc
       balMap = lBalanceMap ledger
-      accMaps = HM.fromList $ map (\a -> (aId a, aType a)) $ lAccounts ledger
-      accTypef = \a -> accMaps HM.! a
+      accMaps = lAccountMap ledger
+      accTypef = \a -> aType $ accMaps HM.! a
   in trialBalanceQuantity openAcc accTypef balMap accId (aType acc) dateSpan 
+
+balanceSheetQty :: Ledger -> DateSpan -> Account -> Quantity
+balanceSheetQty ledger dateSpan acc =
+  let earnAcc = jfEarningsAccount $ lJournalFile ledger
+      openAcc = jfOpeningBalanceAccount $ lJournalFile ledger
+      accId = aId acc
+      balMap = lBalanceMap ledger
+      accMaps = lAccountMap ledger
+      accTypef = \a -> aType $ accMaps HM.! a
+  in balanceSheetQuantity earnAcc openAcc accTypef balMap accId dateSpan 
 
 isAccountActive :: Ledger -> DateSpan -> Account -> Bool
 isAccountActive ledger (d1, d2) acc =
@@ -76,15 +144,18 @@ data CompareExtraColumns
       }
   deriving (Eq, Show)
 
+compareExtraColumnsDefault :: CompareExtraColumns
+compareExtraColumnsDefault = CompareExtraColumns False False False False False False
+
 data ReportParams 
   -- Single or multi line transactions format
   = Transactions ReportPeriod (Maybe CompareAnotherPeriod) Bool
   | TrialBalance ReportPeriod (Maybe CompareAnotherPeriod) ShowRow
   -- Show Diff, Show Percent, % of Row, % of Column
-  | BalanceSheet ReportPeriod (Maybe CompareAnotherPeriod) ShowRow DisplayColumns 
+  | BalanceSheet ReportPeriod (Maybe CompareAnotherPeriod) ShowRow (Maybe DisplayColumns)
     CompareExtraColumns
   -- Show Diff, Show Percent, % of Row, % of Column, % of revenue, % of expense
-  | IncomeStatement ReportPeriod (Maybe CompareAnotherPeriod) ShowRow DisplayColumns 
+  | IncomeStatement ReportPeriod (Maybe CompareAnotherPeriod) ShowRow (Maybe DisplayColumns) 
     CompareExtraColumns
   deriving (Eq, Show)
 

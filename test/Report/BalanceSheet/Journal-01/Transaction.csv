@@ -1,0 +1,19 @@
+Date;Contrepartie;Commentaire;Étiquette;Compte 1;Montant 1;Date du relevé 1;Compte 2;Montant 2;Date du relevé 2;Compte 3;Montant 3
+2018-01-02;ABC Company;Un commentaire;Tag 1;Compte chèque;1950,42;;Salaire;-2500;;Taxes;549,58
+2018-01-06;;;;Carte de crédit;-100;;Vêtements;100;;;
+2018-01-10;;;;Marge de crédit;-123,45;;Nourriture;123,45;;;
+2018-01-14;;;;Compte chèque;-500;;Hypothèque;500;;;
+2018-01-18;;;;Compte chèque;1950,42;;Salaire;-2500;;Taxes;549,58
+2018-01-30;;Apparaît en février sur le relevé;;Compte chèque;-800;;Carte de crédit;800;2018-02-01;;
+2018-02-02;;;;Marge de crédit;-400;;Divertissements;;;;
+2018-02-05;;;;Compte chèque;1950,42;;Salaire;-2500;;Taxes;549,58
+2018-02-08;;;;Compte chèque;900;;Revenu de location;-1000;;Taxes;100
+2018-02-14;;;;Carte de crédit;;;Vêtements;87;;;
+2018-02-17;;;;Carte de crédit;-670;;Dépenses non catégorisées;670;;;
+2018-02-20;;;;Compte chèque;1950,42;;Salaire;-2500;;Taxes;549,58
+2018-02-23;;;;Compte chèque;-800;;Carte de crédit;800;;;
+2019-02-02;;;;Compte chèque;1950,42;;Salaire;-2500;;Taxes;549,58
+2019-02-06;;;;Carte de crédit;-450;;Vêtements;450;;;
+2019-02-10;;;;Marge de crédit;-220;;Nourriture;220;;;
+2019-05-08;;;;Compte chèque;900;;Revenu de location;-1000;;Taxes;100
+2019-03-23;;;;Compte chèque;-300;;Carte de crédit;300;;;

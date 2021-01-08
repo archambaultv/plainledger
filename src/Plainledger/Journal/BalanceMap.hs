@@ -19,7 +19,8 @@ module Plainledger.Journal.BalanceMap
   earnings,
   postingsToBalanceMap,
   transactionsToBalanceMap,
-  trialBalanceQuantity
+  trialBalanceQuantity,
+  balanceSheetQuantity
   )
 where
 
@@ -142,4 +143,17 @@ trialBalanceQuantity :: T.Text ->
 trialBalanceQuantity openAcc accTypef m acc accType (sd, ed)
   | openAcc == acc = balance m acc ed + journalOpeningBalance accTypef m sd
   | isIncomeStatementType accType = cashFlow m acc (sd, ed)
+  | otherwise = balance m acc ed
+
+-- | Does not check if the account is trully a balance sheet account
+balanceSheetQuantity :: T.Text ->
+                        T.Text -> 
+                        (T.Text -> AccountType) ->
+                        BalanceMap -> 
+                        T.Text -> 
+                        (Day, Day) -> 
+                        Quantity
+balanceSheetQuantity earnAcc openAcc accTypef m acc (sd, ed)
+  | earnAcc == acc = balance m acc ed + earnings accTypef m (sd, ed)
+  | openAcc == acc = balance m acc ed + journalOpeningBalance accTypef m sd
   | otherwise = balance m acc ed

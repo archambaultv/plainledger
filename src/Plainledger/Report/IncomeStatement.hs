@@ -8,31 +8,61 @@
 --
 
 module Plainledger.Report.IncomeStatement (
-  -- reportToIncomeStatement,
-  -- IncomeStatementOption
+  incomeStatementReport
   )
 where
 
--- import Plainledger.Ledger
--- import Plainledger.Reports.Report
--- import Plainledger.Reports.BalanceSheet
--- import qualified Data.Text as T
+import Data.List
+import Data.Ord
+import Data.Maybe
+import Data.Time
+import Plainledger.I18n.I18n
+import Plainledger.Journal
+import Plainledger.Report.Report
+import qualified Data.Vector as V
+import qualified Data.Text as T
 
--- type IncomeStatementOption = BalanceSheetOption
 
--- reportToIncomeStatement :: IncomeStatementOption -> Report -> [[T.Text]]
--- reportToIncomeStatement opt r =
---     let
---       serialize :: Account -> Maybe [Quantity]
---       serialize a
---         | isReportActive a r == False
---           -- && all (== 0) (reportCashFlow acc r)
---           && not (grShowInactiveAccounts opt) = Nothing
---       serialize acc = Just (reportCashFlow acc r)
+incomeStatementReport :: ReportPeriod -> 
+                      (Maybe CompareAnotherPeriod) -> 
+                      ShowRow -> 
+                      (Maybe DisplayColumns) ->
+                      CompareExtraColumns ->
+                      Ledger ->
+                      Day ->
+                      V.Vector (V.Vector T.Text)
+incomeStatementReport period _ showRow _ _ ledger today = 
+  let lang = jfLanguage $ lJournalFile ledger
+      reportName = i18nText lang TReportIncomeStatementName
+      dateSpan = reportPeriodToSpan period today ledger
+      body = case dateSpan of
+              Nothing -> []
+              Just x -> incomeStatementBody showRow x ledger
+  in standardReport period ledger today reportName body
+      
+incomeStatementBody :: ShowRow -> DateSpan -> Ledger -> [(V.Vector T.Text)]
+incomeStatementBody showRow dates ledger 
+  = let lang = jfLanguage $ lJournalFile ledger
+        header = V.fromList [i18nText lang (TReportAccName)]
+        lines1 = mapMaybe serialize 
+               $ sortBy (comparing aNumber) 
+               $ filter (isIncomeStatementType . aType)
+               $ lAccounts ledger
+        body = map snd lines1
 
---       report = groupReport "Income Statement" serialize isIncomeStatementType r
+    in header : body
+  where serialize :: Account -> Maybe (Quantity, V.Vector T.Text)
+        serialize acc =
+          let number = T.pack $ show $ aNumber acc
+              name = T.concat [aDisplayName acc, " (", number, ")"]
+              amnt = trialBalanceQty ledger dates acc
+              amntText = qtyToNormallyPositive decimalSep (aType acc) amnt
+              isActive = isAccountActive ledger dates acc
+              line = V.fromList $ [name, amntText]
+          in case (isActive, showRow) of
+                (_, ShowAll) -> Just (amnt, line)
+                (False, _) -> Nothing
+                (True, ShowNonZero) | amnt == 0 -> Nothing
+                (True, _) -> Just (amnt, line)
 
---       rEarnings = reportEarnings r
---       earningsLines = concatMap (serializeAmount NormallyPositive Revenue) rEarnings
-
---     in report ++ [[]] ++ ["Earnings" : earningsLines]
+        decimalSep = jfDecimalSeparator $ lJournalFile ledger
