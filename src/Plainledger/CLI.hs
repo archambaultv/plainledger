@@ -97,27 +97,11 @@ period =  (Month <$> option auto (long "month"))
       <|> (parseDates <$> optional startDate <*> optional endDate)
 
 
-
-
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
 
 csvFile :: Parser String
 csvFile = argument str (metavar "CSV-FILE" <> help "The csv file")
-
--- csvDir :: Parser String
--- csvDir = argument str (metavar "CSV-DIR" <> help "The directory in which to output the csv files")
-
--- outputArg :: Parser String
--- outputArg = argument str (metavar "OUTPUT-FILE" <> help "The ouptut file")
---
--- outputOpt :: Parser (Maybe String)
--- outputOpt = optional
---            $ strOption
---            $ short 'o'
---            <> long "output"
---            <> metavar "OUTPUT-FILE"
---            <> help "The output file."
 
 txnDecodeOption :: Parser TransactionCsvRecordType
 txnDecodeOption = flag MultipleCsvRecords SingleCsvRecord
@@ -133,104 +117,75 @@ transactionsCommand = Command
                    <$> journalFile
                    <*> csvFile
                    <*> (Transactions
-                   <$> period
-                   <*> (pure Nothing)
-                   <*> txnDecodeOption)
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> txnDecodeOption)
 
 transactionsInfo :: ParserInfo Command
 transactionsInfo = info (transactionsCommand <**> helper)
               (fullDesc
                <> progDesc "Prints all transactions in a CSV format")
 
--- trialBalanceCommand :: Parser Command
--- trialBalanceCommand = CTrialBalance
---                <$> (TrialBalanceCommand
---                    <$> journalFile
---                    <*> csvFile
---                    <*> period
---                    <*> trialBalanceOption)
-
--- trialBalanceOption :: Parser TrialBalanceOption
--- trialBalanceOption = FlatReportOption
---                    <$> balanceFormat
---                    <*> showInactiveAccounts
-
---   where balanceFormat = flag TwoColumnDebitCredit InflowOutflow
---            ( long "signed-balance"
---           <> short 's'
---           <> help "Does not report the balance with debit credit columns, but only \
---                   \with a signed quantity. A positive amount means debit and a \
---                   \negative amount means credit.")
-
---         showInactiveAccounts = flag False True
---            ( long "show-all-accounts"
---           <> short 'a'
---           <> help "Show all the accounts defined in the accounts section of \
---                   \the JOURNAL-FILE in the trial balance, including accounts \
---                   \without transactions.")
-
--- trialBalanceInfo :: ParserInfo Command
--- trialBalanceInfo = info (trialBalanceCommand <**> helper)
---               (fullDesc
---                <> progDesc "Prints the trial balance in a CSV format")
+showRowOption :: Parser ShowRow
+showRowOption = (flag' ShowActive (long "show-active-accounts"))
+             <|> (flag' ShowAll (long "show-all-accounts"))
+             <|> (flag' ShowNonZero (long "show-non-zero-accounts"))
+             <|> (pure ShowActive)
 
 
--- balanceSheetCommand :: Parser Command
--- balanceSheetCommand = CBalanceSheet
---                <$> (BalanceSheetCommand
---                    <$> journalFile
---                    <*> csvFile
---                    <*> period
---                    <*> balanceSheetOption)
+trialBalanceCommand :: Parser Command
+trialBalanceCommand = Command
+                   <$> journalFile
+                   <*> csvFile
+                   <*> (TrialBalance
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> showRowOption)
 
--- balanceSheetOption :: Parser BalanceSheetOption
--- balanceSheetOption = GroupReportOption
---                    <$> showInactiveAccounts
+trialBalanceInfo :: ParserInfo Command
+trialBalanceInfo = info (trialBalanceCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints the trial balance in a CSV format")
 
---   where showInactiveAccounts = flag False True
---            ( long "show-all-accounts"
---           <> short 'a'
---           <> help "Show all the accounts defined in the accounts section of \
---                   \the JOURNAL-FILE, including accounts \
---                   \without transactions.")
 
--- balanceSheetInfo :: ParserInfo Command
--- balanceSheetInfo = info (balanceSheetCommand <**> helper)
---               (fullDesc
---                <> progDesc "Prints the balance sheet in a CSV format")
+balanceSheetCommand :: Parser Command
+balanceSheetCommand = Command
+                   <$> journalFile
+                   <*> csvFile
+                   <*> (BalanceSheet
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> showRowOption
+                       <*> (pure Nothing)
+                       <*> (pure compareExtraColumnsDefault))
 
--- incomeStatementCommand :: Parser Command
--- incomeStatementCommand = CIncomeStatement
---                <$> (IncomeStatementCommand
---                    <$> journalFile
---                    <*> csvFile
---                    <*> period
---                    <*> balanceSheetOption)
+balanceSheetInfo :: ParserInfo Command
+balanceSheetInfo = info (balanceSheetCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints the balance sheet in a CSV format")
 
--- incomeStatementInfo :: ParserInfo Command
--- incomeStatementInfo = info (incomeStatementCommand <**> helper)
---               (fullDesc
---                <> progDesc "Prints the income statement in a CSV format")
+incomeStatementCommand :: Parser Command
+incomeStatementCommand = Command
+                   <$> journalFile
+                   <*> csvFile
+                   <*> (IncomeStatement
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> showRowOption
+                       <*> (pure Nothing)
+                       <*> (pure compareExtraColumnsDefault))
 
--- allReportsCommand :: Parser Command
--- allReportsCommand = CAllReports
---                <$> (AllReportsCommand
---                    <$> journalFile
---                    <*> csvDir
---                    <*> period
---                    <*> trialBalanceOption)
-
--- allReportsInfo :: ParserInfo Command
--- allReportsInfo = info (allReportsCommand <**> helper)
---               (fullDesc
---                <> progDesc "Prints all the reports a CSV format")
+incomeStatementInfo :: ParserInfo Command
+incomeStatementInfo = info (incomeStatementCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints the income statement in a CSV format")
 
 parseCommand :: Parser Command
 parseCommand = subparser
-  ( command "transactions" transactionsInfo )
-  -- <> command "trialbalance" trialBalanceInfo
-  -- <> command "balancesheet" balanceSheetInfo
-  -- <> command "incomestatement" incomeStatementInfo)
+  ( command "transactions" transactionsInfo
+   <> command "trial-balance" trialBalanceInfo
+   <> command "balance-sheet" balanceSheetInfo
+   <> command "income-statement" incomeStatementInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)
