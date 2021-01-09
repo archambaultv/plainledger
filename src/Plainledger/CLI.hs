@@ -13,35 +13,31 @@ module Plainledger.CLI
   cli
 ) where
 
--- import Data.Time
+import Data.Time
+import Data.Bifunctor
 import Options.Applicative
 import Plainledger.CLI.Command
+import Plainledger.Journal
+import Plainledger.I18n.I18n
 import Plainledger.Report
 
--- dateparser :: Date -> Char -> String -> String -> String -> Parser Day
--- dateparser def shortOption optionStr helpStr meta = option
---   (eitherReader parseISO8601M)
---   (value def <>
---    short shortOption <>
---    long optionStr <>
---    help helpStr <>
---    metavar meta)
+dateReader :: ReadM Day
+dateReader = eitherReader 
+           $ \s -> first (i18nString En_CA . TError . head) (parseISO8601M s)
 
--- startDate :: Parser (Date)
--- startDate = dateparser
---              MinDate
---             'b'
---             "begin"
---             "All transactions in the journal file before this date are ignored"
---             "BEGIN"
+startDate :: Parser Day
+startDate = option dateReader
+   ( short 'b' 
+  <> long "begin"
+  <> help "All transactions in the journal file before this date are ignored"
+  <> metavar "BEGIN")
 
--- endDate :: Parser (LDate)
--- endDate = dateparser
---           MaxDate
---           'e'
---           "end"
---           "All transactions in the journal file after this date are ignored"
---           "END"
+endDate :: Parser Day
+endDate = option dateReader
+   ( short 'e' 
+  <> long "end"
+  <> help "All transactions in the journal file after this date are ignored"
+  <> metavar "END")
 
 -- yearEndDay :: Parser Day
 -- yearEndDay = option
@@ -59,9 +55,9 @@ import Plainledger.Report
 --          <> help "How many fiscal year to show in the reports"
 --          <> metavar "YEARS" )
 
--- period :: Parser Period
--- period = (MultiYear <$> yearEndDay <*> multiYear)
---        <|> (Span <$> startDate <*> endDate)
+period :: Parser ReportPeriod
+period =  (CustomPeriod <$> startDate <*> endDate)
+      <|> (pure AllDates)
 
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
@@ -83,37 +79,28 @@ csvFile = argument str (metavar "CSV-FILE" <> help "The csv file")
 --            <> metavar "OUTPUT-FILE"
 --            <> help "The output file."
 
--- txnDecodeOption :: Parser CsvRecordOptions
--- txnDecodeOption = flag MultipleRecords SingleRecord
---    ( long "single-record"
---   <> short 's'
---   <> help "Each transaction will be encoded as a single \
---           \line in the CSV-FILE. The default \
---           \is to encode transactions on mulitple lines, one \
---           \per posting.")
+txnDecodeOption :: Parser TransactionCsvRecordType
+txnDecodeOption = flag MultipleCsvRecords SingleCsvRecord
+   ( long "single-record"
+  <> short 's'
+  <> help "Each transaction will be encoded as a single \
+          \line in the CSV-FILE. The default \
+          \is to encode transactions on multiple lines, one \
+          \line per posting.")
 
--- validationOption :: Parser Bool
--- validationOption = flag True False
---    ( long "no-validation"
---   <> short 'n'
---   <> help "Does not perform any validation on the JOURNAL-FILE. \
---           \Use this option to export to CSV and keep the unspecified optional \
---           \field empty in the CSV. Othewise validation will fill in the missing \
---           \values.")
+transactionsCommand :: Parser Command
+transactionsCommand = Command
+                   <$> journalFile
+                   <*> csvFile
+                   <*> (Transactions
+                   <$> period
+                   <*> (pure Nothing)
+                   <*> txnDecodeOption)
 
--- transactionsCommand :: Parser Command
--- transactionsCommand = CTransactions
---                <$> (TransactionsCommand
---                    <$> journalFile
---                    <*> csvFile
---                    <*> period
---                    <*> txnDecodeOption
---                    <*> validationOption)
-
--- transactionsInfo :: ParserInfo Command
--- transactionsInfo = info (transactionsCommand <**> helper)
---               (fullDesc
---                <> progDesc "Prints all transactions in a CSV format")
+transactionsInfo :: ParserInfo Command
+transactionsInfo = info (transactionsCommand <**> helper)
+              (fullDesc
+               <> progDesc "Prints all transactions in a CSV format")
 
 -- trialBalanceCommand :: Parser Command
 -- trialBalanceCommand = CTrialBalance
@@ -198,18 +185,12 @@ csvFile = argument str (metavar "CSV-FILE" <> help "The csv file")
 --               (fullDesc
 --                <> progDesc "Prints all the reports a CSV format")
 
--- parseCommand :: Parser Command
--- parseCommand = subparser
---   ( command "transactions" transactionsInfo
---   <> command "trialbalance" trialBalanceInfo
---   <> command "balancesheet" balanceSheetInfo
---   <> command "incomestatement" incomeStatementInfo)
-
 parseCommand :: Parser Command
-parseCommand = Command
-  <$> journalFile
-  <*> csvFile
-  <*> (pure $ Transactions AllDates Nothing True)
+parseCommand = subparser
+  ( command "transactions" transactionsInfo )
+  -- <> command "trialbalance" trialBalanceInfo
+  -- <> command "balancesheet" balanceSheetInfo
+  -- <> command "incomestatement" incomeStatementInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

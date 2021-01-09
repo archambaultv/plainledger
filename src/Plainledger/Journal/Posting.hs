@@ -30,6 +30,9 @@ import qualified Data.Text as T
 -- Transactions are made of at least two postings.
 data PostingF q = Posting
   {
+    pFileOrder :: Int, -- | Records to position of the posting in the journal
+                       -- | so we can print them back the way the user input
+                       -- | them
     pBalanceDate :: Day,
     pAccount :: T.Text,
     pAmount :: q
@@ -39,13 +42,13 @@ type JPosting = PostingF (Maybe Quantity)
 type Posting = PostingF Quantity
 
 changePostingDate :: Day -> PostingF a -> PostingF a
-changePostingDate d (Posting _ acc amnt) = (Posting d acc amnt)
+changePostingDate d (Posting order _ acc amnt) = (Posting order d acc amnt)
 
 -- | Updates the amount if it is Nothing
 setAmount :: Quantity -> PostingF (Maybe Quantity) -> PostingF Quantity
-setAmount txAmount (Posting balDate acc amnt) =
+setAmount txAmount (Posting order balDate acc amnt) =
   let a = fromMaybe txAmount amnt
-  in Posting balDate acc a
+  in Posting order balDate acc a
 
 -- | Asserts a zero balance of all the postings
 balancePostings :: (MonadError Errors m) =>

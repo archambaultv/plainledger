@@ -38,9 +38,8 @@ import Plainledger.Report.Transactions
 import Plainledger.Internal.Utils
 
 runReport :: ReportParams -> Day -> Journal -> V.Vector (V.Vector T.Text)
-runReport (Transactions period _ b) today j = 
-  let dateSpan = reportPeriodToSpan period today (journalToLedger j)
-  in transactionReport dateSpan b j
+runReport (Transactions period c b) today j = 
+  transactionReport period c b (journalToLedger j) today
 runReport (TrialBalance period c showRow) today j = 
   trialBalanceReport period c showRow (journalToLedger j) today
 runReport (BalanceSheet period c showRow displayColumns displayExtraC) today j = 

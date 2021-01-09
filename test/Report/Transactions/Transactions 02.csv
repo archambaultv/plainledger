@@ -1,0 +1,14 @@
+Date;Commentaire;Contrepartie;Étiquette;Compte 1;Montant 1;Date du relevé 1;Compte 2;Montant 2;Date du relevé 2;Compte 3;Montant 3;Date du relevé 3
+2018-01-02;Un commentaire;ABC Company;Tag 1;Compte chèque;1950,42;2018-01-02;Salaire;-2500;2018-01-02;Taxes;549,58;2018-01-02
+2018-01-06;;;;Carte de crédit;-100;2018-01-06;Vêtements;100;2018-01-06
+2018-01-10;;;;Marge de crédit;-123,45;2018-01-10;Nourriture;123,45;2018-01-10
+2018-01-14;;;;Compte chèque;-500;2018-01-14;Hypothèque;500;2018-01-14
+2018-01-18;;;;Compte chèque;1950,42;2018-01-18;Salaire;-2500;2018-01-18;Taxes;549,58;2018-01-18
+2018-01-30;Apparaît en février sur le relevé;;;Compte chèque;-800;2018-01-30;Carte de crédit;800;2018-02-01
+2018-02-02;;;;Marge de crédit;-400;2018-02-02;Divertissements;400;2018-02-02
+2018-02-05;;;;Compte chèque;1950,42;2018-02-05;Salaire;-2500;2018-02-05;Taxes;549,58;2018-02-05
+2018-02-08;;;;Compte chèque;900;2018-02-08;Revenu de location;-1000;2018-02-08;Taxes;100;2018-02-08
+2018-02-14;;;;Carte de crédit;-87;2018-02-14;Vêtements;87;2018-02-14
+2018-02-17;;;;Carte de crédit;-670;2018-02-17;Dépenses non catégorisées;670;2018-02-17
+2018-02-20;;;;Compte chèque;1950,42;2018-02-20;Salaire;-2500;2018-02-20;Taxes;549,58;2018-02-20
+2018-02-23;;;;Compte chèque;-800;2018-02-23;Carte de crédit;800;2018-02-23

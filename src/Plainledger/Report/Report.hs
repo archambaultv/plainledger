@@ -26,7 +26,8 @@ module Plainledger.Report.Report
   ShowRow(..),
   DisplayColumns(..),
   trialBalanceQty,
-  balanceSheetQty
+  balanceSheetQty,
+  TransactionCsvRecordType(..)
   )
 where
 
@@ -147,9 +148,12 @@ data CompareExtraColumns
 compareExtraColumnsDefault :: CompareExtraColumns
 compareExtraColumnsDefault = CompareExtraColumns False False False False False False
 
+data TransactionCsvRecordType = MultipleCsvRecords | SingleCsvRecord
+  deriving (Eq, Show)
+
 data ReportParams 
   -- Single or multi line transactions format
-  = Transactions ReportPeriod (Maybe CompareAnotherPeriod) Bool
+  = Transactions ReportPeriod (Maybe CompareAnotherPeriod) TransactionCsvRecordType
   | TrialBalance ReportPeriod (Maybe CompareAnotherPeriod) ShowRow
   -- Show Diff, Show Percent, % of Row, % of Column
   | BalanceSheet ReportPeriod (Maybe CompareAnotherPeriod) ShowRow (Maybe DisplayColumns)

@@ -104,7 +104,9 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
   let tagIdx = optionalColumnIndex indexes (i18nText lang TTransactionTag)
 
   -- Check for postings columns based on the account column
+  -- Sorts them by appearance in the header
   let accSufix = filter (T.isPrefixOf accPrefix . fst)
+               $ sortOn snd
                $ HM.toList indexes
   let postingIdx = map (postingIndexes 
                         (accPrefix, amntPrefix, datePrefix)
@@ -122,7 +124,9 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
                  counterParty <- optionalColumnData "" counterPartyIdx line 
                  tag <- optionalColumnData "" tagIdx line
 
-                 ps <- fmap catMaybes $ mapM (postingColumns date line) postingIdx
+                 ps <- fmap catMaybes 
+                       $ mapM (postingColumns date line) 
+                       $ zip [1..] postingIdx
                  if null ps || null (tail ps)
                   then throwError $ mkErrorNoPos $ ZeroOrOnePostingOnly
                   else 
@@ -144,9 +148,9 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
 
         postingColumns :: Day -> 
                           V.Vector T.Text -> 
-                          (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex) -> 
+                          (Int, (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex)) -> 
                           m (Maybe JPosting)
-        postingColumns d l (aIdx, amIdx, bIdx) = do
+        postingColumns d l (i, (aIdx, amIdx, bIdx)) = do
           acc <- optionalColumnData "" (Just aIdx) l
           if T.null acc
            then return Nothing
@@ -154,7 +158,7 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
                amount <- optionalColumnDataM Nothing amIdx l 
                         (fmap Just . parseAmount decimalSeparator)
                balanceDate <- optionalColumnDataM d bIdx l (parseISO8601M . T.unpack)
-               return $ Just $ Posting balanceDate acc amount
+               return $ Just $ Posting i balanceDate acc amount
 
 --  Asserts all transactions have valid postings
 --  Asserts all transactions balance to zero
