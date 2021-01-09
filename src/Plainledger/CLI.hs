@@ -39,25 +39,65 @@ endDate = option dateReader
   <> help "All transactions in the journal file after this date are ignored"
   <> metavar "END")
 
--- yearEndDay :: Parser Day
--- yearEndDay = option
---   (eitherReader parseISO8601M)
---   (short 'p' <>
---    long "year-end" <>
---    help "The year-end date. All transactions in the journal file after this date are ignored" <>
---    metavar "YEAR-END")
 
--- multiYear :: Parser Int
--- multiYear = option auto
---           ( long "years"
---          <> short 'y'
---          <> value 1
---          <> help "How many fiscal year to show in the reports"
---          <> metavar "YEARS" )
+parseDates :: Maybe Day -> Maybe Day -> ReportPeriod
+parseDates Nothing Nothing = AllDates
+parseDates (Just d1) Nothing = SinceDateUntilTheEnd d1
+parseDates Nothing (Just d2) = FromBeginningUntil d2
+parseDates (Just d1) (Just d2) = CustomPeriod d1 d2
 
 period :: Parser ReportPeriod
-period =  (CustomPeriod <$> startDate <*> endDate)
-      <|> (pure AllDates)
+period =  (Month <$> option auto (long "month"))
+      <|> (flag' (Month 0) (long "this-month"))
+      <|> (flag' (Month (-1)) (long "last-month"))
+
+      <|> (MonthToDate <$> option auto (long "month-to-date"))
+      <|> (flag' (MonthToDate 0) (long "this-month-to-date"))
+      <|> (flag' (MonthToDate (-1)) (long "last-month-to-date"))
+
+      <|> (CalendarQuarter <$> option auto (long "calendar-quarter"))
+      <|> (flag' (CalendarQuarter 0) (long "this-calendar-quarter"))
+      <|> (flag' (CalendarQuarter (-1)) (long "last-calendar-quarter"))
+
+      <|> (CalendarQuarterToDate <$> option auto (long "calendar-quarter-to-date"))
+      <|> (flag' (CalendarQuarterToDate 0) (long "this-calendar-quarter-to-date"))
+      <|> (flag' (CalendarQuarterToDate (-1)) (long "last-calendar-quarter-to-date"))
+
+      <|> (FiscalQuarter <$> option auto (long "fiscal-quarter"))
+      <|> (flag' (FiscalQuarter 0) (long "this-fiscal-quarter"))
+      <|> (flag' (FiscalQuarter (-1)) (long "last-fiscal-quarter"))
+
+      <|> (FiscalQuarterToDate <$> option auto (long "fiscal-quarter-to-date"))
+      <|> (flag' (FiscalQuarterToDate 0) (long "this-fiscal-quarter-to-date"))
+      <|> (flag' (FiscalQuarterToDate (-1)) (long "last-fiscal-quarter-to-date"))
+
+      <|> (CalendarYear <$> option auto (long "calendar-year" <> short 'c'))
+      <|> (flag' (CalendarYear 0) (long "this-calendar-year"))
+      <|> (flag' (CalendarYear (-1)) (long "last-calendar-year"))
+
+      <|> (CalendarYearToDate <$> option auto (long "calendar-year-to-date"))
+      <|> (flag' (CalendarYearToDate 0) (long "this-calendar-year-to-date"))
+      <|> (flag' (CalendarYearToDate (-1)) (long "last-calendar-year-to-date"))
+
+      <|> (FiscalYear <$> option auto (long "fiscal-year" <> short 'f'))
+      <|> (flag' (FiscalYear 0) (long "this-fiscal-year"))
+      <|> (flag' (FiscalYear (-1)) (long "last-fiscal-year"))
+
+      <|> (FiscalYearToDate <$> option auto (long "fiscal-year-to-date"))
+      <|> (flag' (FiscalYearToDate 0) (long "this-fiscal-year-to-date"))
+      <|> (flag' (FiscalYearToDate (-1)) (long "last-fiscal-year-to-date"))
+
+      <|> (flag' Since30DaysAgo (long "since30days"))
+      <|> (flag' Since60DaysAgo (long "since60days"))
+      <|> (flag' Since90DaysAgo (long "since90days"))
+      <|> (flag' Since365DaysAgo (long "since365days"))
+
+      <|> (SinceDateToDate <$> option dateReader (long "since-date-until-today"))
+
+      <|> (parseDates <$> optional startDate <*> optional endDate)
+
+
+
 
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
