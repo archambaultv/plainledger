@@ -60,7 +60,6 @@ runReportOk folder period compareC lineType today actualTransactions =
                      }
      let csvBS = C.encodeWith myOptions $ V.toList txns
      actualBS <- BS.readFile ("test/Report/Transactions/" ++ actualTransactions)
-     BS.writeFile ("test/" ++ actualTransactions) (BL.toStrict csvBS)
      assertEqual "" (BL.fromStrict actualBS) csvBS
 
 transactionEncodeDecode ::  String -> 
