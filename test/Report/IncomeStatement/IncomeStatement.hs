@@ -33,9 +33,9 @@ import qualified Data.ByteString.Lazy as BL
 incomeStatementTestTree :: TestTree
 incomeStatementTestTree =
    testGroup "IncomeStatement"
-    [ runReportOk "Journal-01" ThisFiscalYear Nothing ShowNonZero 
+    [ runReportOk "Journal-01" (FiscalYear 0) Nothing ShowNonZero 
       (read "2018-12-31") "Income Statement 2018.csv",
-      runReportOk "Journal-01" ThisFiscalYear Nothing ShowNonZero 
+      runReportOk "Journal-01" (FiscalYear 0) Nothing ShowNonZero 
       (read "2019-12-31") "Income Statement 2019.csv"
     ]
 

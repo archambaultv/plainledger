@@ -31,37 +31,37 @@ reportTestTree =
       reportPeriodToSpanTest (CustomPeriod (read "2021-01-01") (read "2021-06-30")) 
       (read "2021-06-30") 01 (Just (read "2021-01-01", read "2021-06-30")),
       
-      reportPeriodToSpanTest ThisMonth (read "2021-06-30") 01
+      reportPeriodToSpanTest (Month 0) (read "2021-06-30") 01
       (Just (read "2021-06-01", read "2021-06-30")),
 
-      reportPeriodToSpanTest ThisMonthToDate (read "2021-06-13") 01
+      reportPeriodToSpanTest (MonthToDate 0) (read "2021-06-13") 01
       (Just (read "2021-06-01", read "2021-06-13")),
 
-      reportPeriodToSpanTest ThisCalendarQuarter (read "2018-05-17") 01
+      reportPeriodToSpanTest (CalendarQuarter 0) (read "2018-05-17") 01
       (Just (read "2018-04-01", read "2018-06-30")),
 
-      reportPeriodToSpanTest ThisCalendarQuarterToDate (read "2018-05-17") 01
+      reportPeriodToSpanTest (CalendarQuarterToDate 0) (read "2018-05-17") 01
       (Just (read "2018-04-01", read "2018-05-17")),
 
-      reportPeriodToSpanTest ThisFiscalQuarter (read "2018-05-17") 07
+      reportPeriodToSpanTest (FiscalQuarter 0) (read "2018-05-17") 07
       (Just (read "2018-04-01", read "2018-06-30")),
 
-      reportPeriodToSpanTest ThisFiscalQuarter (read "2018-05-17") 05
+      reportPeriodToSpanTest (FiscalQuarter 0) (read "2018-05-17") 05
       (Just (read "2018-05-01", read "2018-07-31")),
 
-      reportPeriodToSpanTest ThisCalendarYearToDate (read "2018-05-17") 05
+      reportPeriodToSpanTest (CalendarYearToDate 0) (read "2018-05-17") 05
       (Just (read "2018-01-01", read "2018-05-17")),
 
-      reportPeriodToSpanTest ThisFiscalYear (read "2018-05-17") 05
+      reportPeriodToSpanTest (FiscalYear 0) (read "2018-05-17") 05
       (Just (read "2018-05-01", read "2019-04-30")),
 
-      reportPeriodToSpanTest ThisFiscalYear (read "2018-05-17") 06
+      reportPeriodToSpanTest (FiscalYear 0) (read "2018-05-17") 06
       (Just (read "2017-06-01", read "2018-05-31")),
 
-      reportPeriodToSpanTest ThisFiscalYearToDate (read "2018-05-17") 05
+      reportPeriodToSpanTest (FiscalYearToDate 0) (read "2018-05-17") 05
       (Just (read "2018-05-01", read "2018-05-17")),
 
-      reportPeriodToSpanTest ThisFiscalYearToDate (read "2018-05-17") 06
+      reportPeriodToSpanTest (FiscalYearToDate 0) (read "2018-05-17") 06
       (Just (read "2017-06-01", read "2018-05-17")),
 
       reportPeriodToSpanTest Since365DaysAgo (read "2020-01-01") 06

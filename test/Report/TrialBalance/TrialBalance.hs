@@ -33,9 +33,9 @@ import qualified Data.ByteString.Lazy as BL
 trialBalanceTestTree :: TestTree
 trialBalanceTestTree =
    testGroup "TrialBalance"
-    [ runReportOk "Journal-01" ThisFiscalYear Nothing ShowActive 
+    [ runReportOk "Journal-01" (FiscalYear 0) Nothing ShowActive 
       (read "2018-12-31") "Trial Balance 2018.csv",
-      runReportOk "Journal-01" ThisFiscalYear Nothing ShowActive 
+      runReportOk "Journal-01" (FiscalYear 0) Nothing ShowActive 
       (read "2019-12-31") "Trial Balance 2019.csv"
     ]
 

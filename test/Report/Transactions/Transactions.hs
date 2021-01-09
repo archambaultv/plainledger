@@ -37,7 +37,7 @@ transactionsTestTree =
    testGroup "Transactions"
     [ runReportOk "Journal-01" AllDates Nothing SingleCsvRecord 
       (read "2020-01-01") "Transactions 01.csv",
-      runReportOk "Journal-01" ThisCalendarYear Nothing SingleCsvRecord 
+      runReportOk "Journal-01" (CalendarYear 0) Nothing SingleCsvRecord 
       (read "2018-01-01") "Transactions 02.csv",
       
       transactionEncodeDecode "Journal-01"
