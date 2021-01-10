@@ -120,7 +120,7 @@ journalOpeningBalance accTypeF m d =
   let incomeStatementBal = map snd
                           $ filter (isIncomeStatementType . accTypeF . fst) 
                           $ HM.toList m
-  in sum $ map snd $ mapMaybe (M.lookupLE d) incomeStatementBal
+  in sum $ map snd $ mapMaybe (M.lookupLE (addDays (-1) d)) incomeStatementBal
 
 -- | Computes the earnings
 earnings :: (T.Text -> AccountType) -> BalanceMap -> (Day, Day) -> Quantity

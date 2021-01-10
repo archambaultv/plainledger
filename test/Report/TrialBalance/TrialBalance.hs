@@ -36,7 +36,10 @@ trialBalanceTestTree =
     [ runReportOk "Journal-01" (FiscalYear 0) Nothing ShowActive 
       (read "2018-12-31") "Trial Balance 2018.csv",
       runReportOk "Journal-01" (FiscalYear 0) Nothing ShowActive 
-      (read "2019-12-31") "Trial Balance 2019.csv"
+      (read "2019-12-31") "Trial Balance 2019 - 01.csv",
+      -- With transactions on the start date (2019-01-01)
+      runReportOk "Journal-02" (FiscalYear 0) Nothing ShowActive 
+      (read "2019-12-31") "Trial Balance 2019 - 02.csv"
     ]
 
 runReportOk :: String -> 
