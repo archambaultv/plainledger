@@ -14,115 +14,109 @@
 
 module Plainledger.Internal.Csv
 (
-  tagHeader,
-  tagLine,
-  recordToTags,
-  recordToHashMap,
-  csvToData,
-  findColumn,
-  findColumnM,
-  findColumnDefault,
-  findColumnDefaultM
+  columnData,
+  columnDataM,
+  optionalColumnData,
+  optionalColumnDataM,
+  processColumnIndexes,
+  ColumnIndex,
+  ColumnIndexes,
+  columnIndex,
+  optionalColumnIndex,
+  parseInt
 ) where
 
-import Data.List (sort)
-import Data.Maybe (fromMaybe)
-import qualified Data.HashMap.Strict as HM
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashSet as HS
-import Data.HashSet (HashSet)
+import Data.List
+import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
-import qualified Data.ByteString as BS
-import Plainledger.Journal.Tag
+import qualified Data.Text as T
+import qualified Data.Text.Read as T
 import Plainledger.Error
-import Data.Csv
 import Control.Monad.Except
 
--- / Returns the header associated with the tags. The header is sorted
--- alphabetically
-tagHeader :: [Tag] -> [Field]
-tagHeader t = map toField
-            $ sort
-            $ HS.toList
-            $ HS.fromList
-            $ map tagId t
+-- Column name and column number (zero based)
+type ColumnIndex = (T.Text, Int)
+type ColumnIndexes = M.HashMap T.Text Int
 
--- / 'tagLine ts header' builds the record corresponding to the header from the
--- provided list of tags. For each field in the header, it looks if a tag has
--- the same field as id and use its value. If the tag is missing, a blanck field
--- is inserted. Extra tags are ignored.
-tagLine :: [Tag] -> [Field] -> [Field]
-tagLine ts tagHeader' =
-  let m :: HM.HashMap Field Field
-      m = HM.fromList
-        $ map tagToField ts
-  in map (\k -> fromMaybe "" $ HM.lookup k m) tagHeader'
 
-  where tagToField (Tag k v) = (toField k, toField v)
+columnIndex :: (MonadError Errors m) =>
+                     ColumnIndexes ->
+                     T.Text -> 
+                     m ColumnIndex
+columnIndex m key =
+  let err = throwError
+          $ mkError (SourcePos "" 1 0) 
+          $ MissingCsvColumn (T.unpack key)
+  in fmap (key,) $ maybe err return $ M.lookup key m
 
--- / Returns the list of Tag made from all the fields that are not in the
--- HashSet.
-recordToTags :: (MonadError Error m) =>
-                HashMap Field Field -> HashSet Field -> m [Tag]
-recordToTags m s = either throwError return
-                 $ runParser
-                 $ traverse tupleToTagM
-                 $ HM.toList
-                 $ HM.filterWithKey
-                   (\k v -> not (HS.member k s || BS.null v))
-                   m
-  where tupleToTagM (k, v) = do
-            k' <- parseField k
-            v' <- parseField v
-            -- Tag without value in the YAML file are encoded with the value
-            -- being tagId in the CSV file
-            if v' == k'
-              then return $ Tag k' ""
-              else return $ Tag k' v'
+optionalColumnIndex :: ColumnIndexes ->
+                     T.Text -> 
+                     Maybe ColumnIndex
+optionalColumnIndex m key = fmap (key,) $ M.lookup key m
 
--- / 'recordToHashMap header record' translate a record to hashMap using the
--- provided header
-recordToHashMap :: Record -> Record -> HashMap Field Field
-recordToHashMap h l = HM.fromList $ V.toList $ V.zip h l
+-- Return a map where the zero based index represents the position
+-- in the V.Vector T.Text line
+processColumnIndexes :: forall m . (MonadError Errors m) 
+                     => V.Vector (V.Vector T.Text)
+                     -> (T.Text -> Bool)
+                     -> m (V.Vector (V.Vector T.Text), ColumnIndexes)
+processColumnIndexes csv _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
+processColumnIndexes csv keepF  = 
+  let header = filter (keepF . fst) $ flip zip [0..] $ V.toList $ V.head csv
+      csvData = V.tail csv
+      dup = filter (not . null . tail)
+          $ groupBy (==)
+          $ sortBy compare
+          $ map fst header
+      indexes = M.fromList header
+      mkErrorDup x = mkError (SourcePos "" 1 0) (DuplicateCsvColumn $ T.unpack $ head x)
+  in case dup of
+        [] -> return (csvData, indexes)
+        xs -> throwError $ concatMap mkErrorDup xs
 
--- / Takes a CSV where the first line is the header, a function that can convert
--- a line from a HashMap to an object and returns the list of objects
-csvToData :: (MonadError Error m) =>
-             Csv ->
-             (HashMap Field Field -> m a) ->
-             m [a]
-csvToData csv foo
-  | V.null csv = return []
-  | otherwise =
-    let headerRecord = csv V.! 0
-    in V.toList <$> traverse (foo . recordToHashMap headerRecord) (V.tail csv)
+  -- where columnData1 :: Bool -> V.Vector T.Text -> T.Text -> m Int
+  --       columnData1 isOptional header column =
+  --         let is = V.findIndices ((==) column) header
+  --         in case V.length is of
+  --              0 -> if isOptional
+  --                   then return (-1)
+  --                   else throwError
+  --                         $ mkError (SourcePos "" 1 0) 
+  --                         $ MissingCsvColumn (T.unpack column)
 
--- / Find the value in the HashMap or prints an friendly error message
-findColumn :: (MonadError Error m, FromField a) =>
-              Field -> HashMap Field Field -> m a
-findColumn x m = findColumnM x m return
+columnData :: (MonadError Errors m) =>
+              ColumnIndex -> V.Vector T.Text -> m T.Text
+columnData i v = columnDataM i v return
 
-findColumnM :: (MonadError Error m, FromField b) =>
-               Field -> HashMap Field Field -> (b -> m a) -> m a
-findColumnM x m f =
-  case HM.lookup x m of
-    Nothing -> throwError
-               $ "Field "
-               ++ (show x)
-               ++ " is not in the CSV header."
-    Just v -> do
-      b <- either throwError return $ runParser $ parseField v
-      f b
+columnDataM :: (MonadError Errors m) =>
+               ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a
+columnDataM i v f =
+  let err = throwError
+            $ mkErrorNoPos 
+            $ MissingCsvColumnData (T.unpack $ fst i)
+  in columnDataBase (Just i) v f err
 
-findColumnDefault :: (MonadError Error m, FromField a) =>
-                     a -> Field -> HashMap Field Field -> m a
-findColumnDefault v x m = findColumnDefaultM v x m return
+-- If the column is missing or if its value is null, then return the
+-- default value.
+optionalColumnData :: (MonadError Errors m) =>
+                    T.Text -> Maybe ColumnIndex -> V.Vector T.Text -> m T.Text
+optionalColumnData d i v = optionalColumnDataM d i v return
 
-findColumnDefaultM :: (MonadError Error m, FromField b) =>
-                     a -> Field -> HashMap Field Field -> (b -> m a) -> m a
-findColumnDefaultM v x m f =
-  case HM.lookup x m of
-    Nothing -> return v
-    Just v2 -> do
-      b <- either throwError return $ runParser $ parseField v2
-      f b
+optionalColumnDataM :: (MonadError Errors m) =>
+                    a -> Maybe ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a
+optionalColumnDataM d i v f 
+  = columnDataBase i v (\t -> if T.null t then (return d) else f t) (return d)
+
+columnDataBase :: (MonadError Errors m) 
+                => (Maybe ColumnIndex) -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a
+columnDataBase Nothing _ _ notFound = notFound
+columnDataBase (Just (_,i)) v found notFound =
+  case v V.!? i of
+    Nothing -> notFound
+    Just x -> found x `catchError` (throwError . setSourcePosColIfNull (i + 1))
+
+parseInt ::  (MonadError Errors m) => T.Text -> m Int
+parseInt x =
+  case T.decimal x of
+    Right (n, "") -> return n
+    _ -> throwError $ mkErrorNoPos $ ParseIntErr (T.unpack x)

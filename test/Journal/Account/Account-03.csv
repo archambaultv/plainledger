@@ -1,0 +1,17 @@
+Id,Nom,Numéro,Type,Groupe,Sous-groupe,Commentaire
+Compte chèque,,1001,Actif,Actif 1,,Hello World !
+Maison,Maison 123 rue principale,1051,Actif,,,
+Inutilisé,,1102,Actif,Actif 2,,,
+Marge de crédit,,2051,Passif,,,,
+Carte de crédit,My credit card,2001,Passif,,,,
+Hypothèque,,2002,Passif,L1,,,
+Solde d'ouverture,,3001,Capital,,,
+Bénéfice,,3002,Capital,,,,
+Salaire,Salaire compagnie Foo Bar,4152,Revenu,,,,
+Revenu de location,,4153,Revenu,,,,
+Nourriture,,5002,Dépense,E1,,,
+Taxes,,5003,Dépense,E1,E11,,
+Vêtements,,5006,Dépense,E1,E11,,
+Divertissements,,5010,Dépense,E1,E12,,
+Dépenses non catégorisées,,5011,Dépense,E1,E12,,
+Inutilisé 2,,5102,Dépense,E2,,,

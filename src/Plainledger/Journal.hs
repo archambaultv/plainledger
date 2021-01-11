@@ -9,114 +9,95 @@
 -- This module defines the journal data type and reexports all the
 -- data types and functions related to the journal file.
 
-module Plainledger.Journal (
-  JournalF(..),
-  Journal,
-  JournalFile(..),
+module Plainledger.Journal 
+(
+  Journal(..),
+  journalDateSpan,
   journalFileToJournal,
-  yamlPrettyConfig,
+  decodeJournal,
   module Plainledger.Journal.Posting,
   module Plainledger.Journal.Transaction,
   module Plainledger.Journal.Balance,
-  module Plainledger.Journal.Configuration,
+  module Plainledger.Journal.BalanceMap,
+  module Plainledger.Journal.JournalFile,
   module Plainledger.Journal.Account,
   module Plainledger.Journal.Amount,
-  module Plainledger.Journal.Tag,
   module Plainledger.Journal.Day
   )
 where
 
-import Data.Maybe
-import Data.Ord
+
+import System.FilePath
 import Control.Monad.Except
+import qualified Data.HashSet as HS
+import qualified Data.HashMap.Strict as HM
+import Plainledger.I18n.I18n
 import Plainledger.Error
-import qualified Data.Yaml as Y
-import qualified Data.Yaml.Pretty as P
-import Data.Yaml (FromJSON(..), (.:), ToJSON(..), (.=), (.:?))
-import qualified Data.Text as T
-import Data.Aeson (pairs)
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Transaction
 import Plainledger.Journal.Balance
-import Plainledger.Journal.Configuration
+import Plainledger.Journal.BalanceMap
+import Plainledger.Journal.JournalFile
 import Plainledger.Journal.Account
 import Plainledger.Journal.Amount
-import Plainledger.Journal.Tag
 import Plainledger.Journal.Day
-import System.FilePath
 
-data JournalF t = Journal
-  {jConfiguration :: Configuration,
-   jAccounts   :: [Account],
-   jTransactions :: [t],
-   jBalances :: [Balance],
-   jTrialBalances :: [TrialBalanceAssertion]
+data Journal = Journal
+  {
+    jJournalFile :: JournalFile,
+    jAccounts   :: [Account],
+    jTransactions :: [Transaction],
+    jBalances :: [Balance]
   }
-  deriving (Eq, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Show)
 
-type Journal = JournalF JTransaction
-
-data JournalFile = JournalFile {
-    jfConfiguration :: Configuration,
-    jfAccounts :: [String],
-    jfTransactions :: [String],
-    jfBalances :: [String],
-    jfTrialBalances :: [String]
-} deriving (Show, Eq)
+journalDateSpan :: Journal -> Maybe DateSpan
+journalDateSpan journal =
+  case jTransactions journal of
+    [] -> Nothing
+    txns -> let dates = map tDate txns
+            in return (minimum dates, maximum dates)
 
 -- Reads the include files in the journal file
-journalFileToJournal :: FilePath -> JournalFile -> ExceptT Error IO Journal
-journalFileToJournal path (JournalFile c ai ti bi tbi) = do
-  let dir = takeDirectory path
-  acc <- fmap concat $ traverse (decodeAccountsFile) (map (dir </>) ai)
-  txns <- fmap concat $ traverse (decodeJTransactionsFile) (map (dir </>) ti)
-  bals <- fmap concat $ traverse (decodeBalanceFile) (map (dir </>) bi)
-  trialbals <- fmap concat $ traverse (decodeTrialBalanceAssertionFile) (map (dir </>) tbi)
-  return $ Journal c acc txns bals trialbals
+journalFileToJournal :: JournalFile -> ExceptT Errors IO Journal
+journalFileToJournal journalFile = do  
+  let dir = takeDirectory $ jfFilePath journalFile
+  let csvSeparator = jfCsvSeparator journalFile
+  let decimalSeparator = jfDecimalSeparator journalFile
+  let lang = jfLanguage journalFile
 
--- | The Data.Yaml.Pretty configuration object created so that the
--- fields in the yaml file follow the convention of this software.
-yamlPrettyConfig :: P.Config
-yamlPrettyConfig = P.setConfCompare (comparing fieldOrder) P.defConfig
- where fieldOrder :: T.Text -> Int
-       -- Top level fields
-       fieldOrder "configuration" = 1
-       fieldOrder "accounts" = 2
-       fieldOrder "transactions" = 3
-       fieldOrder "balance-assertions" = 4
-       fieldOrder "trial-balance-assertions" = 5
+  -- Read the accounts files and check for errors
+  let accountPath = dir </> jfAccountFile journalFile
+  acc <- decodeAccountsFile lang accountPath csvSeparator 
+         >>= validateAccounts (jfOpeningBalanceAccount journalFile)
+              (jfEarningsAccount journalFile)
+  let accIds = HS.fromList $ map aId acc
 
-       -- Configuration fields
-       fieldOrder "opening-balance-account" = 50
-       fieldOrder "earnings-account" = 51
+  -- Read the transactions files and check for errors
+  let txnPaths = map (dir </>) $ jfTransactionFiles journalFile
+  jtxns <- fmap concat 
+        $ traverse (decodeJTransactionsFile lang csvSeparator decimalSeparator) txnPaths
+  txns <- validateJTransactions accIds jtxns
+        
+  -- Read the balance assertion files and validate them
+  let accMaps = HM.fromList $ map (\a -> (aId a, aType a)) acc
+  let accTypef = \a -> accMaps HM.! a
 
-       fieldOrder _ = 99
+  let balPaths = map (dir </>) $ jfStatementBalanceFiles journalFile
+  bals <- fmap concat $ traverse (decodeStatementBalanceFile lang csvSeparator decimalSeparator) balPaths
+  _ <- validateStatementBalances accIds txns bals
 
-instance FromJSON JournalFile where
-  parseJSON (Y.Object v) =
-    JournalFile
-    <$> v .: "configuration"
-    <*> (fromMaybe [] <$> v .:? "accounts")
-    <*> (fromMaybe [] <$> v .:? "transactions")
-    <*> (fromMaybe [] <$> v .:? "balance-assertions")
-    <*> (fromMaybe [] <$> v .:? "trial-balance-assertions")
+  let tbalPaths = map (dir </>) $ jfTrialBalanceFiles journalFile
+  tbals <- fmap concat $ traverse (decodeTrialBalanceFile lang csvSeparator decimalSeparator) tbalPaths
+  _ <- validateTrialBalances accIds accTypef (jfOpeningBalanceAccount journalFile) txns tbals
 
-  parseJSON _ = fail "Expected Object for Ledger value"
+  return $ Journal journalFile acc txns (map snd bals)
 
--- To JSON instance
-instance ToJSON JournalFile where
-  toJSON (JournalFile config accounts txns bals trialbals) =
-    Y.object
-    $ ["configuration" .= config,
-       "accounts" .= accounts,
-       "transactions" .= txns,
-       "balance-assertions" .= bals,
-       "trial-balance-assertions" .= trialbals]
 
-  toEncoding (JournalFile config accounts txns bals trialbals) =
-    pairs
-    $ "configuration"   .= config
-    <> "accounts"   .= accounts
-    <> "transactions" .= txns
-    <> "balance-assertions" .= bals
-    <> "trial-balance-assertions" .= trialbals
+decodeJournal :: FilePath ->
+                 ExceptT (Language, Errors) IO Journal
+decodeJournal filePath = 
+  decodeJournalFile filePath 
+  >>= withLang journalFileToJournal 
+
+  where withLang foo jf = withExceptT (jfLanguage jf,) (foo jf)

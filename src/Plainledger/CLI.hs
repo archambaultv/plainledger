@@ -8,61 +8,94 @@
 --
 -- This module defines the command line interface of plaingledger
 
-module Plainledger.CLI (
+module Plainledger.CLI 
+(
   cli
 ) where
 
 import Data.Time
+import Data.Bifunctor
 import Options.Applicative
 import Plainledger.CLI.Command
-import Plainledger.CLI.Run
-import Plainledger.Journal.Day
-import Plainledger.Reports
+import Plainledger.Journal
+import Plainledger.I18n.I18n
+import Plainledger.Report
 
-dateparser :: LDate -> Char -> String -> String -> String -> Parser LDate
-dateparser def shortOption optionStr helpStr meta = option
-  (eitherReader $ fmap Date . parseISO8601M)
-  (value def <>
-   short shortOption <>
-   long optionStr <>
-   help helpStr <>
-   metavar meta)
+dateReader :: ReadM Day
+dateReader = eitherReader 
+           $ \s -> first (i18nString En_CA . TError . head) (parseISO8601M s)
 
-startDate :: Parser (LDate)
-startDate = dateparser
-             MinDate
-            'b'
-            "begin"
-            "All transactions in the journal file before this date are ignored"
-            "BEGIN"
+startDate :: Parser Day
+startDate = option dateReader
+   ( short 'b' 
+  <> long "begin"
+  <> help "All transactions in the journal file before this date are ignored"
+  <> metavar "BEGIN")
 
-endDate :: Parser (LDate)
-endDate = dateparser
-          MaxDate
-          'e'
-          "end"
-          "All transactions in the journal file after this date are ignored"
-          "END"
+endDate :: Parser Day
+endDate = option dateReader
+   ( short 'e' 
+  <> long "end"
+  <> help "All transactions in the journal file after this date are ignored"
+  <> metavar "END")
 
-yearEndDay :: Parser Day
-yearEndDay = option
-  (eitherReader parseISO8601M)
-  (short 'p' <>
-   long "year-end" <>
-   help "The year-end date. All transactions in the journal file after this date are ignored" <>
-   metavar "YEAR-END")
 
-multiYear :: Parser Int
-multiYear = option auto
-          ( long "years"
-         <> short 'y'
-         <> value 1
-         <> help "How many fiscal year to show in the reports"
-         <> metavar "YEARS" )
+parseDates :: Maybe Day -> Maybe Day -> ReportPeriod
+parseDates Nothing Nothing = AllDates
+parseDates (Just d1) Nothing = SinceDateUntilTheEnd d1
+parseDates Nothing (Just d2) = FromBeginningUntil d2
+parseDates (Just d1) (Just d2) = CustomPeriod d1 d2
 
-period :: Parser Period
-period = (MultiYear <$> yearEndDay <*> multiYear)
-       <|> (Span <$> startDate <*> endDate)
+period :: Parser ReportPeriod
+period =  (Month <$> option auto (long "month"))
+      <|> (flag' (Month 0) (long "this-month"))
+      <|> (flag' (Month (-1)) (long "last-month"))
+
+      <|> (MonthToDate <$> option auto (long "month-to-date"))
+      <|> (flag' (MonthToDate 0) (long "this-month-to-date"))
+      <|> (flag' (MonthToDate (-1)) (long "last-month-to-date"))
+
+      <|> (CalendarQuarter <$> option auto (long "calendar-quarter"))
+      <|> (flag' (CalendarQuarter 0) (long "this-calendar-quarter"))
+      <|> (flag' (CalendarQuarter (-1)) (long "last-calendar-quarter"))
+
+      <|> (CalendarQuarterToDate <$> option auto (long "calendar-quarter-to-date"))
+      <|> (flag' (CalendarQuarterToDate 0) (long "this-calendar-quarter-to-date"))
+      <|> (flag' (CalendarQuarterToDate (-1)) (long "last-calendar-quarter-to-date"))
+
+      <|> (FiscalQuarter <$> option auto (long "fiscal-quarter"))
+      <|> (flag' (FiscalQuarter 0) (long "this-fiscal-quarter"))
+      <|> (flag' (FiscalQuarter (-1)) (long "last-fiscal-quarter"))
+
+      <|> (FiscalQuarterToDate <$> option auto (long "fiscal-quarter-to-date"))
+      <|> (flag' (FiscalQuarterToDate 0) (long "this-fiscal-quarter-to-date"))
+      <|> (flag' (FiscalQuarterToDate (-1)) (long "last-fiscal-quarter-to-date"))
+
+      <|> (CalendarYear <$> option auto (long "calendar-year" <> short 'c'))
+      <|> (flag' (CalendarYear 0) (long "this-calendar-year"))
+      <|> (flag' (CalendarYear (-1)) (long "last-calendar-year"))
+
+      <|> (CalendarYearToDate <$> option auto (long "calendar-year-to-date"))
+      <|> (flag' (CalendarYearToDate 0) (long "this-calendar-year-to-date"))
+      <|> (flag' (CalendarYearToDate (-1)) (long "last-calendar-year-to-date"))
+
+      <|> (FiscalYear <$> option auto (long "fiscal-year" <> short 'f'))
+      <|> (flag' (FiscalYear 0) (long "this-fiscal-year"))
+      <|> (flag' (FiscalYear (-1)) (long "last-fiscal-year"))
+
+      <|> (FiscalYearToDate <$> option auto (long "fiscal-year-to-date"))
+      <|> (flag' (FiscalYearToDate 0) (long "this-fiscal-year-to-date"))
+      <|> (flag' (FiscalYearToDate (-1)) (long "last-fiscal-year-to-date"))
+
+      <|> (flag' Since30DaysAgo (long "since30days"))
+      <|> (flag' Since60DaysAgo (long "since60days"))
+      <|> (flag' Since90DaysAgo (long "since90days"))
+      <|> (flag' Since365DaysAgo (long "since365days"))
+
+      <|> (SinceDateToDate <$> option dateReader (long "since-date-until-today"))
+
+      <|> (parseDates <$> optional startDate <*> optional endDate)
+
 
 journalFile :: Parser String
 journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
@@ -70,146 +103,61 @@ journalFile = argument str (metavar "JOURNAL-FILE" <> help "The journal file")
 csvFile :: Parser String
 csvFile = argument str (metavar "CSV-FILE" <> help "The csv file")
 
-csvDir :: Parser String
-csvDir = argument str (metavar "CSV-DIR" <> help "The directory in which to output the csv files")
-
--- outputArg :: Parser String
--- outputArg = argument str (metavar "OUTPUT-FILE" <> help "The ouptut file")
---
--- outputOpt :: Parser (Maybe String)
--- outputOpt = optional
---            $ strOption
---            $ short 'o'
---            <> long "output"
---            <> metavar "OUTPUT-FILE"
---            <> help "The output file."
-
-accountsCommand :: Parser Command
-accountsCommand = CAccounts
-               <$> (AccountsCommand
-                   <$> journalFile
-                   <*> csvFile)
-
-accountsInfo :: ParserInfo Command
-accountsInfo = info (accountsCommand <**> helper)
-              (fullDesc
-               <> progDesc "Prints all accounts and their properties\
-                            \ in a CSV format")
-
-txnDecodeOption :: Parser CsvRecordOptions
-txnDecodeOption = flag MultipleRecords SingleRecord
+txnDecodeOption :: Parser TransactionCsvRecordType
+txnDecodeOption = flag MultipleCsvRecords SingleCsvRecord
    ( long "single-record"
   <> short 's'
   <> help "Each transaction will be encoded as a single \
           \line in the CSV-FILE. The default \
-          \is to encode transactions on mulitple lines, one \
-          \per posting.")
-
-validationOption :: Parser Bool
-validationOption = flag True False
-   ( long "no-validation"
-  <> short 'n'
-  <> help "Does not perform any validation on the JOURNAL-FILE. \
-          \Use this option to export to CSV and keep the unspecified optional \
-          \field empty in the CSV. Othewise validation will fill in the missing \
-          \values.")
+          \is to encode transactions on multiple lines, one \
+          \line per posting.")
 
 transactionsCommand :: Parser Command
-transactionsCommand = CTransactions
-               <$> (TransactionsCommand
+transactionsCommand = Command
                    <$> journalFile
                    <*> csvFile
-                   <*> period
-                   <*> txnDecodeOption
-                   <*> validationOption)
+                   <*> (Transactions
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> txnDecodeOption)
 
 transactionsInfo :: ParserInfo Command
 transactionsInfo = info (transactionsCommand <**> helper)
               (fullDesc
                <> progDesc "Prints all transactions in a CSV format")
 
+showRowOption :: Parser ShowRow
+showRowOption = (flag' ShowActive (long "show-active-accounts"))
+             <|> (flag' ShowAll (long "show-all-accounts"))
+             <|> (flag' ShowNonZero (long "show-non-zero-accounts"))
+             <|> (pure ShowActive)
+
+
 trialBalanceCommand :: Parser Command
-trialBalanceCommand = CTrialBalance
-               <$> (TrialBalanceCommand
+trialBalanceCommand = Command
                    <$> journalFile
                    <*> csvFile
-                   <*> period
-                   <*> trialBalanceOption)
-
-trialBalanceOption :: Parser TrialBalanceOption
-trialBalanceOption = FlatReportOption
-                   <$> balanceFormat
-                   <*> showInactiveAccounts
-
-  where balanceFormat = flag TwoColumnDebitCredit InflowOutflow
-           ( long "signed-balance"
-          <> short 's'
-          <> help "Does not report the balance with debit credit columns, but only \
-                  \with a signed quantity. A positive amount means debit and a \
-                  \negative amount means credit.")
-
-        showInactiveAccounts = flag False True
-           ( long "show-all-accounts"
-          <> short 'a'
-          <> help "Show all the accounts defined in the accounts section of \
-                  \the JOURNAL-FILE in the trial balance, including accounts \
-                  \without transactions.")
+                   <*> (TrialBalance
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> showRowOption)
 
 trialBalanceInfo :: ParserInfo Command
 trialBalanceInfo = info (trialBalanceCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the trial balance in a CSV format")
 
-cashFlowCommand :: Parser Command
-cashFlowCommand = CCashFlow
-               <$> (CashFlowCommand
-                   <$> journalFile
-                   <*> csvFile
-                   <*> period
-                   <*> cashFlowOption)
-
-cashFlowOption :: Parser CashFlowOption
-cashFlowOption = FlatReportOption
-                   <$> balanceFormat
-                   <*> showInactiveAccounts
-
-  where balanceFormat = flag TwoColumnDebitCredit InflowOutflow
-           ( long "signed-balance"
-          <> short 's'
-          <> help "Does not report the balance with debit credit columns, but only \
-                  \with a signed quantity. A positive amount means debit and a \
-                  \negative amount means credit.")
-
-        showInactiveAccounts = flag False True
-           ( long "show-all-accounts"
-          <> short 'a'
-          <> help "Show all the accounts defined in the accounts section of \
-                  \the JOURNAL-FILE in the report, including accounts \
-                  \without transactions.")
-
-cashFlowInfo :: ParserInfo Command
-cashFlowInfo = info (cashFlowCommand <**> helper)
-              (fullDesc
-               <> progDesc "Prints the cash flow report in a CSV format")
 
 balanceSheetCommand :: Parser Command
-balanceSheetCommand = CBalanceSheet
-               <$> (BalanceSheetCommand
+balanceSheetCommand = Command
                    <$> journalFile
                    <*> csvFile
-                   <*> period
-                   <*> balanceSheetOption)
-
-balanceSheetOption :: Parser BalanceSheetOption
-balanceSheetOption = GroupReportOption
-                   <$> showInactiveAccounts
-
-  where showInactiveAccounts = flag False True
-           ( long "show-all-accounts"
-          <> short 'a'
-          <> help "Show all the accounts defined in the accounts section of \
-                  \the JOURNAL-FILE, including accounts \
-                  \without transactions.")
+                   <*> (BalanceSheet
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> showRowOption
+                       <*> (pure Nothing)
+                       <*> (pure compareExtraColumnsDefault))
 
 balanceSheetInfo :: ParserInfo Command
 balanceSheetInfo = info (balanceSheetCommand <**> helper)
@@ -217,40 +165,27 @@ balanceSheetInfo = info (balanceSheetCommand <**> helper)
                <> progDesc "Prints the balance sheet in a CSV format")
 
 incomeStatementCommand :: Parser Command
-incomeStatementCommand = CIncomeStatement
-               <$> (IncomeStatementCommand
+incomeStatementCommand = Command
                    <$> journalFile
                    <*> csvFile
-                   <*> period
-                   <*> balanceSheetOption)
+                   <*> (IncomeStatement
+                       <$> period
+                       <*> (pure Nothing)
+                       <*> showRowOption
+                       <*> (pure Nothing)
+                       <*> (pure compareExtraColumnsDefault))
 
 incomeStatementInfo :: ParserInfo Command
 incomeStatementInfo = info (incomeStatementCommand <**> helper)
               (fullDesc
                <> progDesc "Prints the income statement in a CSV format")
 
-allReportsCommand :: Parser Command
-allReportsCommand = CAllReports
-               <$> (AllReportsCommand
-                   <$> journalFile
-                   <*> csvDir
-                   <*> period
-                   <*> trialBalanceOption)
-
-allReportsInfo :: ParserInfo Command
-allReportsInfo = info (allReportsCommand <**> helper)
-              (fullDesc
-               <> progDesc "Prints all the reports a CSV format")
-
 parseCommand :: Parser Command
 parseCommand = subparser
-  ( command "accounts" accountsInfo
-  <> command "transactions" transactionsInfo
-  <> command "trialbalance" trialBalanceInfo
-  <> command "cashflow" cashFlowInfo
-  <> command "balancesheet" balanceSheetInfo
-  <> command "incomestatement" incomeStatementInfo
-  <> command "reports" allReportsInfo)
+  ( command "transactions" transactionsInfo
+   <> command "trial-balance" trialBalanceInfo
+   <> command "balance-sheet" balanceSheetInfo
+   <> command "income-statement" incomeStatementInfo)
 
 opts :: ParserInfo Command
 opts = info (parseCommand <**> helper)

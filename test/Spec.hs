@@ -1,8 +1,8 @@
 module Main where
 
 import Test.Tasty
-import Journal.Journal
-import Reports.Reports
+import Journal.JournalTests
+import Report.Report
 
 main :: IO ()
 main = defaultMain tests

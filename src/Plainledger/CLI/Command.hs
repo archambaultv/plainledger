@@ -9,31 +9,38 @@
 -- This module defines all the possible terminal commands
 
 module Plainledger.CLI.Command
-  (
+(
   Command(..),
-  module Plainledger.CLI.Command.Accounts,
-  module Plainledger.CLI.Command.Transactions,
-  module Plainledger.CLI.Command.TrialBalance,
-  module Plainledger.CLI.Command.Cashflow,
-  module Plainledger.CLI.Command.BalanceSheet,
-  module Plainledger.CLI.Command.IncomeStatement,
-  module Plainledger.CLI.Command.AllReports
-  )
-where
+  runCommand
+) where
 
-import Plainledger.CLI.Command.Accounts
-import Plainledger.CLI.Command.Transactions
-import Plainledger.CLI.Command.TrialBalance
-import Plainledger.CLI.Command.Cashflow
-import Plainledger.CLI.Command.BalanceSheet
-import Plainledger.CLI.Command.IncomeStatement
-import Plainledger.CLI.Command.AllReports
+import Data.Time
+import qualified Data.Text as T
+import Control.Monad.Except
+import Plainledger.I18n.I18n
+import Plainledger.Error
+import Plainledger.Journal
+import Plainledger.Report
 
-data Command
-  = CAccounts AccountsCommand
-  | CTransactions TransactionsCommand
-  | CTrialBalance TrialBalanceCommand
-  | CCashFlow CashFlowCommand
-  | CBalanceSheet BalanceSheetCommand
-  | CIncomeStatement IncomeStatementCommand
-  | CAllReports AllReportsCommand
+data Command = Command {
+  cJournalFile :: String,
+  cOutputFile :: String,
+  cReport :: ReportParams
+  }
+
+-- / How to execute the CLI commands
+runCommand :: Command -> IO ()
+runCommand (Command journalPath outputPath report) = do
+  today <- fmap utctDay getCurrentTime
+  res <- runExceptT 
+         $ fmap (\j -> (j, runReport report today j))
+         $ decodeJournal journalPath
+  case res of
+     Left (lang, err) -> printErr lang err
+     Right (j, r) -> writeReport outputPath j r
+
+
+  where printErr lang err = putStrLn 
+                         $ T.unpack
+                         $ printErrors
+                         $ map (i18nText lang . TError ) err

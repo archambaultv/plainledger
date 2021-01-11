@@ -9,9 +9,11 @@
 -- This module defines helper functions for the Day data type
 
 module Plainledger.Journal.Day (
+  DateSpan,
+  spanStartDate,
+  spanEndDate,
   toISO8601,
-  parseISO8601M,
-  LDate(..)
+  parseISO8601M
   )
 where
 
@@ -19,16 +21,21 @@ import Data.Time
 import Plainledger.Error
 import Control.Monad.Except
 
-data LDate = MinDate | Date Day | MaxDate
-           deriving (Eq, Show, Ord)
+type DateSpan = (Day, Day)
+
+spanStartDate :: DateSpan -> Day
+spanStartDate = fst
+
+spanEndDate :: DateSpan -> Day
+spanEndDate = snd
 
 toISO8601 :: Day -> String
 toISO8601 = formatTime defaultTimeLocale (iso8601DateFormat Nothing)
 
-parseISO8601M :: (MonadError Error m) => String -> m Day
+parseISO8601M :: (MonadError Errors m) => String -> m Day
 parseISO8601M s =
   let d = parseTimeM False defaultTimeLocale
           (iso8601DateFormat Nothing) s
   in case d of
-       Nothing -> throwError $ "Unable to parse date \"" ++ s ++ "\"."
+       Nothing -> throwError $ mkErrorNoPos $ ParseDateErr s
        Just d' -> return d'

@@ -10,8 +10,9 @@
 
 module Plainledger.Error
 (
-  Error
+  module Plainledger.Error.SourcePos,
+  module Plainledger.Error.Error
 ) where
 
--- | For now, errors are simply strings detailing the problem
-type Error = String
+import Plainledger.Error.SourcePos
+import Plainledger.Error.Error

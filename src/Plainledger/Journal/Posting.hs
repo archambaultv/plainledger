@@ -11,43 +11,63 @@
 module Plainledger.Journal.Posting (
   PostingF(..),
   JPosting,
-  fromAmount,
-  fromBalanceDate
+  Posting,
+  balancePostings,
+  changePostingDate
   )
 where
 
 import Data.Maybe
 import Control.Monad.Except
-import GHC.Generics hiding (to, from)
 import Data.Time
+import Data.List
+import Plainledger.Error.Error
 import Plainledger.Journal.Amount
 import Prelude hiding (lines)
 import qualified Data.Text as T
-import Data.Bifunctor
 
 -- | The Posting data type reprensents the change in the balance of an account.
 -- Transactions are made of at least two postings.
-data PostingF d2 q = Posting
+data PostingF q = Posting
   {
-    pBalanceDate :: d2,
+    pFileOrder :: Int, -- | Records to position of the posting in the journal
+                       -- | so we can print them back the way the user input
+                       -- | them
+    pBalanceDate :: Day,
     pAccount :: T.Text,
     pAmount :: q
-  } deriving (Eq, Show, Generic, Functor)
+  } deriving (Eq, Show, Functor)
 
-instance Bifunctor PostingF where
-  first f (Posting b a amnt) = Posting (f b) a amnt
-  second f (Posting b a amnt) = Posting b a (f amnt)
+type JPosting = PostingF (Maybe Quantity)
+type Posting = PostingF Quantity
 
-type JPosting = PostingF (Maybe Day) (Maybe Quantity)
-
--- | Updates the balance date if it is Nothing
-fromBalanceDate :: Day -> PostingF (Maybe Day) q -> PostingF Day q
-fromBalanceDate txDate (Posting balDate acc amnt) =
-  let d = fromMaybe txDate balDate
-  in Posting d acc amnt
+changePostingDate :: Day -> PostingF a -> PostingF a
+changePostingDate d (Posting order _ acc amnt) = (Posting order d acc amnt)
 
 -- | Updates the amount if it is Nothing
-fromAmount :: Quantity -> PostingF d2 (Maybe Quantity) -> PostingF d2 Quantity
-fromAmount txAmount (Posting balDate acc amnt) =
+setAmount :: Quantity -> PostingF (Maybe Quantity) -> PostingF Quantity
+setAmount txAmount (Posting order balDate acc amnt) =
   let a = fromMaybe txAmount amnt
-  in Posting balDate acc a
+  in Posting order balDate acc a
+
+-- | Asserts a zero balance of all the postings
+balancePostings :: (MonadError Errors m) =>
+                    [JPosting] ->
+                    m [Posting]
+balancePostings [] =
+  throwError $ mkErrorNoPos ZeroOrOnePostingOnly
+balancePostings [_] =
+  throwError $ mkErrorNoPos ZeroOrOnePostingOnly
+balancePostings ps =
+  let (noAmount, withAmount)  = partition (isNothing . pAmount) ps
+      withAmount' = map (\p -> p{pAmount = fromJust (pAmount p)}) withAmount
+      s :: Quantity
+      s = sum $ map pAmount withAmount'
+  in case noAmount of
+        [] -> if s == 0
+              then return withAmount'
+              else throwError
+                   $ mkErrorNoPos (UnbalancedTransaction s)
+        [x] -> let x' = setAmount (negate s) x
+               in return $ x' : withAmount'
+        _ -> throwError $ mkErrorNoPos TwoOrMorePostingsWithoutAmount
