@@ -49,7 +49,7 @@ incomeStatementBody showRow dates ledger
                $ filter (isIncomeStatementType . aType)
                $ lAccounts ledger
         body = map snd lines1
-        total = sum $ map fst lines1
+        total = negate $ sum $ map fst lines1
         footer = V.empty 
                 : V.fromList [i18nText lang TReportEarnings, writeAmount decimalSep total]
                 : []
