@@ -45,7 +45,9 @@ runReport (TrialBalance period c showRow) today j =
 runReport (BalanceSheet period c showRow displayColumns displayExtraC) today j = 
   balanceSheetReport period c showRow displayColumns displayExtraC
   (journalToLedger j) today
-runReport (IncomeStatement _ _ _ _ _) _ _ = error "Not Implemented"
+runReport (IncomeStatement period c showRow displayColumns displayExtraC) today j = 
+  incomeStatementReport period c showRow displayColumns displayExtraC
+  (journalToLedger j) today
 
 encodeReport :: Journal -> V.Vector (V.Vector T.Text) -> BL.ByteString
 encodeReport j v =

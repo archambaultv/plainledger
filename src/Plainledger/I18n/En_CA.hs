@@ -74,6 +74,7 @@ en_CAText TReportAccName = "Account"
 en_CAText TReportDebit  = "Debit"
 en_CAText TReportCredit = "Credit"
 en_CAText TReportTotal = "Total"
+en_CAText TReportEarnings = "Earnings"
 en_CAText (TReportGeneratedOn d) = "Reports generated on " ++ show d
 
 -- | Pretty print the error message and add the source file information

@@ -76,3 +76,4 @@ data I18nText
   | TReportCredit
   | TReportTotal
   | TReportGeneratedOn Day
+  | TReportEarnings

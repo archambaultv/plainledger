@@ -49,8 +49,12 @@ incomeStatementBody showRow dates ledger
                $ filter (isIncomeStatementType . aType)
                $ lAccounts ledger
         body = map snd lines1
+        total = sum $ map fst lines1
+        footer = V.empty 
+                : V.fromList [i18nText lang TReportEarnings, writeAmount decimalSep total]
+                : []
 
-    in header : body
+    in header : body ++ footer
   where serialize :: Account -> Maybe (Quantity, V.Vector T.Text)
         serialize acc =
           let number = T.pack $ show $ aNumber acc
