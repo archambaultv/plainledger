@@ -46,7 +46,7 @@ incomeStatementBody showRow dates ledger
         header = V.fromList [i18nText lang (TReportAccName)]
         lines1 = mapMaybe serialize 
                $ sortBy (comparing aNumber) 
-               $ filter (isIncomeStatementType . aType)
+               $ filter (isIncomeStatementType . aAccountType)
                $ lAccounts ledger
         body = map snd lines1
         total = negate $ sum $ map fst lines1
@@ -60,7 +60,7 @@ incomeStatementBody showRow dates ledger
           let number = T.pack $ show $ aNumber acc
               name = T.concat [aDisplayName acc, " (", number, ")"]
               amnt = trialBalanceQty ledger dates acc
-              amntText = qtyToNormallyPositive decimalSep (aType acc) amnt
+              amntText = qtyToNormallyPositive decimalSep (aAccountType acc) amnt
               isActive = isAccountActive ledger dates acc
               line = V.fromList $ [name, amntText]
           in case (isActive, showRow) of

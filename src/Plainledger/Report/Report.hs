@@ -91,45 +91,42 @@ data Ledger = Ledger {
   lJournalFile :: JournalFile,
   lAccounts   :: [Account],
   lTransactions :: [Transaction],
+  lChartOfAccount :: ChartOfAccounts,
   lDateSpan :: Maybe DateSpan,
   lBalanceMap :: BalanceMap,
-  lAccountMap :: HM.HashMap T.Text Account
+  lAccountMap :: HM.HashMap Int Account,
+  lOpeningAccount :: Account,
+  lEarningAccount :: Account
 }
 
 journalToLedger :: Journal -> Ledger
 journalToLedger journal =
   let jf = jJournalFile journal
       accs = jAccounts journal
+      chart = jChartOfAccount journal
       txns = jTransactions journal
-      balMap = transactionsToBalanceMap txns
+      balMap = jBalanceMap journal
       dSpan = journalDateSpan journal
       accMap = HM.fromList $ map (\a -> (aId a, a)) accs
-  in Ledger jf accs txns dSpan balMap accMap
+      open = bmOpeningBalanceAcc balMap
+      earn = bmEarningAcc balMap
+  in Ledger jf accs txns chart dSpan balMap accMap open earn
 
 trialBalanceQty :: Ledger -> DateSpan -> Account -> Quantity
 trialBalanceQty ledger dateSpan acc =
-  let openAcc = jfOpeningBalanceAccount $ lJournalFile ledger
-      accId = aId acc
-      balMap = lBalanceMap ledger
-      accMaps = lAccountMap ledger
-      accTypef = \a -> aType $ accMaps HM.! a
-  in trialBalanceQuantity openAcc accTypef balMap accId (aType acc) dateSpan 
+  let balMap = lBalanceMap ledger
+  in trialBalanceQuantity balMap acc dateSpan 
 
 balanceSheetQty :: Ledger -> DateSpan -> Account -> Quantity
 balanceSheetQty ledger dateSpan acc =
-  let earnAcc = jfEarningsAccount $ lJournalFile ledger
-      openAcc = jfOpeningBalanceAccount $ lJournalFile ledger
-      accId = aId acc
-      balMap = lBalanceMap ledger
-      accMaps = lAccountMap ledger
-      accTypef = \a -> aType $ accMaps HM.! a
-  in balanceSheetQuantity earnAcc openAcc accTypef balMap accId dateSpan 
+  let balMap = lBalanceMap ledger
+  in balanceSheetQuantity balMap acc dateSpan 
 
 isAccountActive :: Ledger -> DateSpan -> Account -> Bool
 isAccountActive ledger (d1, d2) acc =
   let balMap = lBalanceMap ledger
-      accType = aType acc
-  in case balanceAtDate balMap (aId acc) d2 of
+      accType = aAccountType acc
+  in case balanceAtDate balMap acc d2 of
         Nothing -> False
         Just (_, amnt) 
           | isBalanceSheetType accType && amnt /= 0 -> True

@@ -13,7 +13,6 @@ module Plainledger.Report.BalanceSheet (
 where
 
 import Data.List
-import Data.Ord
 import Data.Maybe
 import Data.Time
 import Plainledger.I18n.I18n
@@ -23,15 +22,15 @@ import qualified Data.Vector as V
 import qualified Data.Text as T
 
 
-balanceSheetReport :: ReportPeriod -> 
-                      (Maybe CompareAnotherPeriod) -> 
-                      ShowRow -> 
-                      (Maybe DisplayColumns) ->
+balanceSheetReport :: ReportPeriod ->
+                      Maybe CompareAnotherPeriod ->
+                      ShowRow ->
+                      Maybe DisplayColumns ->
                       CompareExtraColumns ->
                       Ledger ->
                       Day ->
                       V.Vector (V.Vector T.Text)
-balanceSheetReport period _ showRow _ _ ledger today = 
+balanceSheetReport period _ showRow _ _ ledger today =
   let lang = jfLanguage $ lJournalFile ledger
       reportName = i18nText lang TReportBalanceSheetName
       dateSpan = reportPeriodToSpan period today ledger
@@ -39,14 +38,14 @@ balanceSheetReport period _ showRow _ _ ledger today =
               Nothing -> []
               Just x -> balanceSheetBody showRow x ledger
   in standardReport period ledger today reportName body
-      
-balanceSheetBody :: ShowRow -> DateSpan -> Ledger -> [(V.Vector T.Text)]
-balanceSheetBody showRow dates ledger 
+
+balanceSheetBody :: ShowRow -> DateSpan -> Ledger -> [V.Vector T.Text]
+balanceSheetBody showRow dates ledger
   = let lang = jfLanguage $ lJournalFile ledger
-        header = V.fromList [i18nText lang (TReportAccName)]
-        lines1 = mapMaybe serialize 
-               $ sortBy (comparing aNumber) 
-               $ filter (isBalanceSheetType . aType)
+        header = V.fromList [i18nText lang TReportAccName]
+        lines1 = mapMaybe serialize
+               $ sortOn aNumber
+               $ filter (isBalanceSheetType . aAccountType)
                $ lAccounts ledger
         body = map snd lines1
 
@@ -56,10 +55,10 @@ balanceSheetBody showRow dates ledger
           let number = T.pack $ show $ aNumber acc
               name = T.concat [aDisplayName acc, " (", number, ")"]
               amnt = balanceSheetQty ledger dates acc
-              amntText = qtyToNormallyPositive decimalSep (aType acc) amnt
+              amntText = qtyToNormallyPositive decimalSep (aAccountType acc) amnt
               isActive = isAccountActive ledger dates acc
-                       || aId acc == jfEarningsAccount (lJournalFile ledger)
-                       || aId acc == jfOpeningBalanceAccount (lJournalFile ledger)
+                       || acc == lEarningAccount ledger
+                       || acc == lOpeningAccount ledger
               line = V.fromList $ [name, amntText]
           in case (isActive, showRow) of
                 (_, ShowAll) -> Just (amnt, line)

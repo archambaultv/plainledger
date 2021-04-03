@@ -27,12 +27,10 @@ en_CAText TEquity = "Equity"
 en_CAText TRevenue = "Revenue"
 en_CAText TExpense = "Expense"
 
-en_CAText TAccountId = "Id"
 en_CAText TAccountNumber = "Number"
-en_CAText TAccountType = "Type"
 en_CAText TAccountName = "Name"
-en_CAText TAccountGroup = "Group"
-en_CAText TAccountSubGroup = "Subgroup"
+en_CAText TAccountIdent = "Id"
+en_CAText TAccountParent = "Parent"
 
 en_CAText TBalanceStartDate = "Start date"
 en_CAText TBalanceEndDate = "End date"
@@ -190,6 +188,12 @@ printErrorType (EndDateGreaterThanStartDate sd ed)
   ++ "\" is greater than the end date \""
   ++ show ed
   ++ "\""
+
+printErrorType (InvalidParent ident parent)
+  = "The parent account for the account \""
+  ++ show ident
+  ++ "\" is not valide. "
+  ++ "\"" ++ show parent ++ "\" is not an account indentifier."
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f

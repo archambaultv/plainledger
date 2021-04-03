@@ -8,7 +8,7 @@
 --
 -- This module defines the JTransaction data type.
 
-module Plainledger.Journal.Transaction 
+module Plainledger.Journal.Transaction
 (
   TransactionF(..),
   JTransaction,
@@ -37,10 +37,10 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Prelude hiding (lines)
 import qualified Data.Csv as C
-import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import Plainledger.Journal.Account (Account)
 
 data TransactionF p = Transaction
   {
@@ -55,11 +55,11 @@ type JTransaction = TransactionF JPosting
 type Transaction = TransactionF Posting
 
 decodeJTransactionsFile :: Language ->
-                           Char -> 
-                           Char -> 
-                           FilePath -> 
+                           Char ->
+                           Char ->
+                           FilePath ->
                            ExceptT Errors IO [(SourcePos, JTransaction)]
-decodeJTransactionsFile lang csvSeparator decimalSeparator filePath = 
+decodeJTransactionsFile lang csvSeparator decimalSeparator filePath =
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       accs <- decodeTransactions lang csvSeparator decimalSeparator (BL.fromStrict csvBS)
@@ -71,7 +71,7 @@ decodeJTransactionsFile lang csvSeparator decimalSeparator filePath =
 decodeTransactions :: forall m . (MonadError Errors m) =>
                       Language ->
                       Char ->
-                      Char -> 
+                      Char ->
                       ByteString ->
                       m [JTransaction]
 decodeTransactions lang csvSeparator decimalSeparator bs = do
@@ -79,19 +79,19 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
   let opts = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord csvSeparator)
                 }
-  csv <- either (throwError . mkErrorNoPos . ErrorMessage) return 
+  csv <- either (throwError . mkErrorNoPos . ErrorMessage) return
       $ C.decodeWith opts C.NoHeader bs
 
 
-  let accPrefix = (T.append (i18nText lang TTransactionAccountPrefix) " ")
-  let amntPrefix = (T.append (i18nText lang TTransactionAmountPrefix) " ")
-  let datePrefix = (T.append (i18nText lang TTransactionBalanceDatePrefix) " ")
+  let accPrefix = T.append (i18nText lang TTransactionAccountPrefix) " "
+  let amntPrefix = T.append (i18nText lang TTransactionAmountPrefix) " "
+  let datePrefix = T.append (i18nText lang TTransactionBalanceDatePrefix) " "
 
   -- Decode the header to know the index of columns
   let myFilter t
-        = t `elem` [i18nText lang TTransactionDate, 
-                    i18nText lang TTransactionComment, 
-                    i18nText lang TTransactionCounterparty, 
+        = t `elem` [i18nText lang TTransactionDate,
+                    i18nText lang TTransactionComment,
+                    i18nText lang TTransactionCounterparty,
                     i18nText lang TTransactionTag]
         || T.isPrefixOf accPrefix t
         || T.isPrefixOf amntPrefix t
@@ -108,54 +108,54 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
   let accSufix = filter (T.isPrefixOf accPrefix . fst)
                $ sortOn snd
                $ HM.toList indexes
-  let postingIdx = map (postingIndexes 
+  let postingIdx = map (postingIndexes
                         (accPrefix, amntPrefix, datePrefix)
                         indexes)
                    accSufix
 
   -- Add row information to the CSV line
   let csvWithRowNumber = zip [2..] $ V.toList csvData
-  
+
   -- Function to parse a line into a JTransaction                            
   let parseLine (row, line) =
           let p = do
                  date <- columnDataM dateIdx line (parseISO8601M . T.unpack)
-                 comment <- optionalColumnData "" commentIdx line 
-                 counterParty <- optionalColumnData "" counterPartyIdx line 
+                 comment <- optionalColumnData "" commentIdx line
+                 counterParty <- optionalColumnData "" counterPartyIdx line
                  tag <- optionalColumnData "" tagIdx line
 
-                 ps <- fmap catMaybes 
-                       $ mapM (postingColumns date line) 
+                 ps <- fmap catMaybes
+                       $ mapM (postingColumns date line)
                        $ zip [1..] postingIdx
                  if null ps || null (tail ps)
                   then throwError $ mkErrorNoPos $ ZeroOrOnePostingOnly
-                  else 
+                  else
                    return $ Transaction date comment counterParty tag ps
 
           in p `catchError` (throwError . setSourcePosRowIfNull row)
 
   mapM parseLine csvWithRowNumber
 
-  where postingIndexes :: (T.Text, T.Text, T.Text) -> 
+  where postingIndexes :: (T.Text, T.Text, T.Text) ->
                           ColumnIndexes ->
-                          ColumnIndex -> 
+                          ColumnIndex ->
                           (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex)
-        postingIndexes (accPrefix, amntPrefix, balPrefix) m acc = 
+        postingIndexes (accPrefix, amntPrefix, balPrefix) m acc =
           let keySuf = T.drop (T.length accPrefix) (fst acc)
               amnt = T.append amntPrefix keySuf
               bl = T.append balPrefix keySuf
           in (acc, optionalColumnIndex m amnt, optionalColumnIndex m bl)
 
-        postingColumns :: Day -> 
-                          V.Vector T.Text -> 
-                          (Int, (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex)) -> 
+        postingColumns :: Day ->
+                          V.Vector T.Text ->
+                          (Int, (ColumnIndex, Maybe ColumnIndex, Maybe ColumnIndex)) ->
                           m (Maybe JPosting)
         postingColumns d l (i, (aIdx, amIdx, bIdx)) = do
           acc <- optionalColumnData "" (Just aIdx) l
           if T.null acc
            then return Nothing
            else do
-               amount <- optionalColumnDataM Nothing amIdx l 
+               amount <- optionalColumnDataM Nothing amIdx l
                         (fmap Just . parseAmount decimalSeparator)
                balanceDate <- optionalColumnDataM d bIdx l (parseISO8601M . T.unpack)
                return $ Just $ Posting i balanceDate acc amount
@@ -163,30 +163,29 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
 --  Asserts all transactions have valid postings
 --  Asserts all transactions balance to zero
 validateJTransactions :: (MonadError Errors m) =>
-                      HS.HashSet T.Text ->
+                      HM.HashMap T.Text Account ->
                       [(SourcePos, JTransaction)] ->
                       m [Transaction]
 validateJTransactions accs jtransactions = do
-    transactions <- traverse balanceTransaction jtransactions
-    _ <- traverse (checkTxnAccount accs) transactions
+    txns <- traverse balanceTransaction jtransactions
+    transactions <- traverse (setAccountNumber accs) txns
     return $ map snd transactions
+
+-- Change the name of the account for its Id
+setAccountNumber :: (MonadError Errors m) =>
+                      HM.HashMap T.Text Account ->
+                      (SourcePos , TransactionF (PostingF T.Text q)) ->
+                      m (SourcePos, TransactionF (PostingF Account q))
+setAccountNumber m (pos, t) = do
+    ps2 <- traverse (setAccount m) (tPostings t)
+           `catchError` (throwError . setSourcePosIfNull pos)
+    return (pos, t{tPostings = ps2})
 
 -- Balance postings
 balanceTransaction :: (MonadError Errors m) =>
-                             (SourcePos , JTransaction) -> 
-                             m (SourcePos, Transaction)
+                      (SourcePos , JTransaction)->
+                      m (SourcePos, TransactionF (PostingF T.Text Quantity))
 balanceTransaction (pos, t) = do
-    ps2 <- (balancePostings $ tPostings $ t)
+    ps2 <- balancePostings (tPostings t)
            `catchError` (throwError . setSourcePosIfNull pos)
-    return $ (pos, t{tPostings = ps2})
-
-checkTxnAccount :: (MonadError Errors m) =>
-                    HS.HashSet T.Text -> (SourcePos, Transaction) -> m ()
-checkTxnAccount s (pos, t) = traverse foo (tPostings t) >> return ()
-  where foo p = if HS.member (pAccount p) s
-                then return ()
-                else throwError 
-                      $ mkError pos
-                      $ AccountIdNotInAccountFile
-                      $ T.unpack 
-                      $ pAccount p
+    return (pos, t{tPostings = ps2})

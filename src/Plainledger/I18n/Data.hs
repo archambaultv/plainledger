@@ -34,12 +34,10 @@ data I18nText
   | TRevenue
   | TExpense
 
-  | TAccountId
   | TAccountNumber
-  | TAccountType
+  | TAccountIdent
+  | TAccountParent
   | TAccountName
-  | TAccountGroup
-  | TAccountSubGroup
 
   | TBalanceStartDate
   | TBalanceEndDate
