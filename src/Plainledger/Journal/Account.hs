@@ -278,7 +278,7 @@ makeChartOfAccounts lang accounts = do
              $ HM.filter (\(_,x,_) -> not x) m
 
   if null cycles
-  then return chart
+  then return $ sortOn (aId . rootLabel) chart
   else 
     let pos = map fst
             $ mapMaybe (\c -> find (\(_, a) -> aId a == aId c) accounts) cycles
