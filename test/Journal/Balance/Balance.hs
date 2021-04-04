@@ -11,7 +11,7 @@ import Control.Monad.Except
 import Plainledger.I18n.I18n
 import qualified Data.Text as T
 
-statementBalances :: [Balance]
+statementBalances :: [JBalance]
 statementBalances = 
   [
     Balance (read "2018-01-31") "Compte chèque" (read "5834.84") Nothing,
@@ -25,7 +25,7 @@ statementBalances =
     Balance (read "2019-05-31") "Marge de crédit" (read "-6183.45") Nothing
   ]
 
-trialBalances :: [Balance]
+trialBalances :: [JBalance]
 trialBalances = 
   [
     Balance (read "2018-01-31") "Compte chèque" (read "5834.84") Nothing,
@@ -71,7 +71,7 @@ balanceTestTree =
     ]
 
 
-okBalance :: Bool -> String -> Char -> Char -> [Balance] -> TestTree
+okBalance :: Bool -> String -> Char -> Char -> [JBalance] -> TestTree
 okBalance isStatementBalance filename sep decimal expectedBalance = 
   testCase ("Decode " ++ filename) $ do
        let f = decodeFunction isStatementBalance
@@ -93,7 +93,7 @@ decodeFunction :: Bool
                 -> Char
                 -> Char
                 -> FilePath
-                -> ExceptT Errors IO [(SourcePos, Balance)]
+                -> ExceptT Errors IO [(SourcePos, JBalance)]
 decodeFunction True = decodeStatementBalanceFile Fr_CA
 decodeFunction False = decodeTrialBalanceFile Fr_CA
 

@@ -25,7 +25,7 @@ import Plainledger.Error
 import Control.Monad.Except
 import Plainledger.I18n.I18n
 import Plainledger.Report
-import qualified Data.HashSet as HS
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Vector as V
 import qualified Data.Text as T
 import qualified Data.Csv as C
@@ -76,7 +76,9 @@ transactionEncodeDecode folder =
                       C.encDelimiter = fromIntegral (ord csvSeparator)
                     }
     let csvBS = C.encodeWith myOptions $ V.toList report
-    let accIds = HS.fromList $ map aId $ lAccounts journal
+    let accIds = HM.fromList 
+               $ map (\a -> (aIdentifier a, a)) 
+               $ lAccounts journal
     let pos = map (\i -> SourcePos folder i 0) [2..]
     let accs = fmap (zip pos)
              $ decodeTransactions lang csvSeparator decimalSeparator csvBS

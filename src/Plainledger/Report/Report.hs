@@ -27,7 +27,9 @@ module Plainledger.Report.Report
   DisplayColumns(..),
   trialBalanceQty,
   balanceSheetQty,
-  TransactionCsvRecordType(..)
+  TransactionCsvRecordType(..),
+  emptyLedger,
+  nameWithNumber
   )
 where
 
@@ -50,6 +52,10 @@ qtyToNormallyPositive :: Char -> AccountType -> Quantity -> T.Text
 qtyToNormallyPositive c accType qty
   | isCreditType accType = writeAmount c $ negate qty
   | otherwise = writeAmount c qty
+
+nameWithNumber :: T.Text -> Maybe Int -> T.Text
+nameWithNumber x Nothing = x
+nameWithNumber x (Just i) = T.concat [x, " (", T.pack $ show i, ")"]
 
 standardReport :: ReportPeriod -> 
                   Ledger ->
@@ -98,6 +104,12 @@ data Ledger = Ledger {
   lOpeningAccount :: Account,
   lEarningAccount :: Account
 }
+
+emptyLedger :: Ledger
+emptyLedger = 
+  let a = dummyAccount Asset
+      bal = BalanceMap HM.empty a a
+  in Ledger emptyJournalFile  [] [] [] Nothing bal HM.empty a a
 
 journalToLedger :: Journal -> Ledger
 journalToLedger journal =

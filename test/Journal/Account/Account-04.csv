@@ -1,17 +1,21 @@
-﻿Id;Numéro;Type
-Compte chèque;1001;Actif
-Maison;1051;Actif
-Inutilisé;1102;Actif
-Marge de crédit;2051;Passif
-Carte de crédit;2001;Passif
-Hypothèque;2002;Passif
-Solde d'ouverture;3001;Capital
-Bénéfice;3002;Capital
-Salaire;4152;Revenu
-Revenu de location;4153;Revenu
-Nourriture;5002;Dépense
-Taxes;5003;Dépense
-Vêtements;5006;Dépense
-Divertissements;5010;Dépense
-Dépenses non catégorisées;5011;Dépense
-Inutilisé 2;5102;Dépense
+﻿Id;Numéro;Parent;
+Actif court terme;1000;Actif;
+Compte chèque;1001;Actif court terme;
+Maison;1051;Actif;
+Autres actifs;1100;Actif;
+Inutilisé;1102;Autres actifs;
+Marge de crédit;2051;Passif;
+Carte de crédit;2001;Passif;
+Passif Long Terme;2000;Passif;
+Hypothèque;2002;Passif Long Terme;
+Solde d'ouverture;3001;Capital;
+Bénéfice;3002;Capital;
+Salaire;4152;Revenu;
+Revenu de location;4153;Revenu;
+Dépenses courantes;5000;Dépense;
+Nourriture;5002;Dépenses courantes;
+Taxes;5003;Dépenses courantes;
+Vêtements;5006;Dépenses courantes;
+Divertissements;5010;Dépenses courantes;
+Dépenses non catégorisées;5011;Dépense;
+Inutilisé 2;5102;Dépense;

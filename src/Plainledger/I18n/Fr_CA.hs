@@ -195,6 +195,14 @@ printErrorType (InvalidParent ident parent)
   ++ "\" est invalide. "
   ++ "\"" ++ show parent ++ "\" n'est pas un identifiant de compte connu."
 
+printErrorType (CycleInParents idents)
+  = "Les parents des comptes suivants forment une (ou plusieurs) référence circulaire :\n"
+  ++ intercalate ", " idents
+
+printErrorType (InvalidIdentifier s)
+  = "Les identifiants de compte suivant ne peuvent être utilisés :"
+  ++ intercalate ", " s
+
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
 showSourcePos (SourcePos f r c) | c <= 0

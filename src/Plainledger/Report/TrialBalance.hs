@@ -57,7 +57,7 @@ trialBalanceBody showRow dates ledger
     in (header4 : body) ++ [total]
   where serialize :: Account -> Maybe (Quantity, V.Vector T.Text)
         serialize acc =
-          let number = T.pack $ show $ aNumber acc
+          let number = T.pack $ maybe "" show $ aNumber acc
               name = aDisplayName acc
               amnt = trialBalanceQty ledger dates acc
               amntText = qtyToDebitCredit decimalSep (aAccountType acc) amnt

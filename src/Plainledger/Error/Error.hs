@@ -54,9 +54,11 @@ data ErrorType
 
   | ZeroLengthAccountId
   | DuplicateAccountId String
+  | InvalidIdentifier [String]
   | OpeningBalanceNotDefined String
   | EarningsAccountNotDefined String
   | InvalidParent String String
+  | CycleInParents [String]
 
   | MissingCsvColumn String
   | MissingCsvColumnData String

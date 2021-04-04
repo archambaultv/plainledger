@@ -9,12 +9,12 @@ import Plainledger.Journal
 import Plainledger.Error
 import Control.Monad.Except
 import Journal.Account.Account
-import qualified Data.HashSet as HS
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 import Plainledger.I18n.I18n
 
-accs :: HS.HashSet T.Text
-accs = HS.fromList $ map aId accounts
+accs :: HM.HashMap T.Text Account
+accs = HM.fromList $ map (\a -> (aIdentifier a, a)) accounts
 
 transactions :: [JTransaction]
 transactions = 

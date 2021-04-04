@@ -57,8 +57,7 @@ incomeStatementBody showRow dates ledger
     in header : body ++ footer
   where serialize :: Account -> Maybe (Quantity, V.Vector T.Text)
         serialize acc =
-          let number = T.pack $ show $ aNumber acc
-              name = T.concat [aDisplayName acc, " (", number, ")"]
+          let name = nameWithNumber (aDisplayName acc)  (aNumber acc)
               amnt = trialBalanceQty ledger dates acc
               amntText = qtyToNormallyPositive decimalSep (aAccountType acc) amnt
               isActive = isAccountActive ledger dates acc

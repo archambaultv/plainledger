@@ -192,8 +192,16 @@ printErrorType (EndDateGreaterThanStartDate sd ed)
 printErrorType (InvalidParent ident parent)
   = "The parent account for the account \""
   ++ show ident
-  ++ "\" is not valide. "
+  ++ "\" is not valid. "
   ++ "\"" ++ show parent ++ "\" is not an account indentifier."
+
+printErrorType (CycleInParents idents)
+  = "The following accounts (when taking their parent, parent of parent , etc.) form one or more cycles :\n"
+  ++ intercalate ", " idents
+
+printErrorType (InvalidIdentifier s)
+  = "The following account identifier cannot be used :"
+  ++ intercalate ", " s
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
