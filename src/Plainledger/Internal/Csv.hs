@@ -36,9 +36,9 @@ import qualified Data.Text.Read as T
 import Plainledger.Error
 import Control.Monad.Except
 import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.Internal as B (c2w)
 import qualified Data.Csv as C
 import Data.Char (ord)
+import Data.Word (Word8)
 
 -- Column name and column number (zero based)
 type ColumnIndex = (T.Text, Int)
@@ -58,8 +58,11 @@ readCsvFile csvSeparator bs =
                 C.decDelimiter = fromIntegral (ord csvSeparator)
                 }
 
-      nl = B.c2w '\n'
-      cr = B.c2w '\r'
+      nl:: Word8
+      nl = 10
+
+      cr :: Word8
+      cr = 13
 
       -- Returns only the non empty lines with their number
       csvLines :: Int -> B.ByteString -> [(Int, B.ByteString)]
