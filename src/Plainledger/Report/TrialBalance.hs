@@ -12,7 +12,7 @@ module Plainledger.Report.TrialBalance (
   )
 where
 
-import Data.List
+import Data.List ( sortOn )
 import Data.Maybe
 import Data.Time
 import Plainledger.I18n.I18n
