@@ -19,9 +19,8 @@ module Plainledger.Journal.Transaction
 )
 where
 
-import Data.Char (ord)
 import Data.Function
-import Data.List hiding (lines)
+import Data.List ( sortOn )
 import Data.Maybe
 import Control.Monad.Except
 import Data.ByteString.Lazy (ByteString)
@@ -36,7 +35,6 @@ import Plainledger.Internal.Utils
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Prelude hiding (lines)
-import qualified Data.Csv as C
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -63,8 +61,8 @@ decodeJTransactionsFile lang csvSeparator decimalSeparator filePath =
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       accs <- decodeTransactions lang csvSeparator decimalSeparator (BL.fromStrict csvBS)
-      let pos = map (\i -> SourcePos filePath i 0) [2..]
-      return $ zip pos accs
+      let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) accs
+      return withPos
 
 
 -- | The first line is the header
@@ -73,15 +71,10 @@ decodeTransactions :: forall m . (MonadError Errors m) =>
                       Char ->
                       Char ->
                       ByteString ->
-                      m [JTransaction]
+                      m [(SourceRow, JTransaction)]
 decodeTransactions lang csvSeparator decimalSeparator bs = do
   -- Read the CSV file as vector of T.Text
-  let opts = C.defaultDecodeOptions {
-                C.decDelimiter = fromIntegral (ord csvSeparator)
-                }
-  csv <- either (throwError . mkErrorNoPos . ErrorMessage) return
-      $ C.decodeWith opts C.NoHeader bs
-
+  csv <- readCsvFile csvSeparator bs
 
   let accPrefix = T.append (i18nText lang TTransactionAccountPrefix) " "
   let amntPrefix = T.append (i18nText lang TTransactionAmountPrefix) " "
@@ -113,12 +106,9 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
                         indexes)
                    accSufix
 
-  -- Add row information to the CSV line
-  let csvWithRowNumber = zip [2..] $ V.toList csvData
-
   -- Function to parse a line into a JTransaction                            
   let parseLine (row, line) =
-          let p = do
+          let p = (row,) <$> do
                  date <- columnDataM dateIdx line (parseISO8601M . T.unpack)
                  comment <- optionalColumnData "" commentIdx line
                  counterParty <- optionalColumnData "" counterPartyIdx line
@@ -128,13 +118,13 @@ decodeTransactions lang csvSeparator decimalSeparator bs = do
                        $ mapM (postingColumns date line)
                        $ zip [1..] postingIdx
                  if null ps || null (tail ps)
-                  then throwError $ mkErrorNoPos $ ZeroOrOnePostingOnly
+                  then throwError $ mkErrorNoPos ZeroOrOnePostingOnly
                   else
                    return $ Transaction date comment counterParty tag ps
 
           in p `catchError` (throwError . setSourcePosRowIfNull row)
 
-  mapM parseLine csvWithRowNumber
+  mapM parseLine csvData
 
   where postingIndexes :: (T.Text, T.Text, T.Text) ->
                           ColumnIndexes ->

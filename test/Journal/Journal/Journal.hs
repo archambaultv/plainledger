@@ -17,9 +17,14 @@ journalJournalTestTree =
 
       validationKO "Journal-02"
       $ mkError (SourcePos "test/Journal/Journal/Journal-02/TrialBalance.csv" 20 0) 
-      $ WrongBalance "Revenu de location" (read "2018-12-31") (-100) (Just (-1000))
-    ]
+      $ WrongBalance "Revenu de location" (read "2018-12-31") (-100) (Just (-1000)),
 
+      validationKO "Journal-03"
+      $ mkErrorMultiPos 
+        [SourcePos "test/Journal/Journal/Journal-03/StatementBalance.csv" 2 0,
+         SourcePos "test/Journal/Journal/Journal-03/StatementBalance.csv" 3 0]
+        (DuplicateBalance (read "2018-01-31") "Compte chèque")
+    ]
 
 validationOk :: String -> TestTree
 validationOk folder = testCase folder $ do

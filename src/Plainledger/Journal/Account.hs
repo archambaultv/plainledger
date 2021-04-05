@@ -32,19 +32,21 @@ module Plainledger.Journal.Account
 where
 
 import System.FilePath
-import Data.Char (ord)
 import Data.Function
 import Control.Monad.Except
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy (ByteString)
-import Data.List hiding (group, lines)
+import Data.List
+    ( sortBy,
+      find,
+      groupBy,
+      sortOn )
 import Plainledger.I18n.I18n
 import Plainledger.Error
 import Plainledger.Internal.Csv
 import Plainledger.Internal.Utils
 import Prelude hiding (lines)
-import qualified Data.Csv as C
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import qualified Data.HashMap.Strict as HM
@@ -312,15 +314,9 @@ makeChartOfAccounts lang accounts = do
 
 -- | The first line is the header
 decodeAccounts :: (MonadError Errors m)
-               => Language -> Char -> ByteString -> m [JAccount]
+               => Language -> Char -> ByteString -> m [(SourceRow, JAccount)]
 decodeAccounts lang csvSeparator bs = do
-  -- Read the CSV file as vector of T.Text
-  let opts = C.defaultDecodeOptions {
-                C.decDelimiter = fromIntegral (ord csvSeparator)
-                }
-  csv <- either (throwError . mkErrorNoPos . ErrorMessage) return
-      $ C.decodeWith opts C.NoHeader bs
-
+  csv <- readCsvFile csvSeparator bs
   -- Decode the header to know the index of columns
   let myFilter t = t `elem` [i18nText lang TAccountIdent,
                              i18nText lang TAccountName,
@@ -333,14 +329,14 @@ decodeAccounts lang csvSeparator bs = do
   parentIdx <- columnIndex indexes (i18nText lang TAccountParent)
   let nameIdx = optionalColumnIndex indexes (i18nText lang TAccountName)
 
- -- Add row information to the CSV line
-  let csvWithRowNumber = zip [2..] $ V.toList csvData
-
-  accs <- mapM (parseLine identIdx nameIdx numberIdx parentIdx) csvWithRowNumber
+  accs <- mapM (parseLine identIdx nameIdx numberIdx parentIdx) 
+          (zip [6..] csvData)
 
   -- Fill DisplayName if it was missing
   let accWithNames = map
-                     (\a -> if T.null (aDisplayName a) then a{aDisplayName = aIdentifier a} else a)
+                     (\(i, a) -> if T.null (aDisplayName a) 
+                                 then (i, a{aDisplayName = aIdentifier a}) 
+                                 else (i,a))
                      accs
   return accWithNames
 
@@ -352,22 +348,22 @@ decodeAccounts lang csvSeparator bs = do
                  Maybe ColumnIndex ->
                  Maybe ColumnIndex ->
                  ColumnIndex ->
-                 (Int, V.Vector T.Text) ->
-                 m JAccount
-    parseLine identIdx nameIdx numberIdx parentIdx (row, line) =
-          let p = do
+                 (Int, (Int, V.Vector T.Text)) ->
+                 m (SourceRow, JAccount)
+    parseLine identIdx nameIdx numberIdx parentIdx (idnum, (row, line)) =
+          let p = (row,) <$> do
                 ident <- columnData identIdx line
                 name <- optionalColumnData ident nameIdx line
                 number <- optionalColumnDataM Nothing numberIdx line parseIntMaybe
                 parent <- columnData parentIdx line
                 -- The first 5 id number are reserved for the top five accounts
-                return $ Account (row + 5) ident name number parent ()
-          in p -- `catchError` (throwError . setSourcePosRowIfNull row)
+                return $ Account idnum ident name number parent ()
+          in p  `catchError` (throwError . setSourcePosRowIfNull row)
 
 decodeAccountsFile :: Language -> FilePath -> Char -> ExceptT Errors IO  [(SourcePos, JAccount)]
 decodeAccountsFile lang filePath csvSeparator =
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       accs <- decodeAccounts lang csvSeparator (BL.fromStrict csvBS)
-      let pos = map (\i -> SourcePos filePath i 0) [2..]
-      return $ zip pos accs
+      let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) accs
+      return withPos

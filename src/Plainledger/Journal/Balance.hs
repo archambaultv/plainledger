@@ -23,8 +23,6 @@ where
 
 import Data.Time ( Day )
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.Vector as V
-import qualified Data.Csv as C
 import qualified Data.Text as T
 import Plainledger.I18n.I18n
     ( I18nText(TBalanceStartDate, TBalanceDate, TBalanceEndDate,
@@ -43,7 +41,7 @@ import Plainledger.Internal.Csv
       processColumnIndexes,
       columnData,
       columnDataM,
-      optionalColumnDataM )
+      optionalColumnDataM, readCsvFile )
 import Plainledger.Internal.Utils ( removeBom )
 import Plainledger.Journal.Account
     ( isIncomeStatementType,
@@ -53,18 +51,19 @@ import Control.Monad.Except
     ( withExceptT, MonadIO(liftIO), MonadError(..), ExceptT )
 import Plainledger.Error
     ( SourcePos(SourcePos),
-      ErrorType(AccountIdNotInAccountFile, ErrorMessage,
-                MissingStartDateInBalance, WrongBalance),
+      ErrorType(AccountIdNotInAccountFile,
+                MissingStartDateInBalance, WrongBalance, DuplicateBalance),
       Errors,
       mkError,
-      mkErrorNoPos,
       setSourcePosFileIfNull,
-      setSourcePosRowIfNull )
+      setSourcePosRowIfNull, mkErrorMultiPos, SourceRow)
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (ByteString)
-import Data.Char (ord)
 import qualified Data.HashMap.Strict as HM
 import Data.Maybe (fromMaybe)
+import Data.Foldable (traverse_)
+import Data.Function (on)
+import Data.List (groupBy, sortBy)
 
 -- | The Balance data type reprensents an assertion about the total of an
 -- account at a particular date. Used for bank statement assertion and trial
@@ -89,9 +88,9 @@ decodeStatementBalanceFile lang csvSeparator decimalSeparator filePath =
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       bals <- decodeBalances lang True csvSeparator decimalSeparator (BL.fromStrict csvBS)
-      let bals1 = map (\b -> b{bStartDate = Nothing}) bals
-      let pos = map (\i -> SourcePos filePath i 0) [2..]
-      return $ zip pos bals1
+      let bals1 = map (\(i, b) -> (i, b{bStartDate = Nothing})) bals
+      let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) bals1
+      return withPos
 
 decodeTrialBalanceFile :: Language ->
                           Char ->
@@ -102,19 +101,15 @@ decodeTrialBalanceFile lang csvSeparator decimalSeparator filePath =
   withExceptT (setSourcePosFileIfNull filePath) $ do
       csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
       bals <- decodeBalances lang False csvSeparator decimalSeparator (BL.fromStrict csvBS)
-      let pos = map (\i -> SourcePos filePath i 0) [2..]
-      return $ zip pos bals
+      let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) bals
+      return withPos
 
 -- | The first line is the header
 decodeBalances :: forall m . (MonadError Errors m)
-               => Language -> Bool -> Char -> Char -> ByteString -> m [JBalance]
+               => Language -> Bool -> Char -> Char -> ByteString -> m [(SourceRow, JBalance)]
 decodeBalances lang statementBalance csvSeparator decimalSeparator bs = do
   -- Read the CSV file as vector of T.Text
-  let opts = C.defaultDecodeOptions {
-                C.decDelimiter = fromIntegral (ord csvSeparator)
-                }
-  csv <- either (throwError . mkErrorNoPos . ErrorMessage) return
-      $ C.decodeWith opts C.NoHeader bs
+  csv <- readCsvFile csvSeparator bs
 
   -- Decode the header to know the index of columns
   let mainDate = if statementBalance
@@ -131,12 +126,9 @@ decodeBalances lang statementBalance csvSeparator decimalSeparator bs = do
   amountIdx <- columnIndex indexes (i18nText lang TBalanceAmount)
   let startDateIdx = optionalColumnIndex indexes (i18nText lang TBalanceStartDate)
 
- -- Add row information to the CSV line
-  let csvWithRowNumber = zip [2..] $ V.toList csvData
-
   -- Function to parse a line into an Account                            
   let parseLine (row, line) =
-          let p = do
+          let p = (row,) <$> do
                 date <- columnDataM dateIdx line (parseISO8601M . T.unpack)
                 acc <- columnData accountIdx line
                 amount <- columnDataM amountIdx line
@@ -147,28 +139,51 @@ decodeBalances lang statementBalance csvSeparator decimalSeparator bs = do
           in p `catchError` (throwError . setSourcePosRowIfNull row)
 
 
-  mapM parseLine csvWithRowNumber
+  mapM parseLine csvData
 
 validateStatementBalances :: forall m . (MonadError Errors m) =>
                       HM.HashMap T.Text Account ->
                       BalanceMap ->
                       [(SourcePos, JBalance)] ->
                       m ()
-validateStatementBalances accMap bm bs = do
-    bals <- traverse (checkBalanceAccount accMap) bs
-    _ <- traverse (checkStatementBalanceAmount bm) bals
-    return ()
+validateStatementBalances accMap bm = 
+  validateBalances (checkStatementBalanceAmount bm) accMap
 
 validateTrialBalances :: forall m . (MonadError Errors m) =>
                       HM.HashMap T.Text Account ->
                       BalanceMap ->
                       [(SourcePos, JBalance)] ->
                       m ()
-validateTrialBalances accSet bm bs = do
-    bals <- traverse (checkBalanceAccount accSet) bs
-    _ <- traverse (checkTrialBalanceAmount bm) bals
-    return ()
+validateTrialBalances accMap bm = do
+    validateBalances (checkTrialBalanceAmount bm) accMap
 
+validateBalances :: forall m . (MonadError Errors m) =>
+                      ((SourcePos, Balance) -> m ()) ->
+                      HM.HashMap T.Text Account ->
+                      [(SourcePos, JBalance)] ->
+                      m ()
+validateBalances checkAmount accMap bs = do
+  checkDuplicateBalance bs
+  bals <- traverse (checkBalanceAccount accMap) bs
+  traverse_ checkAmount bals
+
+checkDuplicateBalance :: (MonadError Errors m) =>
+                        [(SourcePos, JBalance)] ->
+                        m ()
+checkDuplicateBalance balances =
+  let dup :: [[(SourcePos, (Day, T.Text))]]
+      dup = filter (not . null . tail)
+          $ groupBy ((==) `on` snd)
+          $ sortBy (compare `on` snd)
+          $ map (fmap (\b -> (bDate b, bAccount b))) balances
+      mkErr ls = let d = fst $ snd $ head ls
+                     a = T.unpack $ snd $ snd $ head ls
+                     pos = map fst ls
+                 in mkErrorMultiPos pos
+                    (DuplicateBalance d a)
+  in if null dup
+     then return ()
+     else throwError $ concatMap mkErr dup
 
 checkTrialBalanceAmount :: forall m . (MonadError Errors m) =>
                       BalanceMap ->

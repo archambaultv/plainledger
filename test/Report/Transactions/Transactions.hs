@@ -75,13 +75,13 @@ transactionEncodeDecode folder =
                       C.encDelimiter = fromIntegral (ord csvSeparator)
                     }
     let csvBS = C.encodeWith myOptions report
+
     let accIds = HM.fromList 
                $ map (\a -> (aIdentifier a, a)) 
                $ lAccounts journal
-    let pos = map (\i -> SourcePos folder i 0) [2..]
-    let accs = fmap (zip pos)
-             $ decodeTransactions lang csvSeparator decimalSeparator csvBS
-    let txnsM = accs >>= validateJTransactions accIds
+    let accs = decodeTransactions lang csvSeparator decimalSeparator csvBS
+    let acssWithPos = map (\(i, a) -> (SourcePos folder i 0, a)) <$> accs
+    let txnsM = acssWithPos >>= validateJTransactions accIds
     let actualTxns = sortOn tDate
                    $ map (\t -> t{tPostings = sortOn pFileOrder (tPostings t)}) 
                    $ lTransactions journal

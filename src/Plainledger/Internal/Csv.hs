@@ -24,21 +24,78 @@ module Plainledger.Internal.Csv
   columnIndex,
   optionalColumnIndex,
   parseInt,
-  parseIntMaybe
+  parseIntMaybe,
+  readCsvFile
 ) where
 
-import Data.List ( sortBy, groupBy )
+import Data.List ( sort, group )
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
 import qualified Data.Text as T
 import qualified Data.Text.Read as T
 import Plainledger.Error
 import Control.Monad.Except
+import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Internal as B (c2w)
+import qualified Data.Csv as C
+import Data.Char (ord)
 
 -- Column name and column number (zero based)
 type ColumnIndex = (T.Text, Int)
 type ColumnIndexes = M.HashMap T.Text Int
 
+-- Reads the bytestring CSV file, skipping
+-- white row and only delimiter row and
+-- returns the line number
+-- Assumes UTF8 encoding
+readCsvFile :: (MonadError Errors m) =>
+               Char -> 
+               B.ByteString ->
+               m [(Int, V.Vector T.Text)]
+readCsvFile csvSeparator bs =
+  -- Read the CSV file as vector of T.Text
+  let opts = C.defaultDecodeOptions {
+                C.decDelimiter = fromIntegral (ord csvSeparator)
+                }
+
+      nl = B.c2w '\n'
+      cr = B.c2w '\r'
+
+      -- Returns only the non empty lines with their number
+      csvLines :: Int -> B.ByteString -> [(Int, B.ByteString)]
+      csvLines _ ps | B.null ps = []
+      csvLines i ps = 
+        case B.elemIndex nl ps of
+           Nothing -> [(i, ps)]
+           Just 0 -> csvLines (i+1) (dropCarReturn $ B.tail ps)
+           Just n  -> 
+             let x = B.take n ps
+                 xs = dropCarReturn $ B.drop (n+1) ps
+             in (i, x) : csvLines (i+1) xs
+
+      dropCarReturn :: B.ByteString -> B.ByteString
+      dropCarReturn xs | B.null xs = xs
+      dropCarReturn xs | B.head xs == cr = B.drop 1 xs
+      dropCarReturn xs = xs
+
+      parseCsv :: (MonadError Errors m) => 
+                  B.ByteString -> 
+                  m (V.Vector T.Text)
+      parseCsv xs = either (throwError . mkErrorNoPos . ErrorMessage) 
+                  (return . checkSingleLine)
+                  $ C.decodeWith opts C.NoHeader xs
+
+      checkSingleLine :: V.Vector (V.Vector T.Text) -> V.Vector T.Text
+      checkSingleLine v | V.null v = error "Plainledger internal error, vector is null"
+      checkSingleLine v | V.length v == 1 = v V.! 0
+      checkSingleLine v = error $ "Plainledger internal error, vector has more than 1 element" ++ show v
+
+      isEmptyLine :: V.Vector T.Text -> Bool
+      isEmptyLine = V.all T.null
+
+  in filter (not . isEmptyLine . snd)
+     <$> traverse (\(i,x) -> (i,) <$> parseCsv x) 
+         (csvLines 1 bs)
 
 columnIndex :: (MonadError Errors m) =>
                      ColumnIndexes ->
@@ -53,21 +110,21 @@ columnIndex m key =
 optionalColumnIndex :: ColumnIndexes ->
                      T.Text ->
                      Maybe ColumnIndex
-optionalColumnIndex m key = fmap (key,) $ M.lookup key m
+optionalColumnIndex m key = (key,) <$> M.lookup key m
 
 -- Return a map where the zero based index represents the position
 -- in the V.Vector T.Text line
 processColumnIndexes :: forall m . (MonadError Errors m)
-                     => V.Vector (V.Vector T.Text)
+                     => [(Int, V.Vector T.Text)]
                      -> (T.Text -> Bool)
-                     -> m (V.Vector (V.Vector T.Text), ColumnIndexes)
-processColumnIndexes csv _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
+                     -> m ([(Int, V.Vector T.Text)], ColumnIndexes)
+processColumnIndexes [] _ = throwError $ mkErrorNoPos EmptyCsvFile
 processColumnIndexes csv keepF  =
-  let header = filter (keepF . fst) $ flip zip [0..] $ V.toList $ V.head csv
-      csvData = V.tail csv
+  let header = filter (keepF . fst) $ flip zip [0..] $ V.toList $ snd $ head csv
+      csvData = tail csv
       dup = filter (not . null . tail)
-          $ groupBy (==)
-          $ sortBy compare
+          $ group
+          $ sort
           $ map fst header
       indexes = M.fromList header
       mkErrorDup x = mkError (SourcePos "" 1 0) (DuplicateCsvColumn $ T.unpack $ head x)
