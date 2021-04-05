@@ -1,142 +1,40 @@
 -- |
--- Module      :  Plainledger.Reports.Report
--- Copyright   :  © 2020 Vincent Archambault
+-- Module      :  Plainledger.Reports.AccountTreeReport
+-- Copyright   :  © 2021 Vincent Archambault
 -- License     :  0BSD
 --
 -- Maintainer  :  Vincent Archambault <archambault.v@gmail.com>
 -- Stability   :  experimental
 --
 
-module Plainledger.Report.Report 
-(
-  Ledger(..),
-  journalToLedger,
-  isAccountActive,
-  standardReport,
-  standardHeader,
-  standardFooter,
-  qtyToNormallyPositive,
-  qtyToDebitCredit,
-  ReportParams(..),
+module Plainledger.Report.AccountTreeParam (
   ReportPeriod(..),
   reportPeriodToSpan,
   CompareAnotherPeriod(..),
-  CompareExtraColumns(..),
-  compareExtraColumnsDefault,
+  ComparisonColumns(..),
+  comparisonColumnsDefault,
   ShowRow(..),
-  DisplayColumns(..),
-  trialBalanceQty,
-  balanceSheetQty,
-  TransactionCsvRecordType(..)
+  GroupByColumns(..),
+  AccountTreeParam(..)
   )
 where
 
 import Data.Time
 import Data.Bifunctor
 import Plainledger.Journal
-import Plainledger.I18n.I18n
-import qualified Data.Vector as V
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Text as T
+import Plainledger.Report.Ledger
 
-qtyToDebitCredit :: Char -> AccountType -> Quantity -> [T.Text]
-qtyToDebitCredit _ accType 0 = if isCreditType accType
-                             then ["","0"]
-                             else ["0",""]
-qtyToDebitCredit c _ x | x < 0 = ["", writeAmount c $ negate x]
-qtyToDebitCredit c _ x = [writeAmount c x, ""]
+data AccountTreeParam = 
+  AccountTreeParam {
+    atReportPeriod :: ReportPeriod,
+    atCompareAnotherPeriod :: Maybe CompareAnotherPeriod,
+    atShowRow :: ShowRow,
+    atGroupByColumns :: Maybe GroupByColumns,
+    atComparisonColumns :: ComparisonColumns
+  }
 
-qtyToNormallyPositive :: Char -> AccountType -> Quantity -> T.Text
-qtyToNormallyPositive c accType qty
-  | isCreditType accType = writeAmount c $ negate qty
-  | otherwise = writeAmount c qty
-
-standardReport :: ReportPeriod -> 
-                  Ledger ->
-                  Day ->
-                  T.Text ->
-                  [V.Vector T.Text] ->
-                  V.Vector (V.Vector T.Text)
-standardReport period ledger today reportName body = 
-  let header = standardHeader ledger period today reportName
-      footer = standardFooter ledger today
-      body1 = case body of
-              [] -> [V.empty]
-              xs -> V.empty 
-                    : xs
-                    ++ [V.empty]
-
-  in V.fromList
-     $ header 
-     ++ body1
-     ++ footer
-
-standardHeader :: Ledger -> ReportPeriod -> Day -> T.Text -> [V.Vector T.Text]
-standardHeader ledger period today reportName =
-  let lang = jfLanguage $ lJournalFile ledger
-      header1 = V.singleton $ jfCompanyName $ lJournalFile ledger
-      header2 = V.singleton $ reportName
-      dateSpan = reportPeriodToSpan period today ledger
-      header3 = V.singleton $ i18nText lang (TReportDateSpan dateSpan)
-  in [header1, header2, header3]
-
-standardFooter :: Ledger -> Day -> [V.Vector T.Text]
-standardFooter ledger today = 
-  let lang = jfLanguage $ lJournalFile ledger
-  in [V.singleton $ i18nText lang (TReportGeneratedOn today)]
-
--- Ledger is like a journal, but with some precomputed informations
--- usefull for reportings
-data Ledger = Ledger {
-  lJournalFile :: JournalFile,
-  lAccounts   :: [Account],
-  lTransactions :: [Transaction],
-  lDateSpan :: Maybe DateSpan,
-  lBalanceMap :: BalanceMap,
-  lAccountMap :: HM.HashMap T.Text Account
-}
-
-journalToLedger :: Journal -> Ledger
-journalToLedger journal =
-  let jf = jJournalFile journal
-      accs = jAccounts journal
-      txns = jTransactions journal
-      balMap = transactionsToBalanceMap txns
-      dSpan = journalDateSpan journal
-      accMap = HM.fromList $ map (\a -> (aId a, a)) accs
-  in Ledger jf accs txns dSpan balMap accMap
-
-trialBalanceQty :: Ledger -> DateSpan -> Account -> Quantity
-trialBalanceQty ledger dateSpan acc =
-  let openAcc = jfOpeningBalanceAccount $ lJournalFile ledger
-      accId = aId acc
-      balMap = lBalanceMap ledger
-      accMaps = lAccountMap ledger
-      accTypef = \a -> aType $ accMaps HM.! a
-  in trialBalanceQuantity openAcc accTypef balMap accId (aType acc) dateSpan 
-
-balanceSheetQty :: Ledger -> DateSpan -> Account -> Quantity
-balanceSheetQty ledger dateSpan acc =
-  let earnAcc = jfEarningsAccount $ lJournalFile ledger
-      openAcc = jfOpeningBalanceAccount $ lJournalFile ledger
-      accId = aId acc
-      balMap = lBalanceMap ledger
-      accMaps = lAccountMap ledger
-      accTypef = \a -> aType $ accMaps HM.! a
-  in balanceSheetQuantity earnAcc openAcc accTypef balMap accId dateSpan 
-
-isAccountActive :: Ledger -> DateSpan -> Account -> Bool
-isAccountActive ledger (d1, d2) acc =
-  let balMap = lBalanceMap ledger
-      accType = aType acc
-  in case balanceAtDate balMap (aId acc) d2 of
-        Nothing -> False
-        Just (_, amnt) 
-          | isBalanceSheetType accType && amnt /= 0 -> True
-        Just (d, _) -> d >= d1
-
-data CompareExtraColumns 
-  = CompareExtraColumns {
+data ComparisonColumns
+  = ComparisonColumns {
       showDiff :: Bool,
       showPercent :: Bool,
       showRowPercent :: Bool,
@@ -146,23 +44,8 @@ data CompareExtraColumns
       }
   deriving (Eq, Show)
 
-compareExtraColumnsDefault :: CompareExtraColumns
-compareExtraColumnsDefault = CompareExtraColumns False False False False False False
-
-data TransactionCsvRecordType = MultipleCsvRecords | SingleCsvRecord
-  deriving (Eq, Show)
-
-data ReportParams 
-  -- Single or multi line transactions format
-  = Transactions ReportPeriod (Maybe CompareAnotherPeriod) TransactionCsvRecordType
-  | TrialBalance ReportPeriod (Maybe CompareAnotherPeriod) ShowRow
-  -- Show Diff, Show Percent, % of Row, % of Column
-  | BalanceSheet ReportPeriod (Maybe CompareAnotherPeriod) ShowRow (Maybe DisplayColumns)
-    CompareExtraColumns
-  -- Show Diff, Show Percent, % of Row, % of Column, % of revenue, % of expense
-  | IncomeStatement ReportPeriod (Maybe CompareAnotherPeriod) ShowRow (Maybe DisplayColumns) 
-    CompareExtraColumns
-  deriving (Eq, Show)
+comparisonColumnsDefault :: ComparisonColumns
+comparisonColumnsDefault = ComparisonColumns False False False False False False
 
 -- | Not all combinaison of CompareAnotherPeriod and Report Period are valid
 -- | The two booleans are for show diff and show percent.
@@ -199,20 +82,20 @@ data ReportPeriod
 
 -- Could fail to compute a DateSpan if there is no transactions
 -- or if the ReportPeriod is inconsistant
-reportPeriodToSpan :: ReportPeriod -> 
-                      Day -> 
-                      Ledger -> 
+reportPeriodToSpan :: ReportPeriod ->
+                      Day ->
+                      Ledger ->
                       Maybe DateSpan
 reportPeriodToSpan AllDates _ l = lDateSpan l
 reportPeriodToSpan (CustomPeriod d1 d2) _ _ = return (d1, d2)
-reportPeriodToSpan (FromBeginningUntil d2) _ l = 
+reportPeriodToSpan (FromBeginningUntil d2) _ l =
   lDateSpan l >>= (\(d1, _) -> return (d1, d2))
 
-reportPeriodToSpan (Month n) today _ = 
+reportPeriodToSpan (Month n) today _ =
   let (y, m, _) = toGregorian today
       d1 = addGregorianMonthsClip n $ fromGregorian y m 1
   in return (d1, toEndOfMonth d1)
-reportPeriodToSpan (MonthToDate n) today _ = 
+reportPeriodToSpan (MonthToDate n) today _ =
   let (y, m, d) = toGregorian today
       d1 = addGregorianMonthsClip n $ fromGregorian y m 1
       (y1, m1, _) = toGregorian d1
@@ -229,7 +112,7 @@ reportPeriodToSpan (FiscalQuarter n) today l =
   return $ computeFiscalQuarter n today (jfFirstFiscalMonth $ lJournalFile l)
 
 reportPeriodToSpan (FiscalQuarterToDate n) today l =
-  let (d1, _) = computeFiscalQuarter n today 
+  let (d1, _) = computeFiscalQuarter n today
                      (jfFirstFiscalMonth $ lJournalFile l)
   in return (d1, addGregorianMonthsClip (n * 3) today)
 
@@ -255,7 +138,7 @@ reportPeriodToSpan Since30DaysAgo today _ = return (addDays (-30) today, today)
 reportPeriodToSpan Since60DaysAgo today _ = return (addDays (-60) today, today)
 reportPeriodToSpan Since90DaysAgo today _ = return (addDays (-90) today, today)
 reportPeriodToSpan Since365DaysAgo today _ = return (addDays (-365) today, today)
-reportPeriodToSpan (SinceDateUntilTheEnd d1) _ l = 
+reportPeriodToSpan (SinceDateUntilTheEnd d1) _ l =
   lDateSpan l >>= (\(_, d2) -> return (d1, d2))
 reportPeriodToSpan (SinceDateToDate d1) today _ = return (d1, today)
 
@@ -283,37 +166,37 @@ computeFiscalQuarter n today firstFiscalMonth =
 
 
 computeThisFiscalQuarter :: Day -> Int -> (Day, Day)
-computeThisFiscalQuarter today firstFiscalMonth = 
+computeThisFiscalQuarter today firstFiscalMonth =
   let (y, m, _) = toGregorian today
       monthNumber = if m >= firstFiscalMonth
                     then m - firstFiscalMonth
-                    else (m + 12 - firstFiscalMonth)
+                    else m + 12 - firstFiscalMonth
       firstFiscalDay = if m >= firstFiscalMonth
                        then fromGregorian y firstFiscalMonth 1
                        else fromGregorian (y - 1) firstFiscalMonth 1
   in case (monthNumber :: Int) `div` 3 of
-    0 -> (firstFiscalDay, 
+    0 -> (firstFiscalDay,
           toEndOfMonth $ addGregorianMonthsClip 2 firstFiscalDay)
-    1 -> (addGregorianMonthsClip 3 firstFiscalDay, 
+    1 -> (addGregorianMonthsClip 3 firstFiscalDay,
           toEndOfMonth $ addGregorianMonthsClip 5 firstFiscalDay)
-    2 -> (addGregorianMonthsClip 6 firstFiscalDay, 
+    2 -> (addGregorianMonthsClip 6 firstFiscalDay,
           toEndOfMonth $ addGregorianMonthsClip 8 firstFiscalDay)
-    _ -> (addGregorianMonthsClip 9 firstFiscalDay, 
+    _ -> (addGregorianMonthsClip 9 firstFiscalDay,
           toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
 
 computeFiscalYear :: Integer -> Day -> Int -> (Day, Day)
 computeFiscalYear n today firstFiscalMonth =
   let f = addGregorianYearsClip n
-  in bimap f f 
+  in bimap f f
      $ computeThisFiscalYear today firstFiscalMonth
 
 computeThisFiscalYear :: Day -> Int -> (Day, Day)
-computeThisFiscalYear today firstFiscalMonth = 
+computeThisFiscalYear today firstFiscalMonth =
   let (y, m, _) = toGregorian today
       firstFiscalDay = if m >= firstFiscalMonth
                        then fromGregorian y firstFiscalMonth 1
                        else fromGregorian (y - 1) firstFiscalMonth 1
-  in (firstFiscalDay, 
+  in (firstFiscalDay,
       toEndOfMonth $ addGregorianMonthsClip 11 firstFiscalDay)
 
 toEndOfMonth :: Day -> Day
@@ -321,7 +204,7 @@ toEndOfMonth date =
   let (y, m , _) = toGregorian date
   in fromGregorian y m $ gregorianMonthLength y m
 
--- | Which row to show in the report
+-- | Which row (account) to show in the report
 data ShowRow
   = ShowActive
   | ShowAll
@@ -329,7 +212,7 @@ data ShowRow
   deriving (Eq, Show)
 
 -- | Possible report columns
-data DisplayColumns
+data GroupByColumns
   = Months
   | CalendarQuarters
   | FiscalQuarters

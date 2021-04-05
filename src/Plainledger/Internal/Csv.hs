@@ -23,10 +23,11 @@ module Plainledger.Internal.Csv
   ColumnIndexes,
   columnIndex,
   optionalColumnIndex,
-  parseInt
+  parseInt,
+  parseIntMaybe
 ) where
 
-import Data.List
+import Data.List ( sortBy, groupBy )
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
 import qualified Data.Text as T
@@ -41,27 +42,27 @@ type ColumnIndexes = M.HashMap T.Text Int
 
 columnIndex :: (MonadError Errors m) =>
                      ColumnIndexes ->
-                     T.Text -> 
+                     T.Text ->
                      m ColumnIndex
 columnIndex m key =
   let err = throwError
-          $ mkError (SourcePos "" 1 0) 
+          $ mkError (SourcePos "" 1 0)
           $ MissingCsvColumn (T.unpack key)
   in fmap (key,) $ maybe err return $ M.lookup key m
 
 optionalColumnIndex :: ColumnIndexes ->
-                     T.Text -> 
+                     T.Text ->
                      Maybe ColumnIndex
 optionalColumnIndex m key = fmap (key,) $ M.lookup key m
 
 -- Return a map where the zero based index represents the position
 -- in the V.Vector T.Text line
-processColumnIndexes :: forall m . (MonadError Errors m) 
+processColumnIndexes :: forall m . (MonadError Errors m)
                      => V.Vector (V.Vector T.Text)
                      -> (T.Text -> Bool)
                      -> m (V.Vector (V.Vector T.Text), ColumnIndexes)
 processColumnIndexes csv _ | V.null csv = throwError $ mkErrorNoPos EmptyCsvFile
-processColumnIndexes csv keepF  = 
+processColumnIndexes csv keepF  =
   let header = filter (keepF . fst) $ flip zip [0..] $ V.toList $ V.head csv
       csvData = V.tail csv
       dup = filter (not . null . tail)
@@ -92,7 +93,7 @@ columnDataM :: (MonadError Errors m) =>
                ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a
 columnDataM i v f =
   let err = throwError
-            $ mkErrorNoPos 
+            $ mkErrorNoPos
             $ MissingCsvColumnData (T.unpack $ fst i)
   in columnDataBase (Just i) v f err
 
@@ -104,11 +105,11 @@ optionalColumnData d i v = optionalColumnDataM d i v return
 
 optionalColumnDataM :: (MonadError Errors m) =>
                     a -> Maybe ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a
-optionalColumnDataM d i v f 
-  = columnDataBase i v (\t -> if T.null t then (return d) else f t) (return d)
+optionalColumnDataM d i v f
+  = columnDataBase i v (\t -> if T.null t then return d else f t) (return d)
 
-columnDataBase :: (MonadError Errors m) 
-                => (Maybe ColumnIndex) -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a
+columnDataBase :: (MonadError Errors m)
+                => Maybe ColumnIndex -> V.Vector T.Text -> (T.Text -> m a) -> m a -> m a
 columnDataBase Nothing _ _ notFound = notFound
 columnDataBase (Just (_,i)) v found notFound =
   case v V.!? i of
@@ -120,3 +121,12 @@ parseInt x =
   case T.decimal x of
     Right (n, "") -> return n
     _ -> throwError $ mkErrorNoPos $ ParseIntErr (T.unpack x)
+
+-- Returns nothing if the argument is the null text
+parseIntMaybe ::  (MonadError Errors m) => T.Text -> m (Maybe Int)
+parseIntMaybe x =
+  if T.null x
+  then return Nothing
+  else case T.decimal x of
+          Right (n, "") -> return $ Just n
+          _ -> throwError $ mkErrorNoPos $ ParseIntErr (T.unpack x)

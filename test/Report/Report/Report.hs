@@ -20,7 +20,6 @@ import Test.Tasty.HUnit
 import Plainledger.Report
 import Data.Time
 import Plainledger.Journal
-import qualified Data.HashMap.Strict as HM
 
 
 reportTestTree :: TestTree
@@ -92,7 +91,6 @@ reportPeriodToSpanTest :: ReportPeriod ->
 reportPeriodToSpanTest period today i expected = 
   testCase ("reportPeriodToSpan for " ++ show period) $ do
     let journalFile = emptyJournalFile{jfFirstFiscalMonth = i}
-        dateSpan = Nothing
-        ledger = Ledger journalFile [] [] dateSpan HM.empty HM.empty
+        ledger = emptyLedger{lJournalFile = journalFile}
     let res = reportPeriodToSpan period today ledger
     assertEqual "" expected res

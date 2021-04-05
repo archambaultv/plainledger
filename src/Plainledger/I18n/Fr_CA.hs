@@ -27,12 +27,11 @@ fr_CAText TEquity = "Capital"
 fr_CAText TRevenue = "Revenu"
 fr_CAText TExpense = "Dépense"
 
-fr_CAText TAccountId = "Id"
+
 fr_CAText TAccountNumber = "Numéro"
-fr_CAText TAccountType = "Type"
 fr_CAText TAccountName = "Nom"
-fr_CAText TAccountGroup = "Groupe"
-fr_CAText TAccountSubGroup = "Sous-groupe"
+fr_CAText TAccountIdent = "Id"
+fr_CAText TAccountParent = "Parent"
 
 fr_CAText TBalanceStartDate = "Date de début"
 fr_CAText TBalanceEndDate = "Date de fin"
@@ -189,6 +188,20 @@ printErrorType (EndDateGreaterThanStartDate sd ed)
   ++ "\" est supérieure à la date de fin \""
   ++ show ed
   ++ "\""
+
+printErrorType (InvalidParent ident parent)
+  = "La parent du compte \""
+  ++ show ident
+  ++ "\" est invalide. "
+  ++ "\"" ++ show parent ++ "\" n'est pas un identifiant de compte connu."
+
+printErrorType (CycleInParents idents)
+  = "Les parents des comptes suivants forment une (ou plusieurs) référence circulaire :\n"
+  ++ intercalate ", " idents
+
+printErrorType (InvalidIdentifier s)
+  = "Les identifiants de compte suivant ne peuvent être utilisés :"
+  ++ intercalate ", " s
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f

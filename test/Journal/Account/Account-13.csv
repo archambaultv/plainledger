@@ -1,7 +1,7 @@
 Id;Nom;Numéro;Parent;Commentaire
-Actif court terme;;1000;Actif;
+Actif court terme;;1000;Maison;
 Compte chèque;;1001;Actif court terme;Hello World !
-Maison;Maison 123 rue principale;1051;Actif;
+Maison;Maison 123 rue principale;1051;Compte chèque;
 Autres actifs;;1100;Actif;
 Inutilisé;;1102;Autres actifs;
 Marge de crédit;;2051;Passif;

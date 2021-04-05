@@ -1,17 +1,21 @@
-﻿Numéro;Type
-1001;Actif
-1051;Actif
-1102;Actif
-2051;Passif
-2001;Passif
-2002;Passif
-3001;Capital
-3002;Capital
-4152;Revenu
-4153;Revenu
-5002;Dépense
-5003;Dépense
-5006;Dépense
-5010;Dépense
-5011;Dépense
-5102;Dépense
+﻿Identificateur;Nom;Numéro;Parent;Commentaire
+Actif court terme;;1000;Actif;
+Compte chèque;;1001;Actif court terme;Hello World !
+Maison;Maison 123 rue principale;1051;Actif;
+Autres actifs;;1100;Actif;
+Inutilisé;;1102;Autres actifs;
+Marge de crédit;;2051;Passif;
+Carte de crédit;My credit card;2001;Passif;
+Passif Long Terme;Passif Long Terme;2000;Passif;
+Hypothèque;;2002;Passif Long Terme;
+Solde d'ouverture;;3001;Capital;
+Bénéfice;;3002;Capital;
+Salaire;Salaire compagnie Foo Bar;4152;Revenu;
+Revenu de location;;4153;Revenu;
+Dépenses courantes;;5000;Dépense;
+Nourriture;;5002;Dépenses courantes;
+Taxes;;5003;Dépenses courantes;
+Vêtements;;5006;Dépenses courantes;
+Divertissements;;5010;Dépenses courantes;
+Dépenses non catégorisées;;5011;Dépense;
+Inutilisé 2;;5102;Dépense;

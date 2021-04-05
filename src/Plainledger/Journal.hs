@@ -9,7 +9,7 @@
 -- This module defines the journal data type and reexports all the
 -- data types and functions related to the journal file.
 
-module Plainledger.Journal 
+module Plainledger.Journal
 (
   Journal(..),
   journalDateSpan,
@@ -29,7 +29,6 @@ where
 
 import System.FilePath
 import Control.Monad.Except
-import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import Plainledger.I18n.I18n
 import Plainledger.Error
@@ -41,13 +40,15 @@ import Plainledger.Journal.JournalFile
 import Plainledger.Journal.Account
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
+import Data.Tree
 
 data Journal = Journal
   {
     jJournalFile :: JournalFile,
     jAccounts   :: [Account],
     jTransactions :: [Transaction],
-    jBalances :: [Balance]
+    jChartOfAccount :: [Tree Account],
+    jBalanceMap :: BalanceMap 
   }
   deriving (Eq, Show)
 
@@ -60,7 +61,7 @@ journalDateSpan journal =
 
 -- Reads the include files in the journal file
 journalFileToJournal :: JournalFile -> ExceptT Errors IO Journal
-journalFileToJournal journalFile = do  
+journalFileToJournal journalFile = do
   let dir = takeDirectory $ jfFilePath journalFile
   let csvSeparator = jfCsvSeparator journalFile
   let decimalSeparator = jfDecimalSeparator journalFile
@@ -68,36 +69,37 @@ journalFileToJournal journalFile = do
 
   -- Read the accounts files and check for errors
   let accountPath = dir </> jfAccountFile journalFile
-  acc <- decodeAccountsFile lang accountPath csvSeparator 
-         >>= validateAccounts (jfOpeningBalanceAccount journalFile)
-              (jfEarningsAccount journalFile)
-  let accIds = HS.fromList $ map aId acc
+  chart <- decodeAccountsFile lang accountPath csvSeparator
+                >>= validateAccounts (jfOpeningBalanceAccount journalFile)
+                      (jfEarningsAccount journalFile) lang
+  let acc = chartToList chart
+  let accIds = HM.fromList $ map (\a -> (aIdentifier a, a)) acc
 
   -- Read the transactions files and check for errors
   let txnPaths = map (dir </>) $ jfTransactionFiles journalFile
-  jtxns <- fmap concat 
-        $ traverse (decodeJTransactionsFile lang csvSeparator decimalSeparator) txnPaths
+  jtxns <- concat <$> traverse (decodeJTransactionsFile lang csvSeparator decimalSeparator) txnPaths
   txns <- validateJTransactions accIds jtxns
-        
+
   -- Read the balance assertion files and validate them
-  let accMaps = HM.fromList $ map (\a -> (aId a, aType a)) acc
-  let accTypef = \a -> accMaps HM.! a
+  let earn = accIds HM.! jfEarningsAccount journalFile
+  let open = accIds HM.! jfOpeningBalanceAccount journalFile
+  let trialBal = transactionsToBalanceMap open earn txns
+  let statementBal = txnsToBalanceMapUsingBalanceDate open earn txns
 
   let balPaths = map (dir </>) $ jfStatementBalanceFiles journalFile
-  bals <- fmap concat $ traverse (decodeStatementBalanceFile lang csvSeparator decimalSeparator) balPaths
-  _ <- validateStatementBalances accIds txns bals
+  bals <- concat <$> traverse (decodeStatementBalanceFile lang csvSeparator decimalSeparator) balPaths
+  _ <- validateStatementBalances accIds statementBal bals
 
   let tbalPaths = map (dir </>) $ jfTrialBalanceFiles journalFile
-  tbals <- fmap concat $ traverse (decodeTrialBalanceFile lang csvSeparator decimalSeparator) tbalPaths
-  _ <- validateTrialBalances accIds accTypef (jfOpeningBalanceAccount journalFile) txns tbals
+  tbals <- concat <$> traverse (decodeTrialBalanceFile lang csvSeparator decimalSeparator) tbalPaths
+  _ <- validateTrialBalances accIds trialBal tbals
 
-  return $ Journal journalFile acc txns (map snd bals)
-
+  return $ Journal journalFile acc txns chart trialBal
 
 decodeJournal :: FilePath ->
                  ExceptT (Language, Errors) IO Journal
-decodeJournal filePath = 
-  decodeJournalFile filePath 
-  >>= withLang journalFileToJournal 
+decodeJournal filePath =
+  decodeJournalFile filePath
+  >>= withLang journalFileToJournal
 
   where withLang foo jf = withExceptT (jfLanguage jf,) (foo jf)

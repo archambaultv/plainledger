@@ -25,8 +25,7 @@ import Plainledger.Error
 import Control.Monad.Except
 import Plainledger.I18n.I18n
 import Plainledger.Report
-import qualified Data.HashSet as HS
-import qualified Data.Vector as V
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 import qualified Data.Csv as C
 import qualified Data.ByteString as BS
@@ -58,7 +57,7 @@ runReportOk folder period compareC lineType today actualTransactions =
      let myOptions = C.defaultEncodeOptions {
                        C.encDelimiter = fromIntegral (ord csvSeparator)
                      }
-     let csvBS = C.encodeWith myOptions $ V.toList txns
+     let csvBS = C.encodeWith myOptions txns
      actualBS <- BS.readFile ("test/Report/Transactions/" ++ actualTransactions)
      assertEqual "" (BL.fromStrict actualBS) csvBS
 
@@ -75,8 +74,10 @@ transactionEncodeDecode folder =
     let myOptions = C.defaultEncodeOptions {
                       C.encDelimiter = fromIntegral (ord csvSeparator)
                     }
-    let csvBS = C.encodeWith myOptions $ V.toList report
-    let accIds = HS.fromList $ map aId $ lAccounts journal
+    let csvBS = C.encodeWith myOptions report
+    let accIds = HM.fromList 
+               $ map (\a -> (aIdentifier a, a)) 
+               $ lAccounts journal
     let pos = map (\i -> SourcePos folder i 0) [2..]
     let accs = fmap (zip pos)
              $ decodeTransactions lang csvSeparator decimalSeparator csvBS
@@ -99,7 +100,7 @@ getTransactionReport :: ReportPeriod ->
                          TransactionCsvRecordType ->
                          String -> 
                          Day ->
-                         IO (Ledger, V.Vector (V.Vector T.Text))
+                         IO (Ledger, [ReportRow])
 getTransactionReport period compareC lineType folder today = do
  let journalPath = "test/Report/Transactions/" ++ folder ++ "/Journal.csv"
  ledger <- runExceptT $ fmap journalToLedger $ decodeJournal journalPath

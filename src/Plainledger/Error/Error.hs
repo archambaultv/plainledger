@@ -24,10 +24,10 @@ module Plainledger.Error.Error
   setSourcePosIfNull
 ) where
 
-import Data.Decimal
-import Data.Time
+import Data.Decimal ( Decimal )
+import Data.Time ( Day )
 import qualified Data.Text as T
-import Plainledger.Error.SourcePos
+import Plainledger.Error.SourcePos ( SourcePos(..) )
 
 type Errors = [Error]
 
@@ -54,8 +54,11 @@ data ErrorType
 
   | ZeroLengthAccountId
   | DuplicateAccountId String
+  | InvalidIdentifier [String]
   | OpeningBalanceNotDefined String
   | EarningsAccountNotDefined String
+  | InvalidParent String String
+  | CycleInParents [String]
 
   | MissingCsvColumn String
   | MissingCsvColumnData String
@@ -74,7 +77,7 @@ data ErrorType
   | MissingStartDateInBalance String
 
   | EndDateGreaterThanStartDate Day Day
-  
+
   deriving (Eq, Show)
 
 -- | Pretty print the first 10 error messages and add the source file information
@@ -92,35 +95,35 @@ mkErrorMultiPos :: [SourcePos] -> ErrorType -> Errors
 mkErrorMultiPos pos e = [Error pos e]
 
 setSourcePosIfNull :: SourcePos -> Errors -> Errors
-setSourcePosIfNull pos xs = map f xs
+setSourcePosIfNull pos = map f
   where f (Error [] e) = Error [pos] e
         f x = x
 
 setSourcePosFileIfNull :: String -> Errors -> Errors
-setSourcePosFileIfNull f xs = map (setSourcePosFileIfNull' f) xs
+setSourcePosFileIfNull f = map (setSourcePosFileIfNull' f)
 
 
 setSourcePosRowIfNull :: Int -> Errors -> Errors
-setSourcePosRowIfNull f xs = map (setSourcePosRowIfNull' f) xs
+setSourcePosRowIfNull f = map (setSourcePosRowIfNull' f)
 
 
 setSourcePosColIfNull :: Int -> Errors -> Errors
-setSourcePosColIfNull f xs = map (setSourcePosColIfNull' f) xs
+setSourcePosColIfNull f = map (setSourcePosColIfNull' f)
 
 setSourcePosFileIfNull' :: String -> Error -> Error
 setSourcePosFileIfNull' f (Error [] e) = Error [SourcePos f 0 0] e
-setSourcePosFileIfNull' f (Error sp e) = 
+setSourcePosFileIfNull' f (Error sp e) =
   let sp' = map (\x -> if null (spFile x) then x{spFile = f} else x) sp
   in Error sp' e
 
 setSourcePosRowIfNull' :: Int -> Error -> Error
 setSourcePosRowIfNull' i (Error [] e) = Error [SourcePos "" i 0] e
-setSourcePosRowIfNull' i (Error sp e) = 
+setSourcePosRowIfNull' i (Error sp e) =
   let sp' = map (\x -> if spCsvRow x == 0 then x{spCsvRow = i} else x) sp
   in Error sp' e
 
 setSourcePosColIfNull' :: Int -> Error -> Error
 setSourcePosColIfNull' i (Error [] e) = Error [SourcePos "" 0 i] e
-setSourcePosColIfNull' i (Error sp e) = 
+setSourcePosColIfNull' i (Error sp e) =
   let sp' = map (\x -> if spCsvColumn x == 0 then x{spCsvColumn = i} else x) sp
   in Error sp' e

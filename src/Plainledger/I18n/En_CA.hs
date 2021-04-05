@@ -14,9 +14,10 @@ module Plainledger.I18n.En_CA
   en_CAText,
 ) where
 
-import Data.List
-import Plainledger.I18n.Data
+import Data.List ( intercalate )
+import Plainledger.I18n.Data ( I18nText(..) )
 import Plainledger.Error
+    ( SourcePos(SourcePos), ErrorType(..), Error(..) )
 
 en_CAText :: I18nText -> String
 en_CAText (TError x) = printError x
@@ -27,12 +28,10 @@ en_CAText TEquity = "Equity"
 en_CAText TRevenue = "Revenue"
 en_CAText TExpense = "Expense"
 
-en_CAText TAccountId = "Id"
 en_CAText TAccountNumber = "Number"
-en_CAText TAccountType = "Type"
 en_CAText TAccountName = "Name"
-en_CAText TAccountGroup = "Group"
-en_CAText TAccountSubGroup = "Subgroup"
+en_CAText TAccountIdent = "Id"
+en_CAText TAccountParent = "Parent"
 
 en_CAText TBalanceStartDate = "Start date"
 en_CAText TBalanceEndDate = "End date"
@@ -190,6 +189,20 @@ printErrorType (EndDateGreaterThanStartDate sd ed)
   ++ "\" is greater than the end date \""
   ++ show ed
   ++ "\""
+
+printErrorType (InvalidParent ident parent)
+  = "The parent account for the account \""
+  ++ show ident
+  ++ "\" is not valid. "
+  ++ "\"" ++ show parent ++ "\" is not an account indentifier."
+
+printErrorType (CycleInParents idents)
+  = "The following accounts (when taking their parent, parent of parent , etc.) form one or more cycles :\n"
+  ++ intercalate ", " idents
+
+printErrorType (InvalidIdentifier s)
+  = "The following account identifier cannot be used :"
+  ++ intercalate ", " s
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f

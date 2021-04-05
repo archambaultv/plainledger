@@ -24,7 +24,6 @@ import Plainledger.Error
 import Plainledger.Report
 import Control.Monad.Except
 import Plainledger.I18n.I18n
-import qualified Data.Vector as V
 import qualified Data.Text as T
 import qualified Data.Csv as C
 import qualified Data.ByteString as BS
@@ -53,7 +52,7 @@ runReportOk folder period comparePeriod showRow today actualBalanceSheet =
      let myOptions = C.defaultEncodeOptions {
                        C.encDelimiter = fromIntegral (ord csvSeparator)
                      }
-     let csvBS = C.encodeWith myOptions $ V.toList tb
+     let csvBS = C.encodeWith myOptions tb
      actualBS <- BS.readFile ("test/Report/BalanceSheet/" ++ actualBalanceSheet)
      assertEqual "" (BL.fromStrict actualBS) csvBS
 
@@ -67,16 +66,16 @@ getBalanceSheetReport :: ReportPeriod ->
                          ShowRow ->
                          Day ->
                          String -> 
-                         IO (Ledger, V.Vector (V.Vector T.Text))
+                         IO (Ledger, [ReportRow])
 getBalanceSheetReport period comparePeriod showRow today folder = do
  let journalPath = "test/Report/BalanceSheet/" ++ folder ++ "/Journal.csv"
  ledger <- runExceptT $ fmap journalToLedger $ decodeJournal journalPath
  let report = fmap (\j -> (j, balanceSheetReport 
-                              period 
+                              (AccountTreeParam period 
                               comparePeriod 
                               showRow 
                               Nothing
-                              compareExtraColumnsDefault 
+                              comparisonColumnsDefault)
                               j 
                               today)) ledger
  case report of
