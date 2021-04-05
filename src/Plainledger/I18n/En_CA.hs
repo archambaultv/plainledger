@@ -14,9 +14,10 @@ module Plainledger.I18n.En_CA
   en_CAText,
 ) where
 
-import Data.List
-import Plainledger.I18n.Data
+import Data.List ( intercalate )
+import Plainledger.I18n.Data ( I18nText(..) )
 import Plainledger.Error
+    ( SourcePos(SourcePos), ErrorType(..), Error(..) )
 
 en_CAText :: I18nText -> String
 en_CAText (TError x) = printError x

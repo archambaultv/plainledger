@@ -29,7 +29,7 @@ import Plainledger.Report.Ledger
 import qualified Data.Text as T
 import Plainledger.Report.AccountTreeParam
 import Data.Tree
-import Data.List
+import Data.List ( intercalate )
 
 type ReportRow = [T.Text]
 

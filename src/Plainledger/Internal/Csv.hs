@@ -27,7 +27,7 @@ module Plainledger.Internal.Csv
   parseIntMaybe
 ) where
 
-import Data.List
+import Data.List ( sortBy, groupBy )
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
 import qualified Data.Text as T
