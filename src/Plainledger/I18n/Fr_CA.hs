@@ -14,7 +14,7 @@ module Plainledger.I18n.Fr_CA
   fr_CAText,
 ) where
 
-import Data.List
+import Data.List ( intercalate )
 import Plainledger.I18n.Data
 import Plainledger.Error
 
@@ -202,6 +202,11 @@ printErrorType (CycleInParents idents)
 printErrorType (InvalidIdentifier s)
   = "Les identifiants de compte suivant ne peuvent être utilisés :"
   ++ intercalate ", " s
+
+printErrorType (DuplicateBalance d t)
+  = "Doublon dans les balances de vérifications.\n"
+  ++ "Date : " ++ show d ++ "\n"
+  ++ "Compte : " ++ t
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f

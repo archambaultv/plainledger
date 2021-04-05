@@ -204,6 +204,11 @@ printErrorType (InvalidIdentifier s)
   = "The following account identifier cannot be used :"
   ++ intercalate ", " s
 
+printErrorType (DuplicateBalance d t)
+  = "Duplicate balance assertion.\n"
+  ++ "Date : " ++ show d ++ "\n"
+  ++ "Account : " ++ t
+
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f
 showSourcePos (SourcePos f r c) | c <= 0

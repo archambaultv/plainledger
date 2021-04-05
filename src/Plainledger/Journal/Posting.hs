@@ -21,7 +21,7 @@ where
 import Data.Maybe
 import Control.Monad.Except
 import Data.Time
-import Data.List
+import Data.List ( partition )
 import Plainledger.Error.Error
 import Plainledger.Journal.Amount
 import Prelude hiding (lines)

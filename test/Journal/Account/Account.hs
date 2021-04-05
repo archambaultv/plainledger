@@ -4,7 +4,7 @@ module Journal.Account.Account
   accounts
   )where
 
-import Data.List
+import Data.List ( sortOn )
 import Test.Tasty
 import Test.Tasty.HUnit
 import Plainledger.Journal
@@ -16,27 +16,27 @@ import qualified Data.Text as T
 accountsJ :: [JAccount]
 accountsJ = 
   [
-    Account 7 "Actif court terme" "Actif court terme" (Just 1000) "Actif" (),
-    Account 8 "Compte chèque" "Compte chèque" (Just 1001) "Actif court terme" (),
-    Account 9 "Maison" "Maison 123 rue principale" (Just 1051) "Actif" (),
-    Account 10 "Autres actifs" "Autres actifs" (Just 1100) "Actif" (),
-    Account 11 "Inutilisé" "Inutilisé" (Just 1102) "Autres actifs" (),
-    Account 12 "Marge de crédit" "Marge de crédit" (Just 2051) "Passif" (),
-    Account 13 "Carte de crédit" "My credit card" (Just 2001) "Passif" (),
-    Account 14 "Passif Long Terme" "Passif Long Terme" (Just 2000) "Passif" (),
-    Account 15 "Hypothèque" "Hypothèque" (Just 2002) "Passif Long Terme" (),
-    Account 16 "Solde d'ouverture" "Solde d'ouverture" (Just 3001) "Capital" (),
-    Account 17 "Bénéfice" "Bénéfice" (Just 3002) "Capital" (),
-    Account 18 "Salaire" "Salaire compagnie Foo Bar" (Just 4152) "Revenu" (),
-    Account 19 "Revenu de location" "Revenu de location" (Just 4153) "Revenu" (),
-    Account 20 "Dépenses courantes" "Dépenses courantes" (Just 5000) "Dépense" (),
-    Account 21 "Nourriture" "Nourriture" (Just 5002) "Dépenses courantes" (),
-    Account 22 "Taxes" "Taxes" (Just 5003) "Dépenses courantes" (),
-    Account 23 "Vêtements" "Vêtements" (Just 5006) "Dépenses courantes" (),
-    Account 24 "Divertissements" "Divertissements" (Just 5010) "Dépenses courantes" (),
-    Account 25 "Dépenses non catégorisées" "Dépenses non catégorisées" 
+    Account 6 "Actif court terme" "Actif court terme" (Just 1000) "Actif" (),
+    Account 7 "Compte chèque" "Compte chèque" (Just 1001) "Actif court terme" (),
+    Account 8 "Maison" "Maison 123 rue principale" (Just 1051) "Actif" (),
+    Account 9 "Autres actifs" "Autres actifs" (Just 1100) "Actif" (),
+    Account 10 "Inutilisé" "Inutilisé" (Just 1102) "Autres actifs" (),
+    Account 11 "Marge de crédit" "Marge de crédit" (Just 2051) "Passif" (),
+    Account 12 "Carte de crédit" "My credit card" (Just 2001) "Passif" (),
+    Account 13 "Passif Long Terme" "Passif Long Terme" (Just 2000) "Passif" (),
+    Account 14 "Hypothèque" "Hypothèque" (Just 2002) "Passif Long Terme" (),
+    Account 15 "Solde d'ouverture" "Solde d'ouverture" (Just 3001) "Capital" (),
+    Account 16 "Bénéfice" "Bénéfice" (Just 3002) "Capital" (),
+    Account 17 "Salaire" "Salaire compagnie Foo Bar" (Just 4152) "Revenu" (),
+    Account 18 "Revenu de location" "Revenu de location" (Just 4153) "Revenu" (),
+    Account 19 "Dépenses courantes" "Dépenses courantes" (Just 5000) "Dépense" (),
+    Account 20 "Nourriture" "Nourriture" (Just 5002) "Dépenses courantes" (),
+    Account 21 "Taxes" "Taxes" (Just 5003) "Dépenses courantes" (),
+    Account 22 "Vêtements" "Vêtements" (Just 5006) "Dépenses courantes" (),
+    Account 23 "Divertissements" "Divertissements" (Just 5010) "Dépenses courantes" (),
+    Account 24 "Dépenses non catégorisées" "Dépenses non catégorisées" 
                (Just 5011) "Dépense" (),
-    Account 26 "Inutilisé 2" "Inutilisé 2" (Just 5102) "Dépense" ()
+    Account 25 "Inutilisé 2" "Inutilisé 2" (Just 5102) "Dépense" ()
   ]
 
 accounts :: [Account]
@@ -46,10 +46,10 @@ accounts = map foo accountsJ
         foo x | aParent x == "Capital" = x{aAccountType = Equity, aParent = 3}
         foo x | aParent x == "Revenu" = x{aAccountType = Revenue, aParent = 4}
         foo x | aParent x == "Dépense" = x{aAccountType = Expense, aParent = 5}
-        foo x | aParent x == "Actif court terme" = x{aAccountType = Asset, aParent = 7}
-        foo x | aParent x == "Autres actifs" = x{aAccountType = Asset, aParent = 10}
-        foo x | aParent x == "Passif Long Terme" = x{aAccountType = Liability, aParent = 14}
-        foo x | aParent x == "Dépenses courantes" = x{aAccountType = Expense, aParent = 20}
+        foo x | aParent x == "Actif court terme" = x{aAccountType = Asset, aParent = 6}
+        foo x | aParent x == "Autres actifs" = x{aAccountType = Asset, aParent = 9}
+        foo x | aParent x == "Passif Long Terme" = x{aAccountType = Liability, aParent = 13}
+        foo x | aParent x == "Dépenses courantes" = x{aAccountType = Expense, aParent = 19}
         foo _ = error "Incomplete pattern in test/.../Accounts.hs:accounts"
 
 
@@ -107,7 +107,17 @@ accountTestTree =
         (CycleInParents ["Actif court terme","Compte chèque","Maison"]),
 
       koValidateAccount "Account-14.csv" ';'
-      $ mkError (SourcePos "test/Journal/Account/Account-14.csv" 9 0)  (InvalidIdentifier ["Passif"])
+      $ mkError (SourcePos "test/Journal/Account/Account-14.csv" 9 0)  (InvalidIdentifier ["Passif"]),
+
+      -- With extra empty rows
+      okAccount "Account-15.csv" ';' accountsJ,
+
+      -- With extra rows having only delimeters (;;;;)
+      okAccount "Account-16.csv" ';' accountsJ,
+
+      -- With extra empty rows, checking for correct row number in error
+      koValidateAccount "Account-17.csv" ';'
+      $ mkError (SourcePos "test/Journal/Account/Account-17.csv" 7 0)  (InvalidParent "Autres actifs" "Wrong Parent")
     ]
 
 

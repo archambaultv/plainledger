@@ -26,7 +26,7 @@ module Plainledger.Journal.BalanceMap
 where
 
 import Data.Time
-import Data.List
+import Data.List ( groupBy, sortOn )
 import Data.Function
 import Data.Maybe
 import qualified Data.Map.Strict as M

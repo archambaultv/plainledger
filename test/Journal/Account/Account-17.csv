@@ -2,7 +2,9 @@ Id;Nom;Numéro;Parent;Commentaire
 Actif court terme;;1000;Actif;
 Compte chèque;;1001;Actif court terme;Hello World !
 Maison;Maison 123 rue principale;1051;Actif;
-Autres actifs;;1100;Actif;
+
+
+Autres actifs;;1100;Wrong Parent;
 Inutilisé;;1102;Autres actifs;
 Marge de crédit;;2051;Passif;
 Carte de crédit;My credit card;2001;Passif;

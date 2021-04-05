@@ -75,6 +75,7 @@ data ErrorType
 
   | WrongBalance String Day Decimal (Maybe Decimal)
   | MissingStartDateInBalance String
+  | DuplicateBalance Day String
 
   | EndDateGreaterThanStartDate Day Day
 
