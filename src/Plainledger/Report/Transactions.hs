@@ -9,7 +9,8 @@
 
 module Plainledger.Report.Transactions
 (
-  transactionReport
+  transactionReport,
+  TransactionCsvRecordType(..)
 )
 where
 
@@ -29,21 +30,20 @@ import Plainledger.Journal
       Transaction,
       TransactionF(tDate, tComment, tCounterParty, tTag, tPostings),
       AccountF(aIdentifier) )
-import Plainledger.Report.Report
-    ( ReportPeriod,
-      CompareAnotherPeriod,
-      TransactionCsvRecordType(..),
-      Ledger(lJournalFile, lTransactions),
-      reportPeriodToSpan )
+import Plainledger.Report.Ledger
+import Plainledger.Report.AccountTreeParam
+import Plainledger.Report.AccountTreeReport
 import qualified Data.Text as T
-import qualified Data.Vector as V
+
+data TransactionCsvRecordType = MultipleCsvRecords | SingleCsvRecord
+  deriving (Eq, Show)
 
 transactionReport :: ReportPeriod ->
                      Maybe CompareAnotherPeriod ->
                      TransactionCsvRecordType ->
                      Ledger ->
                      Day ->
-                     V.Vector (V.Vector T.Text)
+                     [ReportRow]
 transactionReport period _ csvRecordType ledger today =
   let dateSpan = reportPeriodToSpan period today ledger
       lang = jfLanguage $ lJournalFile ledger
@@ -56,11 +56,11 @@ transactionReport period _ csvRecordType ledger today =
 
       header = mkHeader lang csvRecordType txns
       body = concatMap (mkBody csvRecordType decimalSep) (zip [1..] txns)
-  in V.fromList $ header : body
+  in header : body
 
 
-mkHeader :: Language -> TransactionCsvRecordType -> [Transaction] -> V.Vector T.Text
-mkHeader lang MultipleCsvRecords _ = V.fromList
+mkHeader :: Language -> TransactionCsvRecordType -> [Transaction] -> ReportRow
+mkHeader lang MultipleCsvRecords _ =
                        [i18nText lang TTransactionId,
                         i18nText lang TTransactionDate,
                         i18nText lang TTransactionComment,
@@ -79,7 +79,7 @@ mkHeader lang SingleCsvRecord txns =
                     T.append amntPrefix (T.pack $ show i),
                     T.append datePrefix (T.pack $ show i)]
       postingHeader = concatMap mkPrefix [1..nbOfPosting]
-  in V.fromList $
+  in
       [i18nText lang TTransactionDate,
        i18nText lang TTransactionComment,
        i18nText lang TTransactionCounterparty,
@@ -87,7 +87,7 @@ mkHeader lang SingleCsvRecord txns =
       ++ postingHeader
 
 
-mkBody :: TransactionCsvRecordType -> Char -> (Int, Transaction) -> [V.Vector T.Text]
+mkBody :: TransactionCsvRecordType -> Char -> (Int, Transaction) -> [ReportRow]
 mkBody MultipleCsvRecords decimalSep (n, t) =
   let ps = sortOn pFileOrder $ tPostings t
       toLine p = [T.pack $ show n,
@@ -99,13 +99,12 @@ mkBody MultipleCsvRecords decimalSep (n, t) =
                   writeAmount decimalSep $ pAmount p,
                   T.pack $ show $ pBalanceDate p
                   ]
-  in map (V.fromList . toLine) ps
+  in map toLine ps
 mkBody SingleCsvRecord decimalSep (_, t) =
   let mkPosting p = [aIdentifier $ pAccount p,
                      writeAmount decimalSep $ pAmount p,
                      T.pack $ show $ pBalanceDate p]
-  in [V.fromList $
-      [T.pack $ show $ tDate t,
+  in [[T.pack $ show $ tDate t,
        tComment t,
        tCounterParty t,
        tTag t]

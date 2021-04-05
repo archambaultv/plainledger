@@ -24,7 +24,6 @@ import Plainledger.Error
 import Plainledger.Report
 import Control.Monad.Except
 import Plainledger.I18n.I18n
-import qualified Data.Vector as V
 import qualified Data.Text as T
 import qualified Data.Csv as C
 import qualified Data.ByteString as BS
@@ -56,7 +55,7 @@ runReportOk folder period comparePeriod showRow today actualTrialBalance =
      let myOptions = C.defaultEncodeOptions {
                        C.encDelimiter = fromIntegral (ord csvSeparator)
                      }
-     let csvBS = C.encodeWith myOptions $ V.toList tb
+     let csvBS = C.encodeWith myOptions tb
      actualBS <- BS.readFile ("test/Report/TrialBalance/" ++ actualTrialBalance)
      assertEqual "" (BL.fromStrict actualBS) csvBS
 
@@ -70,7 +69,7 @@ getTrialBalanceReport :: ReportPeriod ->
                          ShowRow ->
                          Day ->
                          String -> 
-                         IO (Ledger, V.Vector (V.Vector T.Text))
+                         IO (Ledger, [ReportRow])
 getTrialBalanceReport period comparePeriod showRow today folder = do
  let journalPath = "test/Report/TrialBalance/" ++ folder ++ "/Journal.csv"
  ledger <- runExceptT $ fmap journalToLedger $ decodeJournal journalPath

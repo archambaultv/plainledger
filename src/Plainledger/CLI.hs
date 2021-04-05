@@ -8,7 +8,7 @@
 --
 -- This module defines the command line interface of plaingledger
 
-module Plainledger.CLI 
+module Plainledger.CLI
 (
   cli
 ) where
@@ -22,19 +22,19 @@ import Plainledger.I18n.I18n
 import Plainledger.Report
 
 dateReader :: ReadM Day
-dateReader = eitherReader 
+dateReader = eitherReader
            $ \s -> first (i18nString En_CA . TError . head) (parseISO8601M s)
 
 startDate :: Parser Day
 startDate = option dateReader
-   ( short 'b' 
+   ( short 'b'
   <> long "begin"
   <> help "All transactions in the journal file before this date are ignored"
   <> metavar "BEGIN")
 
 endDate :: Parser Day
 endDate = option dateReader
-   ( short 'e' 
+   ( short 'e'
   <> long "end"
   <> help "All transactions in the journal file after this date are ignored"
   <> metavar "END")
@@ -47,54 +47,54 @@ parseDates Nothing (Just d2) = FromBeginningUntil d2
 parseDates (Just d1) (Just d2) = CustomPeriod d1 d2
 
 period :: Parser ReportPeriod
-period =  (Month <$> option auto (long "month"))
-      <|> (flag' (Month 0) (long "this-month"))
-      <|> (flag' (Month (-1)) (long "last-month"))
+period =  Month <$> option auto (long "month")
+      <|> flag' (Month 0) (long "this-month")
+      <|> flag' (Month (-1)) (long "last-month")
 
-      <|> (MonthToDate <$> option auto (long "month-to-date"))
-      <|> (flag' (MonthToDate 0) (long "this-month-to-date"))
-      <|> (flag' (MonthToDate (-1)) (long "last-month-to-date"))
+      <|> MonthToDate <$> option auto (long "month-to-date")
+      <|> flag' (MonthToDate 0) (long "this-month-to-date")
+      <|> flag' (MonthToDate (-1)) (long "last-month-to-date")
 
-      <|> (CalendarQuarter <$> option auto (long "calendar-quarter"))
-      <|> (flag' (CalendarQuarter 0) (long "this-calendar-quarter"))
-      <|> (flag' (CalendarQuarter (-1)) (long "last-calendar-quarter"))
+      <|> CalendarQuarter <$> option auto (long "calendar-quarter")
+      <|> flag' (CalendarQuarter 0) (long "this-calendar-quarter")
+      <|> flag' (CalendarQuarter (-1)) (long "last-calendar-quarter")
 
-      <|> (CalendarQuarterToDate <$> option auto (long "calendar-quarter-to-date"))
-      <|> (flag' (CalendarQuarterToDate 0) (long "this-calendar-quarter-to-date"))
-      <|> (flag' (CalendarQuarterToDate (-1)) (long "last-calendar-quarter-to-date"))
+      <|> CalendarQuarterToDate <$> option auto (long "calendar-quarter-to-date")
+      <|> flag' (CalendarQuarterToDate 0) (long "this-calendar-quarter-to-date")
+      <|> flag' (CalendarQuarterToDate (-1)) (long "last-calendar-quarter-to-date")
 
-      <|> (FiscalQuarter <$> option auto (long "fiscal-quarter"))
-      <|> (flag' (FiscalQuarter 0) (long "this-fiscal-quarter"))
-      <|> (flag' (FiscalQuarter (-1)) (long "last-fiscal-quarter"))
+      <|> FiscalQuarter <$> option auto (long "fiscal-quarter")
+      <|> flag' (FiscalQuarter 0) (long "this-fiscal-quarter")
+      <|> flag' (FiscalQuarter (-1)) (long "last-fiscal-quarter")
 
-      <|> (FiscalQuarterToDate <$> option auto (long "fiscal-quarter-to-date"))
-      <|> (flag' (FiscalQuarterToDate 0) (long "this-fiscal-quarter-to-date"))
-      <|> (flag' (FiscalQuarterToDate (-1)) (long "last-fiscal-quarter-to-date"))
+      <|> FiscalQuarterToDate <$> option auto (long "fiscal-quarter-to-date")
+      <|> flag' (FiscalQuarterToDate 0) (long "this-fiscal-quarter-to-date")
+      <|> flag' (FiscalQuarterToDate (-1)) (long "last-fiscal-quarter-to-date")
 
-      <|> (CalendarYear <$> option auto (long "calendar-year" <> short 'c'))
-      <|> (flag' (CalendarYear 0) (long "this-calendar-year"))
-      <|> (flag' (CalendarYear (-1)) (long "last-calendar-year"))
+      <|> CalendarYear <$> option auto (long "calendar-year" <> short 'c')
+      <|> flag' (CalendarYear 0) (long "this-calendar-year")
+      <|> flag' (CalendarYear (-1)) (long "last-calendar-year")
 
-      <|> (CalendarYearToDate <$> option auto (long "calendar-year-to-date"))
-      <|> (flag' (CalendarYearToDate 0) (long "this-calendar-year-to-date"))
-      <|> (flag' (CalendarYearToDate (-1)) (long "last-calendar-year-to-date"))
+      <|> CalendarYearToDate <$> option auto (long "calendar-year-to-date")
+      <|> flag' (CalendarYearToDate 0) (long "this-calendar-year-to-date")
+      <|> flag' (CalendarYearToDate (-1)) (long "last-calendar-year-to-date")
 
-      <|> (FiscalYear <$> option auto (long "fiscal-year" <> short 'f'))
-      <|> (flag' (FiscalYear 0) (long "this-fiscal-year"))
-      <|> (flag' (FiscalYear (-1)) (long "last-fiscal-year"))
+      <|> FiscalYear <$> option auto (long "fiscal-year" <> short 'f')
+      <|> flag' (FiscalYear 0) (long "this-fiscal-year")
+      <|> flag' (FiscalYear (-1)) (long "last-fiscal-year")
 
-      <|> (FiscalYearToDate <$> option auto (long "fiscal-year-to-date"))
-      <|> (flag' (FiscalYearToDate 0) (long "this-fiscal-year-to-date"))
-      <|> (flag' (FiscalYearToDate (-1)) (long "last-fiscal-year-to-date"))
+      <|> FiscalYearToDate <$> option auto (long "fiscal-year-to-date")
+      <|> flag' (FiscalYearToDate 0) (long "this-fiscal-year-to-date")
+      <|> flag' (FiscalYearToDate (-1)) (long "last-fiscal-year-to-date")
 
-      <|> (flag' Since30DaysAgo (long "since30days"))
-      <|> (flag' Since60DaysAgo (long "since60days"))
-      <|> (flag' Since90DaysAgo (long "since90days"))
-      <|> (flag' Since365DaysAgo (long "since365days"))
+      <|> flag' Since30DaysAgo (long "since30days")
+      <|> flag' Since60DaysAgo (long "since60days")
+      <|> flag' Since90DaysAgo (long "since90days")
+      <|> flag' Since365DaysAgo (long "since365days")
 
-      <|> (SinceDateToDate <$> option dateReader (long "since-date-until-today"))
+      <|> SinceDateToDate <$> option dateReader (long "since-date-until-today")
 
-      <|> (parseDates <$> optional startDate <*> optional endDate)
+      <|> parseDates <$> optional startDate <*> optional endDate
 
 
 journalFile :: Parser String
@@ -118,7 +118,7 @@ transactionsCommand = Command
                    <*> csvFile
                    <*> (Transactions
                        <$> period
-                       <*> (pure Nothing)
+                       <*> pure Nothing
                        <*> txnDecodeOption)
 
 transactionsInfo :: ParserInfo Command
@@ -127,10 +127,10 @@ transactionsInfo = info (transactionsCommand <**> helper)
                <> progDesc "Prints all transactions in a CSV format")
 
 showRowOption :: Parser ShowRow
-showRowOption = (flag' ShowActive (long "show-active-accounts"))
-             <|> (flag' ShowAll (long "show-all-accounts"))
-             <|> (flag' ShowNonZero (long "show-non-zero-accounts"))
-             <|> (pure ShowActive)
+showRowOption = flag' ShowActive (long "show-active-accounts")
+             <|> flag' ShowAll (long "show-all-accounts")
+             <|> flag' ShowNonZero (long "show-non-zero-accounts")
+             <|> pure ShowActive
 
 
 trialBalanceCommand :: Parser Command
@@ -139,7 +139,7 @@ trialBalanceCommand = Command
                    <*> csvFile
                    <*> (TrialBalance
                        <$> period
-                       <*> (pure Nothing)
+                       <*> pure Nothing
                        <*> showRowOption)
 
 trialBalanceInfo :: ParserInfo Command
@@ -154,10 +154,10 @@ balanceSheetCommand = Command
                    <*> csvFile
                    <*> (BalanceSheet
                        <$> period
-                       <*> (pure Nothing)
+                       <*> pure Nothing
                        <*> showRowOption
-                       <*> (pure Nothing)
-                       <*> (pure compareExtraColumnsDefault))
+                       <*> pure Nothing
+                       <*> pure comparisonColumnsDefault )
 
 balanceSheetInfo :: ParserInfo Command
 balanceSheetInfo = info (balanceSheetCommand <**> helper)
@@ -170,10 +170,10 @@ incomeStatementCommand = Command
                    <*> csvFile
                    <*> (IncomeStatement
                        <$> period
-                       <*> (pure Nothing)
+                       <*> pure Nothing
                        <*> showRowOption
-                       <*> (pure Nothing)
-                       <*> (pure compareExtraColumnsDefault))
+                       <*> pure Nothing
+                       <*> pure comparisonColumnsDefault)
 
 incomeStatementInfo :: ParserInfo Command
 incomeStatementInfo = info (incomeStatementCommand <**> helper)
