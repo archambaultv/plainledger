@@ -15,7 +15,7 @@ module Report.Transactions.Transactions
 )
 where
 
-import Data.List
+import Data.List ( sortOn )
 import Data.Time
 import Data.Char (ord)
 import Test.Tasty
