@@ -95,7 +95,7 @@ printErrorType (ParseIntErr s)
 printErrorType (ParseCharErr s)
   = "Erreur de lecture du caractère \"" ++ s ++ "\"."
 printErrorType (ParseAmountErr s)
-  = "Erreur de lecture du nombre \"" ++ s ++ "\" as a number."
+  = "Erreur de lecture du nombre \"" ++ s ++ "\"."
 printErrorType (ParseAmountExponentErr s)
   = printErrorType (ParseAmountErr s)
   ++ "\nTrop de décimales (maximum 256)"
