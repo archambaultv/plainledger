@@ -10,6 +10,7 @@ import Plainledger.Error
 import Control.Monad.Except
 import Plainledger.I18n.I18n
 import qualified Data.Text as T
+import Plainledger.Journal.Amount (AmountDescriptor)
 
 statementBalances :: [JBalance]
 statementBalances = 
@@ -55,24 +56,27 @@ trialBalances =
     Balance (read "2019-01-01") "Solde d'ouverture" (read "-115005.23") (Just $ read "2019-12-31")
   ]
 
+amountDesc = (',',Nothing,Nothing)
 balanceTestTree :: TestTree
 balanceTestTree =
   testGroup "Balance"
-    [ okBalance True "StatementBalance-01.csv" ';' ',' statementBalances,
-      okBalance True "StatementBalance-02.csv" ';' ',' statementBalances,
-      koBalance True "StatementBalance-03.csv" ';' ',' 
+    [ okBalance True "StatementBalance-01.csv" ';' statementBalances,
+      okBalance True "StatementBalance-02.csv" ';' statementBalances,
+      koBalance True "StatementBalance-03.csv" ';'  
       $ mkError (SourcePos "test/Journal/Balance/StatementBalance-03.csv" 1 0 ) 
         (MissingCsvColumn "Compte"),
 
-      okBalance False "TrialBalance-01.csv" ';' ',' trialBalances,
-      okBalance False "TrialBalance-02.csv" ';' ','
+      okBalance False "TrialBalance-01.csv" ';'  trialBalances,
+      okBalance False "TrialBalance-02.csv" ';' 
       $ map (\t -> t{bStartDate = Nothing}) trialBalances
       
     ]
 
+decimal :: AmountDescriptor
+decimal = (',',Nothing,Nothing)
 
-okBalance :: Bool -> String -> Char -> Char -> [JBalance] -> TestTree
-okBalance isStatementBalance filename sep decimal expectedBalance = 
+okBalance :: Bool -> String -> Char ->  [JBalance] -> TestTree
+okBalance isStatementBalance filename sep  expectedBalance = 
   testCase ("Decode " ++ filename) $ do
        let f = decodeFunction isStatementBalance
        balance1 <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
@@ -80,8 +84,8 @@ okBalance isStatementBalance filename sep decimal expectedBalance =
          Left err -> assertFailure $ printErr err
          Right actual -> assertEqual "" expectedBalance (map snd actual)
 
-koBalance :: Bool -> String -> Char -> Char -> Errors -> TestTree
-koBalance isStatementBalance filename sep decimal expectedErr =
+koBalance :: Bool -> String -> Char ->  Errors -> TestTree
+koBalance isStatementBalance filename sep expectedErr =
    testCase ("Assert error for " ++ filename) $ do
        let f = decodeFunction isStatementBalance
        balance1 <- runExceptT $ f sep decimal ("test/Journal/Balance/" ++ filename)
@@ -91,7 +95,7 @@ koBalance isStatementBalance filename sep decimal expectedErr =
 
 decodeFunction :: Bool 
                 -> Char
-                -> Char
+                -> AmountDescriptor
                 -> FilePath
                 -> ExceptT Errors IO [(SourcePos, JBalance)]
 decodeFunction True = decodeStatementBalanceFile Fr_CA

@@ -64,7 +64,7 @@ journalFileToJournal :: JournalFile -> ExceptT Errors IO Journal
 journalFileToJournal journalFile = do
   let dir = takeDirectory $ jfFilePath journalFile
   let csvSeparator = jfCsvSeparator journalFile
-  let decimalSeparator = jfDecimalSeparator journalFile
+  let decimalSeparator = jfAmountDescriptor journalFile
   let lang = jfLanguage journalFile
 
   -- Read the accounts files and check for errors

@@ -54,7 +54,7 @@ type Transaction = TransactionF Posting
 
 decodeJTransactionsFile :: Language ->
                            Char ->
-                           Char ->
+                           AmountDescriptor ->
                            FilePath ->
                            ExceptT Errors IO [(SourcePos, JTransaction)]
 decodeJTransactionsFile lang csvSeparator decimalSeparator filePath =
@@ -69,7 +69,7 @@ decodeJTransactionsFile lang csvSeparator decimalSeparator filePath =
 decodeTransactions :: forall m . (MonadError Errors m) =>
                       Language ->
                       Char ->
-                      Char ->
+                      AmountDescriptor ->
                       ByteString ->
                       m [(SourceRow, JTransaction)]
 decodeTransactions lang csvSeparator decimalSeparator bs = do

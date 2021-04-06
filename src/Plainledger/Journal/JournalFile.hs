@@ -14,7 +14,8 @@ module Plainledger.Journal.JournalFile
   emptyJournalFile,
   decodeJournalFile,
   processJournalFileHeader,
-  processJournalFileBody
+  processJournalFileBody,
+  jfAmountDescriptor
 )
 where
 
@@ -29,6 +30,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Text.Read as T
+import Plainledger.Journal.Amount
 
 -- | The JournalFile of the journal
 data JournalFile = JournalFile {
@@ -42,7 +44,11 @@ data JournalFile = JournalFile {
    jfCompanyName :: T.Text,
    -- | The decimal separator
    jfDecimalSeparator :: Char,
+   -- | The decimal separator
+   jfThousandSeparator :: Maybe Char,
    -- | The CSV separator. It is automatically inferred
+   jfCurrencySymbol :: Maybe Char,
+
    jfCsvSeparator :: Char,
    -- | First month of the fiscal year
    jfFirstFiscalMonth :: Int,
@@ -59,8 +65,13 @@ data JournalFile = JournalFile {
   }
   deriving (Eq, Show) 
 
+jfAmountDescriptor :: JournalFile -> AmountDescriptor
+jfAmountDescriptor jf = (jfDecimalSeparator jf, 
+                         jfThousandSeparator jf, 
+                         jfCurrencySymbol jf)
+
 emptyJournalFile :: JournalFile
-emptyJournalFile = JournalFile "" "" "" '.' ',' 1 "" [] [] [] "" En_CA False
+emptyJournalFile = JournalFile "" "" "" '.' Nothing Nothing ',' 1 "" [] [] [] "" En_CA False
 
 csvSeparator :: [Char] 
 csvSeparator = [',', ';', '\t']

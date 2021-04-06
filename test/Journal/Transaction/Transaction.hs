@@ -85,44 +85,44 @@ transactions =
 transactionTestTree :: TestTree
 transactionTestTree =
   testGroup "Transaction"
-    [ okTransaction "Transaction-01.csv" ';' '.' transactions,
+    [ okTransaction "Transaction-01.csv" ';' transactions,
       -- Like Transaction-01, but with a dummy column
-      okTransaction "Transaction-02.csv" ';' '.' transactions,
+      okTransaction "Transaction-02.csv" ';' transactions,
       -- Second posting suffix is not numeric
-      okTransaction "Transaction-03.csv" ';' '.' transactions,
+      okTransaction "Transaction-03.csv" ';' transactions,
       -- Extra posting column names for amount and balance date
-      okTransaction "Transaction-04.csv" ';' '.' transactions,
+      okTransaction "Transaction-04.csv" ';' transactions,
 
-      koTransaction "Transaction-05.csv" ';' '.' 
+      koTransaction "Transaction-05.csv" ';'  
       $ mkError (SourcePos "test/Journal/Transaction/Transaction-05.csv" 3 0) 
         ZeroOrOnePostingOnly,
 
-      koValidateTransaction "Transaction-06.csv" ';' '.' 
+      koValidateTransaction "Transaction-06.csv" ';' 
       $ mkError (SourcePos "test/Journal/Transaction/Transaction-06.csv" 4 0) 
         (AccountIdNotInAccountFile "Wrong Name"),
 
-      koValidateTransaction "Transaction-07.csv" ';' '.' 
+      koValidateTransaction "Transaction-07.csv" ';' 
       $ mkError (SourcePos "test/Journal/Transaction/Transaction-07.csv" 3 0) 
         (UnbalancedTransaction $ read "-10"),
 
-      koValidateTransaction "Transaction-08.csv" ';' '.' 
+      koValidateTransaction "Transaction-08.csv" ';' 
       $ mkError (SourcePos "test/Journal/Transaction/Transaction-08.csv" 9 0) 
         TwoOrMorePostingsWithoutAmount
     ]
 
 
-okTransaction :: String -> Char -> Char ->[JTransaction] -> TestTree
-okTransaction filename sep decimal expectedTransaction = 
+okTransaction :: String -> Char -> [JTransaction] -> TestTree
+okTransaction filename sep expectedTransaction = 
   testCase ("Decode " ++ filename) $ do
-       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep decimal ("test/Journal/Transaction/" ++ filename) 
+       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep ('.',Nothing,Nothing) ("test/Journal/Transaction/" ++ filename) 
        case transaction of
          Left err -> assertFailure $ printErr err
          Right actual -> assertEqual "" expectedTransaction (map snd actual)
 
-koTransaction :: String -> Char -> Char ->Errors -> TestTree
-koTransaction filename sep decimal expectedErr =
+koTransaction :: String -> Char -> Errors -> TestTree
+koTransaction filename sep expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep decimal ("test/Journal/Transaction/" ++ filename) 
+       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep ('.',Nothing,Nothing) ("test/Journal/Transaction/" ++ filename) 
        case transaction of
          Left actual -> assertEqual "" expectedErr actual
          Right _ -> assertFailure $ "Decoding " ++ filename ++ " should throw an error"
@@ -138,10 +138,10 @@ koTransaction filename sep decimal expectedErr =
 --          Right actual -> assertEqual "" expectedTransaction actual
 
 
-koValidateTransaction :: String -> Char -> Char -> Errors -> TestTree
-koValidateTransaction filename sep decimal expectedErr =
+koValidateTransaction :: String -> Char ->  Errors -> TestTree
+koValidateTransaction filename sep expectedErr =
    testCase ("Assert error for " ++ filename) $ do
-       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep decimal ("test/Journal/Transaction/" ++ filename) 
+       transaction <- runExceptT $ decodeJTransactionsFile Fr_CA sep ('.',Nothing,Nothing) ("test/Journal/Transaction/" ++ filename) 
                    >>= validateJTransactions accs
        case transaction of
          Left actual -> assertEqual "" expectedErr actual

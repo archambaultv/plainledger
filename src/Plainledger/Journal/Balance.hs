@@ -29,7 +29,7 @@ import Plainledger.I18n.I18n
                TBalanceAccount, TBalanceAmount),
       Language,
       i18nText )
-import Plainledger.Journal.Amount ( Quantity, parseAmount )
+import Plainledger.Journal.Amount ( Quantity, parseAmount, AmountDescriptor )
 import Plainledger.Journal.Day ( parseISO8601M )
 import Plainledger.Journal.BalanceMap
     ( BalanceMap(bmOpeningBalanceAcc, bmBalances),
@@ -81,7 +81,7 @@ type Balance = BalanceF Account
 
 decodeStatementBalanceFile :: Language ->
                               Char ->
-                              Char ->
+                              AmountDescriptor ->
                               FilePath ->
                               ExceptT Errors IO [(SourcePos, JBalance)]
 decodeStatementBalanceFile lang csvSeparator decimalSeparator filePath =
@@ -94,7 +94,7 @@ decodeStatementBalanceFile lang csvSeparator decimalSeparator filePath =
 
 decodeTrialBalanceFile :: Language ->
                           Char ->
-                          Char ->
+                          AmountDescriptor ->
                           FilePath ->
                           ExceptT Errors IO [(SourcePos, JBalance)]
 decodeTrialBalanceFile lang csvSeparator decimalSeparator filePath =
@@ -106,7 +106,7 @@ decodeTrialBalanceFile lang csvSeparator decimalSeparator filePath =
 
 -- | The first line is the header
 decodeBalances :: forall m . (MonadError Errors m)
-               => Language -> Bool -> Char -> Char -> ByteString -> m [(SourceRow, JBalance)]
+               => Language -> Bool -> Char -> AmountDescriptor  -> ByteString -> m [(SourceRow, JBalance)]
 decodeBalances lang statementBalance csvSeparator decimalSeparator bs = do
   -- Read the CSV file as vector of T.Text
   csv <- readCsvFile csvSeparator bs

@@ -15,33 +15,33 @@ journalFileTestTree =
   testGroup "JournalFile"
     [ -- With BOM, comma for csv, period for decimal
       okConfig "Journal-01.csv" 
-        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' ',' 7 "comptes.csv" 
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' Nothing Nothing ',' 7 "comptes.csv" 
           ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-01.csv" Fr_CA True,
       -- With BOM, semicolon for csv, comma for decimal
       okConfig "Journal-02.csv" 
-        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" ',' ';' 1 "comptes.csv" 
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" ',' Nothing Nothing ';' 1 "comptes.csv" 
           ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-02.csv" Fr_CA True,
       -- Without BOM, comma for csv, period for decimal
       okConfig "Journal-03.csv" 
-        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' ',' 7 "comptes.csv" 
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' Nothing Nothing ',' 7 "comptes.csv" 
           ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-03.csv" Fr_CA False,
       -- Without BOM, comma for csv, period for decimal, multiple files
       okConfig "Journal-04.csv" 
-        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company, Inc." '.' ',' 1 "comptes.csv" 
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company, Inc." '.'Nothing Nothing  ',' 1 "comptes.csv" 
           ["transactions 1.csv", "transactions 2.csv", "transactions 3.csv"] 
           ["soldes 1.csv", "soldes 2.csv"] []
           "test/Journal/JournalFile/Journal-04.csv" Fr_CA False,
       -- With BOM, tab for csv, period for decimal
       okConfig "Journal-05.csv"
-        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' '\t' 7 "comptes.csv" 
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company" '.' Nothing Nothing '\t' 7 "comptes.csv" 
           ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-05.csv" Fr_CA True,
       -- Without BOM, semicolon, comma for decimal, comma in field
       okConfig "Journal-13.csv" 
-        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company, Inc" ',' ';' 1 "comptes.csv" 
+        $ JournalFile "Solde d'ouverture" "Bénéfice" "My Company, Inc" ',' Nothing Nothing ';' 1 "comptes.csv" 
           ["transactions.csv"] ["vérification de soldes.csv"] []
           "test/Journal/JournalFile/Journal-13.csv" Fr_CA False,
 

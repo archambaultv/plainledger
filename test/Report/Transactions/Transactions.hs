@@ -30,6 +30,7 @@ import qualified Data.Text as T
 import qualified Data.Csv as C
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
+import Plainledger.Journal.JournalFile (jfAmountDescriptor)
 
 transactionsTestTree :: TestTree
 transactionsTestTree =
@@ -69,7 +70,7 @@ transactionEncodeDecode folder =
     -- Encode the report as csv and then decode the report back
     -- Ensures the decoded report is equal to the original transactions
     let csvSeparator = jfCsvSeparator $ lJournalFile journal
-    let decimalSeparator = jfDecimalSeparator $ lJournalFile journal
+    let decimalSeparator = jfAmountDescriptor $ lJournalFile journal
     let lang = jfLanguage $ lJournalFile journal
     let myOptions = C.defaultEncodeOptions {
                       C.encDelimiter = fromIntegral (ord csvSeparator)
