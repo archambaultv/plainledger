@@ -23,8 +23,13 @@ amountTestTree =
       okAmount amountDescFull "123.45 $" 123.45,
       okAmount amountDescFull "($ 123.34)" (-123.34),
       okAmount amountDescFull "(123.34$)" (-123.34),
-      
+      okAmount amountDescFull "3,456" 3456,
+      okAmount amountDescFull "(123,345.34$)" (-123345.34),
+      okAmount amountDescFull "123,456" 123456,
+      okAmount amountDescFull "123,456,789" 123456789,
+      okAmount amountDescFull "(123,345,789.34$)" (-123345789.34),
       koAmount amountDesc "" (mkErrorNoPos $ ParseAmountErr ""),
+      koAmount amountDesc "123abc" (mkErrorNoPos $ ParseAmountErr "123abc"),
       koAmount amountDesc "3e-257" (mkErrorNoPos $ ParseAmountExponentErr "3e-257"),
       koAmount amountDesc ".45" (mkErrorNoPos $ ParseAmountErr ".45"),
       koAmount amountDesc "5." (mkErrorNoPos $ ParseAmountErr "5."),
@@ -43,7 +48,13 @@ amountTestTree =
       koAmount amountDescFull "($12" (mkErrorNoPos $ ParseAmountErr "($12"),
       koAmount amountDescFull "$12)" (mkErrorNoPos $ ParseAmountErr "$12)"),
       koAmount amountDescFull "123$.24" (mkErrorNoPos $ ParseAmountErr "123$.24"),
-      koAmount amountDescFull "(-1)" (mkErrorNoPos $ ParseAmountErr "(-1)")
+      koAmount amountDescFull "(-1)" (mkErrorNoPos $ ParseAmountErr "(-1)"),
+      koAmount amountDescFull "123 456" (mkErrorNoPos $ ParseAmountErr "123 456"),
+      koAmount amountDescFull "123.456,789" (mkErrorNoPos $ ParseAmountErr "123.456,789"),
+      koAmount amountDescFull ",123.45" (mkErrorNoPos $ ParseAmountErr ",123.45"),
+      koAmount amountDescFull "12,3456,789" (mkErrorNoPos $ ParseAmountErr "12,3456,789"),
+      koAmount amountDescFull "123,456," (mkErrorNoPos $ ParseAmountErr "123,456,"),
+      koAmount amountDescFull "123,456789" (mkErrorNoPos $ ParseAmountErr "123,456789")
     ]
 
 -- Accepts as list of numbers and generate test by

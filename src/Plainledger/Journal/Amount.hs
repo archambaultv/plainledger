@@ -126,7 +126,7 @@ parseNumber :: forall m . (MonadError ErrorType m) =>
                T.Text -> 
                m Quantity
 parseNumber (sep, thousandSep, _) x = do
-  (coeff, x2) <- parseInt $ removeThousand x
+  (coeff, x2) <- parseIntWithSep x
   (frac, x3) <- parseFractional x2
   (exponent1, x4) <- parseExponent x3
 
@@ -147,16 +147,43 @@ parseNumber (sep, thousandSep, _) x = do
 
         parseInt :: T.Text -> m (T.Text, T.Text)
         parseInt y = 
-          let n = T.takeWhile isDigit y
-              r = T.drop (T.length n) y
+          let (n, r) = T.break (not . isDigit) y
           in notNull n >> return (n, r)
 
-        removeThousand :: T.Text -> T.Text
-        removeThousand t =
+        parseIntWithSep :: T.Text -> m (T.Text, T.Text)
+        parseIntWithSep t =
           case thousandSep of
-            Nothing -> t
-            Just s ->
-              T.filter (/= s) t
+            Nothing -> parseInt t
+            Just s -> 
+              let (n, r) = T.break (not . \d -> isDigit d || d == s) t
+              in notNull n >> (,r) <$> parseSep s n
+
+        parseSep :: Char -> T.Text -> m T.Text
+        parseSep s d = validSep False 0 s d 
+                     >>= \y -> if y then return (T.filter (/= s) d) else return d
+
+        -- Checks that the thousand separator is well placed.
+        -- Not at the beginning
+        -- From the right to left, every tree digit (if present)
+        -- Returns if a separator was present (or throw an error)
+        validSep :: Bool --  Did we found a separator char ?
+                  -> Int --  How many digit since the last separator char
+                         --  or how many digit processed so far (if first param)
+                         --  is false
+                  -> Char --  The separator char
+                  -> T.Text --  Remaining input to process
+                  -> m Bool
+        validSep False _ _ "" = return False
+        validSep False 0 s t | T.head t == s = throwError $ ParseAmountErr ""
+        validSep False n s t | T.head t == s && n <= 3 = validSep True 0 s (T.tail t)
+        validSep False n s t | T.head t == s && n > 3 = throwError $ ParseAmountErr ""
+        validSep False n s t = validSep False (n + 1) s (T.tail t)
+        validSep True 3 _ "" = return True
+        validSep True _ _ "" = throwError $ ParseAmountErr ""
+        validSep True 3 s t | T.head t == s = validSep True 0 s (T.tail t)
+        validSep True 3 s t | T.head t /= s = throwError $ ParseAmountErr ""
+        validSep True _ s t | T.head t == s = throwError $ ParseAmountErr ""
+        validSep True n s t = validSep True (n + 1) s (T.tail t)
 
         parseFractional :: T.Text -> m (T.Text, T.Text)
         parseFractional "" = return ("","")
