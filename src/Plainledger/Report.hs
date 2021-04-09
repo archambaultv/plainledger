@@ -38,7 +38,7 @@ import Plainledger.Report.IncomeStatement
 import Plainledger.Report.Transactions
 import Plainledger.Report.AccountTreeReport
 import Plainledger.Report.AccountTreeParam
-import Plainledger.Internal.Utils
+import Plainledger.Internal.Csv
 
 data ReportParams 
   = Transactions ReportPeriod (Maybe CompareAnotherPeriod) TransactionCsvRecordType
@@ -73,6 +73,6 @@ writeReport :: FilePath -> Journal -> [ReportRow] -> IO ()
 writeReport path j v = 
   let report = encodeReport j v
       bomReport = if jfHasBom $ jJournalFile j
-                  then BL.append (BL.fromStrict bom) report
+                  then BL.append bom report
                   else report
   in BS.writeFile path (BL.toStrict bomReport)

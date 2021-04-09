@@ -66,18 +66,12 @@ journalFileTestTree =
       koConfig "Journal-12.csv"
         $ mkError (SourcePos "test/Journal/JournalFile/Journal-12.csv" 0 0 ) 
         (MissingFieldinJournalFile "Fichier des comptes"),
-      -- Field starting with double quote but no double quote at the end
       koConfig "Journal-14.csv"
-        $ mkError (SourcePos "test/Journal/JournalFile/Journal-14.csv" 0 0 ) 
-        (MissingFieldinJournalFile "Fichier des comptes"),
-      -- Invalid CSV syntax. Should not get InvalideHeaderJournalFile
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-14.csv" 6 2 ) 
+        (UnallowedAmountChar '('),
       koConfig "Journal-15.csv"
-        $ mkError (SourcePos "test/Journal/JournalFile/Journal-15.csv" 0 0 ) 
-        (ErrorMessage "parse error (Failed reading: satisfy) at \" Inc\nS\195\169parateur de d\195\169cimale;,\nFichier des comptes;comptes.csv\nFichiers des transactions;transacti (truncated)"),
-      -- Invalid CSV syntax in the header. Should not get InvalideHeaderJournalFile
-      koConfig "Journal-16.csv"
-        $ mkError (SourcePos "test/Journal/JournalFile/Journal-16.csv" 1 0 ) 
-        (ErrorMessage "parse error (Failed reading: satisfy) at \"\\\"eur\"")
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-15.csv" 6 2 ) 
+        (UnknownFieldinJournalFile "Séparateur des totos")
     ]
 
 okConfig :: String -> JournalFile -> TestTree

@@ -31,7 +31,6 @@ import Plainledger.Internal.Csv
 import Plainledger.Journal.Posting
 import Plainledger.Journal.Amount
 import Plainledger.Journal.Day
-import Plainledger.Internal.Utils
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Prelude hiding (lines)
@@ -59,8 +58,10 @@ decodeJTransactionsFile :: Language ->
                            ExceptT Errors IO [(SourcePos, JTransaction)]
 decodeJTransactionsFile lang csvSeparator decimalSeparator filePath =
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
-      accs <- decodeTransactions lang csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      csvBS <- fmap (snd . removeBom . BL.fromStrict) 
+            $ liftIO 
+            $ BS.readFile filePath
+      accs <- decodeTransactions lang csvSeparator decimalSeparator csvBS
       let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) accs
       return withPos
 

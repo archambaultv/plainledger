@@ -48,6 +48,8 @@ en_CAText TJournalFileAccountFile = "Accounts file"
 en_CAText TJournalFileTransactionFiles = "Transactions files"
 en_CAText TJournalFileStatementBalanceFiles = "Statement balance assertions files"
 en_CAText TJournalFileTrialBalanceFiles = "Trial balance assertions files"
+en_CAText TJournalFileThousandSeparator = "Thousand separator"
+en_CAText TJournalFileCurrSymbol = "Monetary symbol"
 
 en_CAText TTransactionId = "Transaction number"
 en_CAText TTransactionDate = "Date"
@@ -109,6 +111,8 @@ printErrorType EmptyJournalFile
   = "Journal file is empty"
 printErrorType (UnknownFieldinJournalFile s)
   = "Unknown parameter \"" ++ s ++ "\"."
+printErrorType (DuplicateJournalFileParam s)
+  = "Duplicate parameter in journal file : \"" ++ s ++ "\"."
 printErrorType InvalidHeaderJournalFile
   = "Unable to parse the header in the journal file\n"
   ++ "The CSV format must use a comma (,), semicolon (;) or tab to separate columns\n"
@@ -208,6 +212,11 @@ printErrorType (DuplicateBalance d t)
   = "Duplicate balance assertion.\n"
   ++ "Date : " ++ show d ++ "\n"
   ++ "Account : " ++ t
+
+printErrorType (UnallowedAmountChar c)
+ = "Character "
+ ++ show c
+ ++ " is not allowed as a thousand separator or currency symbol."
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f

@@ -49,6 +49,8 @@ data I18nText
   | TJournalFileEarningsAccount
   | TJournalFileCompanyName 
   | TJournalFileDecimalSeparator
+  | TJournalFileThousandSeparator
+  | TJournalFileCurrSymbol
   | TJournalFileFirstFiscalMonth
   | TJournalFileAccountFile
   | TJournalFileTransactionFiles

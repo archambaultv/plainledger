@@ -25,7 +25,11 @@ module Plainledger.Internal.Csv
   optionalColumnIndex,
   parseInt,
   parseIntMaybe,
-  readCsvFile
+  readCsvFile,
+  csvLines,
+  bom,
+  removeBom,
+  parseCsv
 ) where
 
 import Data.List ( sort, group )
@@ -44,49 +48,69 @@ import Data.Word (Word8)
 type ColumnIndex = (T.Text, Int)
 type ColumnIndexes = M.HashMap T.Text Int
 
+bom :: B.ByteString
+bom = B.pack [0xEF,0xBB,0xBF]
+
+-- | Remove the UTF8 BOM if present
+removeBom :: B.ByteString -> (Bool, B.ByteString)
+removeBom bs | B.take 3 bs == bom = (True, B.drop 3 bs)
+             | otherwise = (False, bs)
+
+nl:: Word8
+nl = 10
+
+cr :: Word8
+cr = 13
+
+-- Returns only the non empty lines with their number
+csvLines :: B.ByteString -> [(Int, B.ByteString)]
+csvLines = csvLines' 1
+
+csvLines' :: Int -> B.ByteString -> [(Int, B.ByteString)]
+csvLines' _ xs = 
+  let noNL = zip [1..] $ B.split nl xs
+      noCR = map (fmap dropCarReturn) noNL
+  in filter (not . B.null . snd) noCR
+
+-- csvLines' _ ps | B.null ps = []
+-- csvLines' i ps = 
+--   case B.elemIndex nl ps of
+--       Nothing -> [(i, ps)]
+--       Just 0 -> csvLines' (i+1) (dropCarReturn $ B.tail ps)
+--       Just n  -> 
+--         let x = B.take n ps
+--             xs = dropCarReturn $ B.drop (n+1) ps
+--         in (i, x) : csvLines' (i+1) xs
+
+dropCarReturn :: B.ByteString -> B.ByteString
+dropCarReturn xs | B.null xs = xs
+dropCarReturn xs | B.last xs == cr = B.init xs
+dropCarReturn xs = xs
+
 -- Reads the bytestring CSV file, skipping
 -- white row and only delimiter row and
 -- returns the line number
 -- Assumes UTF8 encoding
-readCsvFile :: (MonadError Errors m) =>
-               Char -> 
-               B.ByteString ->
-               m [(Int, V.Vector T.Text)]
-readCsvFile csvSeparator bs =
-  -- Read the CSV file as vector of T.Text
-  let opts = C.defaultDecodeOptions {
+parseCsv :: (MonadError Errors m) =>
+            Char ->
+            [(Int, B.ByteString)] -> 
+            m [(Int, V.Vector T.Text)]
+parseCsv csvSeparator xs = 
+          filter (not . isEmptyLine . snd)
+          <$> traverse (uncurry parseLine) xs
+  where 
+      opts = C.defaultDecodeOptions {
                 C.decDelimiter = fromIntegral (ord csvSeparator)
                 }
 
-      nl:: Word8
-      nl = 10
-
-      cr :: Word8
-      cr = 13
-
-      -- Returns only the non empty lines with their number
-      csvLines :: Int -> B.ByteString -> [(Int, B.ByteString)]
-      csvLines _ ps | B.null ps = []
-      csvLines i ps = 
-        case B.elemIndex nl ps of
-           Nothing -> [(i, ps)]
-           Just 0 -> csvLines (i+1) (dropCarReturn $ B.tail ps)
-           Just n  -> 
-             let x = B.take n ps
-                 xs = dropCarReturn $ B.drop (n+1) ps
-             in (i, x) : csvLines (i+1) xs
-
-      dropCarReturn :: B.ByteString -> B.ByteString
-      dropCarReturn xs | B.null xs = xs
-      dropCarReturn xs | B.head xs == cr = B.drop 1 xs
-      dropCarReturn xs = xs
-
-      parseCsv :: (MonadError Errors m) => 
+      parseLine :: (MonadError Errors m) => 
+                  Int ->
                   B.ByteString -> 
-                  m (V.Vector T.Text)
-      parseCsv xs = either (throwError . mkErrorNoPos . ErrorMessage) 
-                  (return . checkSingleLine)
-                  $ C.decodeWith opts C.NoHeader xs
+                  m (Int, V.Vector T.Text)
+      parseLine i ys = either 
+                  (throwError . mkError (SourcePos "" i 0) . ErrorMessage) 
+                  (return . (i,) . checkSingleLine)
+                  $ C.decodeWith opts C.NoHeader ys
 
       checkSingleLine :: V.Vector (V.Vector T.Text) -> V.Vector T.Text
       checkSingleLine v | V.null v = error "Plainledger internal error, vector is null"
@@ -96,9 +120,15 @@ readCsvFile csvSeparator bs =
       isEmptyLine :: V.Vector T.Text -> Bool
       isEmptyLine = V.all T.null
 
-  in filter (not . isEmptyLine . snd)
-     <$> traverse (\(i,x) -> (i,) <$> parseCsv x) 
-         (csvLines 1 bs)
+-- Reads the bytestring CSV file, skipping
+-- white row and only delimiter row and
+-- returns the line number
+-- Assumes UTF8 encoding
+readCsvFile :: (MonadError Errors m) =>
+               Char -> 
+               B.ByteString ->
+               m [(Int, V.Vector T.Text)]
+readCsvFile csvSeparator bs = parseCsv csvSeparator $ csvLines bs 
 
 columnIndex :: (MonadError Errors m) =>
                      ColumnIndexes ->

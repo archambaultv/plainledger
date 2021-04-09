@@ -48,6 +48,8 @@ fr_CAText TJournalFileAccountFile = "Fichier des comptes"
 fr_CAText TJournalFileTransactionFiles = "Fichiers des transactions"
 fr_CAText TJournalFileStatementBalanceFiles = "Assertion des soldes"
 fr_CAText TJournalFileTrialBalanceFiles = "Assertion des balances de vérification"
+fr_CAText TJournalFileThousandSeparator = "Séparateur des milliers"
+fr_CAText TJournalFileCurrSymbol = "Symbol monétaire"
 
 fr_CAText TTransactionId = "Numéro de transaction"
 fr_CAText TTransactionDate = "Date"
@@ -108,6 +110,8 @@ printErrorType EmptyJournalFile
   = "Le journal est vide"
 printErrorType (UnknownFieldinJournalFile s)
   = "Paramètre inconnu \"" ++ s ++ "\"."
+printErrorType (DuplicateJournalFileParam s)
+  = "Paramètre en double : \"" ++ s ++ "\"."
 printErrorType InvalidHeaderJournalFile
   = "Erreur de lecture de l'en-tête du journal.\n"
   ++ "Le fichier doit utiliser la virgule (,), le point-virgule (;) or une tabulation pour séparar les colonnes\n"
@@ -207,6 +211,11 @@ printErrorType (DuplicateBalance d t)
   = "Doublon dans les balances de vérifications.\n"
   ++ "Date : " ++ show d ++ "\n"
   ++ "Compte : " ++ t
+
+printErrorType (UnallowedAmountChar c)
+ = "Le caractère "
+ ++ show c
+ ++ " ne peut être utilisé comme séparateur de milliers ou symbole de devise."
 
 showSourcePos :: SourcePos -> String
 showSourcePos (SourcePos f r _) | r <= 0 = f

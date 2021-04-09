@@ -49,8 +49,10 @@ data ErrorType
   | EmptyJournalFile
   | EmptyFieldInJournalFile String
   | MissingFieldinJournalFile String
-  | UnknownFieldinJournalFile String
+  | DuplicateJournalFileParam String
   | InvalidHeaderJournalFile
+  | UnallowedAmountChar Char
+  | UnknownFieldinJournalFile String
 
   | ZeroLengthAccountId
   | DuplicateAccountId String
