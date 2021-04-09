@@ -45,7 +45,6 @@ import Data.List
 import Plainledger.I18n.I18n
 import Plainledger.Error
 import Plainledger.Internal.Csv
-import Plainledger.Internal.Utils
 import Prelude hiding (lines)
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -363,7 +362,9 @@ decodeAccounts lang csvSeparator bs = do
 decodeAccountsFile :: Language -> FilePath -> Char -> ExceptT Errors IO  [(SourcePos, JAccount)]
 decodeAccountsFile lang filePath csvSeparator =
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
-      accs <- decodeAccounts lang csvSeparator (BL.fromStrict csvBS)
+      csvBS <- fmap (snd . removeBom . BL.fromStrict) 
+            $ liftIO 
+            $ BS.readFile filePath
+      accs <- decodeAccounts lang csvSeparator csvBS
       let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) accs
       return withPos

@@ -41,8 +41,7 @@ import Plainledger.Internal.Csv
       processColumnIndexes,
       columnData,
       columnDataM,
-      optionalColumnDataM, readCsvFile )
-import Plainledger.Internal.Utils ( removeBom )
+      optionalColumnDataM, readCsvFile, removeBom )
 import Plainledger.Journal.Account
     ( isIncomeStatementType,
       Account,
@@ -86,8 +85,10 @@ decodeStatementBalanceFile :: Language ->
                               ExceptT Errors IO [(SourcePos, JBalance)]
 decodeStatementBalanceFile lang csvSeparator decimalSeparator filePath =
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
-      bals <- decodeBalances lang True csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      csvBS <- fmap (snd . removeBom . BL.fromStrict) 
+            $ liftIO 
+            $ BS.readFile filePath
+      bals <- decodeBalances lang True csvSeparator decimalSeparator csvBS
       let bals1 = map (\(i, b) -> (i, b{bStartDate = Nothing})) bals
       let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) bals1
       return withPos
@@ -99,8 +100,10 @@ decodeTrialBalanceFile :: Language ->
                           ExceptT Errors IO [(SourcePos, JBalance)]
 decodeTrialBalanceFile lang csvSeparator decimalSeparator filePath =
   withExceptT (setSourcePosFileIfNull filePath) $ do
-      csvBS <- fmap (snd . removeBom) $ liftIO $ BS.readFile filePath
-      bals <- decodeBalances lang False csvSeparator decimalSeparator (BL.fromStrict csvBS)
+      csvBS <- fmap (snd . removeBom . BL.fromStrict ) 
+            $ liftIO 
+            $ BS.readFile filePath
+      bals <- decodeBalances lang False csvSeparator decimalSeparator csvBS
       let withPos = map (\(i, a) -> (SourcePos filePath i 0, a)) bals
       return withPos
 
