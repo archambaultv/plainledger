@@ -10,7 +10,6 @@ import qualified Data.ByteString.Lazy as BL
 import Plainledger.Internal.Csv
 import qualified Data.Vector as V
 import qualified Data.Text as T
-import Plainledger.Error
 
 csvFileTestTree :: TestTree
 csvFileTestTree =
