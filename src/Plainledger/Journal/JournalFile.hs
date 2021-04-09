@@ -181,7 +181,11 @@ processJournalFileBody filePath lang sep bs = do
                        (Int, V.Vector T.Text) -> 
                        m JournalFile
         parseConfig _ c (_, x) | V.null x = return c
-        parseConfig [] c _ = return c
+        parseConfig [] _ (i, x) = throwError 
+                                $ mkError (SourcePos "" i 2)
+                                $ UnknownFieldinJournalFile 
+                                $ T.unpack 
+                                $ V.head x
         parseConfig ((name, foo):_) c (i,x) | V.head x == i18nText lang name =
             foo c (i18nString lang name) i (V.tail x) 
         parseConfig (_:ns) c x = parseConfig ns c x

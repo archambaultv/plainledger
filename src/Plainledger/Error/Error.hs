@@ -52,6 +52,7 @@ data ErrorType
   | DuplicateJournalFileParam String
   | InvalidHeaderJournalFile
   | UnallowedAmountChar Char
+  | UnknownFieldinJournalFile String
 
   | ZeroLengthAccountId
   | DuplicateAccountId String

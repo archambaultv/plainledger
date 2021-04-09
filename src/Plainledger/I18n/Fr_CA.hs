@@ -108,6 +108,8 @@ printErrorType (MissingFieldinJournalFile s)
   = "Le paramètre \"" ++ s ++ "\" est absent."
 printErrorType EmptyJournalFile
   = "Le journal est vide"
+printErrorType (UnknownFieldinJournalFile s)
+  = "Paramètre inconnu \"" ++ s ++ "\"."
 printErrorType (DuplicateJournalFileParam s)
   = "Paramètre en double : \"" ++ s ++ "\"."
 printErrorType InvalidHeaderJournalFile

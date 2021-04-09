@@ -109,6 +109,8 @@ printErrorType (MissingFieldinJournalFile s)
   = "Parameter \"" ++ s ++ "\" value is missing."
 printErrorType EmptyJournalFile
   = "Journal file is empty"
+printErrorType (UnknownFieldinJournalFile s)
+  = "Unknown parameter \"" ++ s ++ "\"."
 printErrorType (DuplicateJournalFileParam s)
   = "Duplicate parameter in journal file : \"" ++ s ++ "\"."
 printErrorType InvalidHeaderJournalFile

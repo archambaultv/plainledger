@@ -65,7 +65,13 @@ journalFileTestTree =
         (MissingFieldinJournalFile "Nom"),
       koConfig "Journal-12.csv"
         $ mkError (SourcePos "test/Journal/JournalFile/Journal-12.csv" 0 0 ) 
-        (MissingFieldinJournalFile "Fichier des comptes")
+        (MissingFieldinJournalFile "Fichier des comptes"),
+      koConfig "Journal-14.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-14.csv" 6 2 ) 
+        (UnallowedAmountChar '('),
+      koConfig "Journal-15.csv"
+        $ mkError (SourcePos "test/Journal/JournalFile/Journal-15.csv" 6 2 ) 
+        (UnknownFieldinJournalFile "Séparateur des totos")
     ]
 
 okConfig :: String -> JournalFile -> TestTree
