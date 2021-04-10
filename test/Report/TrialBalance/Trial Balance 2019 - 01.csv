@@ -5,9 +5,9 @@ Du 2019-01-01 au 2019-12-31
 Numéro;Compte;Débit;Crédit
 1001;Compte chèque;12386,10;
 1051;Maison 123 rue principale;275000;
+2051;Marge de crédit;;6183,45
 2001;My credit card;358;
 2002;Hypothèque;;164375
-2051;Marge de crédit;;6183,45
 3001;Solde d'ouverture;;115005,23
 4152;Salaire compagnie Foo Bar;;2500
 4153;Revenu de location;;1000

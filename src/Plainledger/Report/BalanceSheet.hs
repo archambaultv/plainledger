@@ -18,24 +18,30 @@ import Plainledger.Journal
 import Plainledger.Report.AccountTreeReport
 import Plainledger.Report.AccountTreeParam
 import Plainledger.Report.Ledger
-
+import qualified Data.Text as T
 
 balanceSheetReport :: AccountTreeParam ->
                       Ledger ->
                       Day ->
                       [ReportRow]
 balanceSheetReport atp ledger today =
-  accountTreeReport atp ledger today TReportBalanceSheetName  
-                    serializeNode serializeTopAccount
+  let bodyHeader = ["", i18nText lang TReportTotal]
+  in standardFormat atp ledger today TReportBalanceSheetName bodyHeader
+      $ addIndentation
+      $ take 3 -- Take only the first 3 top account
+      $ fmap snd
+      <$> singleQuantityReport atp ledger today serializeNode
 
-  where serializeNode acc dates = 
+  where serializeNode :: DateSpan -> Account -> (Quantity, T.Text, Bool)
+        serializeNode dates acc =
           let amnt = balanceSheetQty ledger dates acc
               amntText = qtyToNormallyPositive decimalSep (aAccountType acc) amnt
               isActive = isAccountActive ledger dates acc
                       || acc == lEarningAccount ledger
                       || acc == lOpeningAccount ledger
-          in (amnt, [amntText], isActive)
-
-        serializeTopAccount xs = map snd $ take 3 xs
-
+          in (amnt, amntText, isActive)
+          
+        
         decimalSep = jfDecimalSeparator $ lJournalFile ledger
+
+        lang = jfLanguage $ lJournalFile ledger

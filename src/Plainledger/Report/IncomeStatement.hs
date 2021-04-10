@@ -18,30 +18,36 @@ import Plainledger.Journal
 import Plainledger.Report.AccountTreeReport
 import Plainledger.Report.AccountTreeParam
 import Plainledger.Report.Ledger
+import qualified Data.Text as T
+import Data.Tree
 
 
 incomeStatementReport :: AccountTreeParam ->
                         Ledger ->
                         Day ->
                         [ReportRow]
-incomeStatementReport atp ledger today =
-  accountTreeReport atp ledger today TReportIncomeStatementName   
-                    serializeNode serializeTopAccount
+incomeStatementReport atp ledger today = 
+  let bodyHeader = ["", i18nText lang TReportTotal]
+  in standardFormat atp ledger today TReportIncomeStatementName  bodyHeader
+    $ addIndentation
+    $ addTotal
+    $ drop 3
+    $ singleQuantityReport atp ledger today serializeNode
 
-  where serializeNode acc dates = 
+  where serializeNode :: DateSpan -> Account -> (Quantity, T.Text, Bool)
+        serializeNode dates acc = 
           let amnt = trialBalanceQty ledger dates acc
               amntText = qtyToNormallyPositive decimalSep (aAccountType acc) amnt
               isActive = isAccountActive ledger dates acc
-          in (amnt, [amntText], isActive)
+          in (amnt, amntText, isActive)
 
-        serializeTopAccount :: [(Quantity, [ReportRow])] -> [[ReportRow]]
-        serializeTopAccount xs = 
-          let body = map snd $ drop 3 xs
-              earning = negate $ sum $ map fst $ drop 3 xs
+        addTotal :: [Tree QuantityInfo] -> [Tree NodeRows]
+        addTotal xs =
+          let earning = negate $ sum $ map (fst . fst . rootLabel) xs
               footer :: ReportRow
               footer = [i18nText lang TReportEarnings,  
                         writeAmount decimalSep earning]
-          in body ++ [[footer]]
+          in map (fmap snd) xs ++ [Node ([footer],[]) []]
 
         decimalSep = jfDecimalSeparator $ lJournalFile ledger
 

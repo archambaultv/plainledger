@@ -18,7 +18,12 @@ module Plainledger.Report.AccountTreeReport (
   nameWithNumber,
   trialBalanceQty,
   balanceSheetQty,
-  ReportRow
+  ReportRow,
+  addIndentation,
+  NodeRows,
+  singleQuantityReport,
+  toKeepOrNotToKeep,
+  QuantityInfo
   )
 where
 
@@ -30,77 +35,157 @@ import qualified Data.Text as T
 import Plainledger.Report.AccountTreeParam
 import Data.Tree
 import Data.List ( intercalate )
+import Data.Maybe
 
 type ReportRow = [T.Text]
+type NodeRows = ([ReportRow], [ReportRow])
 
--- Computes
-accountTreeReport :: AccountTreeParam ->
-                    Ledger ->
-                    Day ->
-                    I18nText -> -- | Name of the report
-                    (Account -> DateSpan -> (Quantity, ReportRow, Bool)) -> -- | How to serialize an account
-                    ([(Quantity, [ReportRow])] -> [[ReportRow]]) -> -- | How to serialize top accounts
-                    [ReportRow]
-accountTreeReport atp ledger today reportType serializeNode serializeTopAccount =
-  let reportName = i18nText lang reportType
+emptyRow :: ReportRow
+emptyRow = []
+
+-- Standard format of the reports
+-- Each account can provide 2 ReportRow. One that will come before the 
+-- rows of its children, the other one after the rows of its children.
+-- The function do not print the second row for leaves.
+standardFormat :: AccountTreeParam ->
+                  Ledger ->
+                  Day ->
+                  I18nText ->
+                  ReportRow ->
+                  [Tree NodeRows] ->
+                  [ReportRow]
+standardFormat param ledger today reportType bodyHeader ts =
+  let period = atReportPeriod param
+      lang = jfLanguage $ lJournalFile ledger
+      reportName = i18nText lang reportType
+      header = standardHeader ledger period today reportName
+      footer = standardFooter ledger today
+      body = intercalate [emptyRow]
+           $ map treeToList ts 
+
+  in header
+     ++ [emptyRow]
+     ++ (bodyHeader : body)
+     ++ [emptyRow]
+     ++ footer
+
+  where treeToList :: Tree ([ReportRow], [ReportRow]) -> [ReportRow]
+        treeToList (Node (before, after) xs) =
+          before ++ concatMap treeToList xs ++ after
+
+standardHeader :: Ledger -> ReportPeriod -> Day -> T.Text -> [ReportRow]
+standardHeader ledger period today reportName =
+  let lang = jfLanguage $ lJournalFile ledger
+      header1 = (:[]) $ jfCompanyName $ lJournalFile ledger
+      header2 = (:[]) reportName
       dateSpan = reportPeriodToSpan period today ledger
-      body = maybe [] genericReportBody dateSpan
-  in standardFormat period ledger today reportName body
+      header3 = (:[]) $ i18nText lang (TReportDateSpan dateSpan)
+  in [header1, header2, header3]
+
+standardFooter :: Ledger -> Day -> [ReportRow]
+standardFooter ledger today =
+  let lang = jfLanguage $ lJournalFile ledger
+  in [(:[]) $ i18nText lang (TReportGeneratedOn today)]
+
+-- Add a left pad to make the hiarchy of accounts more visible
+-- t1
+--   t11
+--   t12
+-- t2
+--   t21
+--   t22
+addIndentation :: [Tree NodeRows] -> [Tree NodeRows]
+addIndentation = map (addIndentation' "")
+
+  where addIndentation' pad (Node (x1, x2) cs) =
+          let cs' = map (addIndentation' (T.append "  " pad)) cs
+              padMe = \x -> if null x 
+                            then x 
+                            else T.append pad (head x) : tail x
+          in Node (map padMe x1, map padMe x2) cs'
+
+-- Applies a function from the leaf to the root
+-- When foo returns Nothing, the node deleted
+bottomUp :: (a -> [b] -> Maybe b) -> Tree a -> Maybe (Tree b)
+bottomUp foo (Node x []) =  flip Node [] <$> foo x []
+bottomUp foo (Node x xs) = 
+  let xs' = mapMaybe (bottomUp foo) xs
+  in  flip Node xs' <$> foo x (map rootLabel xs')
+
+-- Applies serializeNode with bottomUp and takes
+-- care of a few plumbing issues
+accountTreeReport :: forall a . 
+                     AccountTreeParam ->
+                     Ledger ->
+                     Day ->
+                     (DateSpan -> Account -> [a] -> Maybe a) -> 
+                     [Tree a]
+accountTreeReport atp ledger today serializeNode =
+  let 
+      period = atReportPeriod atp
+      dateSpan = reportPeriodToSpan period today ledger
+      body = maybe [] toReportRowTree dateSpan
+  in body
 
   where
 
-  showRow = atShowRow atp
-  period = atReportPeriod atp
+  toReportRowTree :: DateSpan -> [Tree a]
+  toReportRowTree dates = mapMaybe (serialize dates) 
+                          $ lChartOfAccount ledger
 
-  genericReportBody :: DateSpan ->[[T.Text]]
-  genericReportBody dates
-    = let header = ["", i18nText lang TReportTotal]
-          body :: [[T.Text]]
-          body = intercalate [[]]
-              $ serializeTopAccount
-              $ map (serialize dates)
-              $ lChartOfAccount ledger
+  serialize :: DateSpan -> Tree Account -> Maybe (Tree a)
+  serialize dates t = bottomUp (serializeNode dates) t
 
-      in header : body
+-- For reports where the quantity to display for each account
+-- at each period is a single quantity and the correct way to
+-- compute the total is to add up the children quantities
+type QuantityInfo = ((Quantity, Account), NodeRows)
 
-  serialize :: DateSpan -> Tree Account -> (Quantity, [[T.Text]])
-  serialize dates (Node acc xs) =
-    let subAccounts :: [(Quantity, [[T.Text]])]
-        subAccounts = map (serialize dates) xs
-        subTotal = sum $ map fst subAccounts
-        subLines = map rightPad $ concatMap snd subAccounts
-        emptyChildren = null subLines
+singleQuantityReport :: AccountTreeParam ->
+                        Ledger ->
+                        Day ->
+                        (DateSpan -> Account -> (Quantity, T.Text, Bool)) -> 
+                        [Tree QuantityInfo]
+singleQuantityReport atp ledger today serializeNode =
+  accountTreeReport atp ledger today serializeNode'
 
-        name = nameWithNumber (aDisplayName acc)  (aNumber acc)
-        (amnt, nodeData, isActive) = serializeNode acc dates
-        isLeaf = null xs
-        nodeLine :: [T.Text]
-        nodeLine = if not isLeaf && not isActive
-                  then [name]
-                  else  name : nodeData
+  where serializeNode' ds acc children =                  
+          let (amnt, amntText, isActive) = serializeNode ds acc
 
-        total :: Quantity
-        total = subTotal + amnt
-        totalName = T.concat [i18nText lang TReportTotal,
-                              " ",
-                              aDisplayName acc]
-        totalAmnt = qtyToNormallyPositive decimalSep (aAccountType acc) total
-        totalLine = [[totalName, totalAmnt] | not isLeaf]
+              subTotal = sum $ map (fst . fst) children
+              emptyChildren = null children
 
-        allLines = nodeLine : subLines ++ totalLine
-    in case (isActive, showRow) of
-          (_, ShowAll) -> (total, allLines)
-          (False, _) -> if emptyChildren then (0, []) else (total, allLines)
-          (True, ShowNonZero) | amnt == 0 ->
-            if emptyChildren then (0, []) else (total, allLines)
-          (True, _) -> (total, allLines)
+              name = nameWithNumber (aDisplayName acc) (aNumber acc)
 
-  decimalSep = jfDecimalSeparator $ lJournalFile ledger
+              nodeLine :: [T.Text]
+              nodeLine = if not emptyChildren && not isActive
+                          then [name]
+                          else  [name, amntText]
 
-  rightPad [] = []
-  rightPad (x:xs) = T.append "  " x : xs
+              total :: Quantity
+              total = subTotal + amnt
+              totalName = T.concat [i18nText lang TReportTotal,
+                                    " ",
+                                    aDisplayName acc]
+              totalAmnt = qtyToNormallyPositive decimalSep (aAccountType acc) total
+              totalLine = [[totalName, totalAmnt] | not emptyChildren]
 
-  lang = jfLanguage $ lJournalFile ledger
+              result = ((total, acc), ([nodeLine], totalLine))
+
+          in toKeepOrNotToKeep isActive showRow emptyChildren (amnt == 0) result
+  
+        decimalSep = jfDecimalSeparator $ lJournalFile ledger
+        lang = jfLanguage $ lJournalFile ledger
+        showRow = atShowRow atp
+
+toKeepOrNotToKeep :: Bool -> ShowRow -> Bool -> Bool -> a -> Maybe a
+toKeepOrNotToKeep isActive showRow emptyChildren isZero x =
+  case (isActive, showRow) of
+    (_, ShowAll) -> Just x
+    (False, _) -> if emptyChildren then Nothing else Just x
+    (True, ShowNonZero) | isZero ->
+      if emptyChildren then Nothing else Just x
+    (True, _) -> Just x
 
 trialBalanceQty :: Ledger -> DateSpan -> Account -> Quantity
 trialBalanceQty ledger dateSpan acc =
@@ -137,36 +222,3 @@ qtyToNormallyPositive c accType qty
 nameWithNumber :: T.Text -> Maybe Int -> T.Text
 nameWithNumber x Nothing = x
 nameWithNumber x (Just i) = T.concat [x, " (", T.pack $ show i, ")"]
-
-standardFormat :: ReportPeriod ->
-                  Ledger ->
-                  Day ->
-                  T.Text ->
-                  [[T.Text]] ->
-                  [[T.Text]]
-standardFormat period ledger today reportName body =
-  let header = standardHeader ledger period today reportName
-      footer = standardFooter ledger today
-      body1 = case body of
-              [] -> [[]]
-              xs -> []
-                    : xs
-                    ++ [[]]
-
-  in header
-     ++ body1
-     ++ footer
-
-standardHeader :: Ledger -> ReportPeriod -> Day -> T.Text -> [[T.Text]]
-standardHeader ledger period today reportName =
-  let lang = jfLanguage $ lJournalFile ledger
-      header1 = (:[]) $ jfCompanyName $ lJournalFile ledger
-      header2 = (:[]) reportName
-      dateSpan = reportPeriodToSpan period today ledger
-      header3 = (:[]) $ i18nText lang (TReportDateSpan dateSpan)
-  in [header1, header2, header3]
-
-standardFooter :: Ledger -> Day -> [[T.Text]]
-standardFooter ledger today =
-  let lang = jfLanguage $ lJournalFile ledger
-  in [(:[]) $ i18nText lang (TReportGeneratedOn today)]

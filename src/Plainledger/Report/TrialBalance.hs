@@ -12,8 +12,6 @@ module Plainledger.Report.TrialBalance (
   )
 where
 
-import Data.List ( sortOn )
-import Data.Maybe
 import Data.Time
 import Plainledger.I18n.I18n
 import Plainledger.Journal
@@ -21,7 +19,9 @@ import Plainledger.Report.Ledger
 import Plainledger.Report.AccountTreeParam
 import Plainledger.Report.AccountTreeReport
 import qualified Data.Text as T
+import Data.Tree
 
+type DebitCreditQty = (Quantity, Quantity)
 
 trialBalanceReport :: ReportPeriod ->
                       Maybe CompareAnotherPeriod ->
@@ -29,45 +29,55 @@ trialBalanceReport :: ReportPeriod ->
                       Ledger ->
                       Day ->
                       [ReportRow]
-trialBalanceReport period _ showRow ledger today =
-  let lang = jfLanguage $ lJournalFile ledger
-      reportName = i18nText lang TReportTrialBalanceName
-      dateSpan = reportPeriodToSpan period today ledger
-      body = case dateSpan of
-              Nothing -> []
-              Just x -> trialBalanceBody showRow x ledger
-  in standardFormat period ledger today reportName body
+trialBalanceReport period cp showRow ledger today =
+  let atp = AccountTreeParam period cp showRow Nothing comparisonColumnsDefault
+      bodyHeader = [i18nText lang TReportAccNumber,
+                    i18nText lang TReportAccName,
+                    i18nText lang TReportDebit,
+                    i18nText lang TReportCredit]
+  in standardFormat atp ledger today TReportTrialBalanceName bodyHeader
+    $ addRootaddTotal
+    $ accountTreeReport atp ledger today serializeNode
 
-trialBalanceBody :: ShowRow -> DateSpan -> Ledger -> [ReportRow]
-trialBalanceBody showRow dates ledger
-  = let header4 = [i18nText lang TReportAccNumber,
-                              i18nText lang TReportAccName,
-                              i18nText lang TReportDebit,
-                              i18nText lang TReportCredit]
-        lang = jfLanguage $ lJournalFile ledger
-        lines1 = mapMaybe serialize
-              $ sortOn aNumber
-              $ lAccounts ledger
-        totalDebit = sum $ filter (> 0) $ map fst lines1
-        totalCredit = sum $ filter (< 0) $ map fst lines1
-        body = map snd lines1
-        total = ["",
-                            i18nText lang TReportTotal,
-                            writeAmount decimalSep totalDebit,
-                            writeAmount decimalSep $ negate totalCredit]
-    in (header4 : body) ++ [total]
-  where serialize :: Account -> Maybe (Quantity, ReportRow)
-        serialize acc =
+  where
+    serializeNode :: DateSpan -> 
+                     Account -> 
+                     [(DebitCreditQty, NodeRows)] -> 
+                     Maybe (DebitCreditQty, NodeRows)
+    serializeNode dates acc children = 
           let number = T.pack $ maybe "" show $ aNumber acc
               name = aDisplayName acc
               amnt = trialBalanceQty ledger dates acc
               amntText = qtyToDebitCredit decimalSep (aAccountType acc) amnt
               isActive = isAccountActive ledger dates acc
               line = [number, name] ++ amntText
-          in case (isActive, showRow) of
-                (_, ShowAll) -> Just (amnt, line)
-                (False, _) -> Nothing
-                (True, ShowNonZero) | amnt == 0 -> Nothing
-                (True, _) -> Just (amnt, line)
+              total = newTotal amnt (map fst children)
+          in   case (isActive, showRow) of
+                  (_, ShowAll) -> Just (total, ([line], []))
+                  (False, _) -> if null children then Nothing else Just (total, ([],[]))
+                  (True, ShowNonZero) | amnt == 0 ->
+                    if null children then Nothing else Just (total, ([],[]))
+                  (True, _) -> Just (total, ([line], []))
 
-        decimalSep = jfDecimalSeparator $ lJournalFile ledger
+    newTotal :: Quantity -> [DebitCreditQty] -> DebitCreditQty
+    newTotal x xs =
+      let debit = sum $ map fst xs
+          credit = sum $ map snd xs
+      in if x < 0 
+         then (debit, credit - x) 
+         else (debit + x, credit)
+
+    -- We add a root to avoid white rows between the top five accounts
+    -- We add an extra Tree for a total
+    addRootaddTotal :: [Tree (DebitCreditQty, NodeRows)] -> [Tree NodeRows]
+    addRootaddTotal xs =
+      let qty = map (fst . rootLabel) xs
+          debit = writeAmount decimalSep $ sum $ map fst qty
+          credit = writeAmount decimalSep $ sum $ map snd qty
+          total = ["",i18nText lang TReportTotal, debit, credit]
+          xs' = map (fmap snd) xs ++ [Node ([total],[]) []]
+      in [Node ([], []) xs']
+
+    decimalSep = jfDecimalSeparator $ lJournalFile ledger
+
+    lang = jfLanguage $ lJournalFile ledger

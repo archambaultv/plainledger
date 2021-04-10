@@ -92,7 +92,7 @@ period =  Month <$> option auto (long "month")
       <|> flag' Since90DaysAgo (long "since90days")
       <|> flag' Since365DaysAgo (long "since365days")
 
-      <|> SinceDateToDate <$> option dateReader (long "since-date-until-today")
+      <|> SinceDateToToday <$> option dateReader (long "since-date-until-today")
 
       <|> parseDates <$> optional startDate <*> optional endDate
 
