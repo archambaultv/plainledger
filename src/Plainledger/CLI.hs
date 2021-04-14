@@ -87,10 +87,11 @@ period =  Month <$> option auto (long "month")
       <|> flag' (FiscalYearToDate 0) (long "this-fiscal-year-to-date")
       <|> flag' (FiscalYearToDate (-1)) (long "last-fiscal-year-to-date")
 
-      <|> flag' Since30DaysAgo (long "since30days")
-      <|> flag' Since60DaysAgo (long "since60days")
-      <|> flag' Since90DaysAgo (long "since90days")
-      <|> flag' Since365DaysAgo (long "since365days")
+      <|> flag' Last30Days (long "last30days")
+      <|> flag' Last60Days (long "last60days")
+      <|> flag' Last91Days (long "last91days")
+      <|> flag' Last182Days (long "last182days")
+      <|> flag' Last365Days (long "last365days")
 
       <|> SinceDateToToday <$> option dateReader (long "since-date-until-today")
 

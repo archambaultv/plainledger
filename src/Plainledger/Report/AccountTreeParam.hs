@@ -75,10 +75,13 @@ data ReportPeriod
   | CalendarYearToDate Integer
   | FiscalYear Integer
   | FiscalYearToDate Integer
-  | Since30DaysAgo
-  | Since60DaysAgo
-  | Since90DaysAgo
-  | Since365DaysAgo
+  -- This includes the current date.
+  -- So Last30Days for January 31st gives : January 2nd to January 31st gives
+  | Last30Days -- (365 mod 12)
+  | Last60Days -- (365 mod 6)
+  | Last91Days -- (365 mod 4)
+  | Last182Days -- (365 mod 2)
+  | Last365Days -- Number of days in a regular year
   | SinceDateUntilTheEnd Day
   | SinceDateToToday Day
   deriving (Eq, Show)
@@ -111,19 +114,19 @@ previousPeriod (CustomPeriod _ _) (d1, d2) i =
 previousPeriod (FromBeginningUntil _) _ _ = Nothing
 previousPeriod (Month _) (d1, d2) i = 
   Just (addGregorianMonthsClip (negate i) d1, 
-   addGregorianMonthsClip (negate i) d2)
+   toEndOfMonth $ addGregorianMonthsClip (negate i) d2)
 previousPeriod (MonthToDate _) (d1, d2) i = 
   Just (addGregorianMonthsClip (negate i) d1, 
    addGregorianMonthsClip (negate i) d2)
 previousPeriod (CalendarQuarter _) (d1, d2) i = 
   Just (addGregorianMonthsClip (3 * negate i) d1, 
-   addGregorianMonthsClip (3 * negate i) d2)
+   toEndOfMonth $ addGregorianMonthsClip (3 * negate i) d2)
 previousPeriod (CalendarQuarterToDate _) (d1, d2) i = 
   Just (addGregorianMonthsClip (3 * negate i) d1, 
    addGregorianMonthsClip (3 * negate i) d2)
 previousPeriod (FiscalQuarter _) (d1, d2) i = 
   Just (addGregorianMonthsClip (3 * negate i) d1, 
-   addGregorianMonthsClip (3 * negate i) d2)
+   toEndOfMonth $ addGregorianMonthsClip (3 * negate i) d2)
 previousPeriod (FiscalQuarterToDate _) (d1, d2) i = 
   Just (addGregorianMonthsClip (3 * negate i) d1, 
    addGregorianMonthsClip (3 * negate i) d2)
@@ -139,16 +142,19 @@ previousPeriod (FiscalYear _) (d1, d2) i =
 previousPeriod (FiscalYearToDate _) (d1, d2) i = 
   Just (addGregorianYearsClip (negate i) d1, 
    addGregorianYearsClip (negate i) d2)
-previousPeriod Since30DaysAgo (d1, d2) i =
+previousPeriod Last30Days (d1, d2) i =
   let nbDays = 30 * negate i
   in Just (addDays nbDays d1, addDays nbDays d2)
-previousPeriod Since60DaysAgo (d1, d2) i =
+previousPeriod Last60Days (d1, d2) i =
   let nbDays = 60 * negate i
   in Just (addDays nbDays d1, addDays nbDays d2)
-previousPeriod Since90DaysAgo (d1, d2) i =
+previousPeriod Last91Days (d1, d2) i =
   let nbDays = 90 * negate i
   in Just (addDays nbDays d1, addDays nbDays d2)
-previousPeriod Since365DaysAgo (d1, d2) i =
+previousPeriod Last182Days (d1, d2) i =
+  let nbDays = 182 * negate i
+  in Just (addDays nbDays d1, addDays nbDays d2)
+previousPeriod Last365Days (d1, d2) i =
   let nbDays = 365 * negate i
   in Just (addDays nbDays d1, addDays nbDays d2)
 previousPeriod (SinceDateUntilTheEnd _) _ _ = Nothing
@@ -208,10 +214,11 @@ reportPeriodToSpan (FiscalYearToDate n) today l =
       (d1, _) = computeFiscalYear n today firstFiscalMonth
   in return (d1, addGregorianYearsClip n today)
 
-reportPeriodToSpan Since30DaysAgo today _ = return (addDays (-30) today, today)
-reportPeriodToSpan Since60DaysAgo today _ = return (addDays (-60) today, today)
-reportPeriodToSpan Since90DaysAgo today _ = return (addDays (-90) today, today)
-reportPeriodToSpan Since365DaysAgo today _ = return (addDays (-365) today, today)
+reportPeriodToSpan Last30Days today _ = return (addDays (-29) today, today)
+reportPeriodToSpan Last60Days today _ = return (addDays (-59) today, today)
+reportPeriodToSpan Last91Days today _ = return (addDays (-90) today, today)
+reportPeriodToSpan Last182Days today _ = return (addDays (-181) today, today)
+reportPeriodToSpan Last365Days today _ = return (addDays (-364) today, today)
 reportPeriodToSpan (SinceDateUntilTheEnd d1) _ l =
   lDateSpan l >>= (\(_, d2) -> return (d1, d2))
 reportPeriodToSpan (SinceDateToToday d1) today _ = return (d1, today)
