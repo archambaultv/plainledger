@@ -118,22 +118,25 @@ accountTreeReport :: forall a .
                      AccountTreeParam ->
                      Ledger ->
                      Day ->
-                     (DateSpan -> Account -> [a] -> Maybe a) -> 
+                     ([DateSpan] -> Account -> [a] -> Maybe a) -> 
                      [Tree a]
 accountTreeReport atp ledger today serializeNode =
   let 
-      period = atReportPeriod atp
-      dateSpan = reportPeriodToSpan period today ledger
-      body = maybe [] toReportRowTree dateSpan
+      p = atReportPeriod atp
+      mp = atCompareAnotherPeriod atp
+      dateSpan = reportPeriods p mp today ledger
+      body = if null dateSpan
+             then []
+             else toReportRowTree dateSpan
   in body
 
   where
 
-  toReportRowTree :: DateSpan -> [Tree a]
+  toReportRowTree :: [DateSpan] -> [Tree a]
   toReportRowTree dates = mapMaybe (serialize dates) 
                           $ lChartOfAccount ledger
 
-  serialize :: DateSpan -> Tree Account -> Maybe (Tree a)
+  serialize :: [DateSpan] -> Tree Account -> Maybe (Tree a)
   serialize dates t = bottomUp (serializeNode dates) t
 
 -- For reports where the quantity to display for each account
@@ -144,7 +147,7 @@ type QuantityInfo = ((Quantity, Account), NodeRows)
 singleQuantityReport :: AccountTreeParam ->
                         Ledger ->
                         Day ->
-                        (DateSpan -> Account -> (Quantity, T.Text, Bool)) -> 
+                        ([DateSpan] -> Account -> (Quantity, T.Text, Bool)) -> 
                         [Tree QuantityInfo]
 singleQuantityReport atp ledger today serializeNode =
   accountTreeReport atp ledger today serializeNode'

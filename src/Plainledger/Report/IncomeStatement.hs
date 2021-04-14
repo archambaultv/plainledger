@@ -34,11 +34,12 @@ incomeStatementReport atp ledger today =
     $ drop 3
     $ singleQuantityReport atp ledger today serializeNode
 
-  where serializeNode :: DateSpan -> Account -> (Quantity, T.Text, Bool)
+  where serializeNode :: [DateSpan] -> Account -> (Quantity, T.Text, Bool)
         serializeNode dates acc = 
-          let amnt = trialBalanceQty ledger dates acc
+          let d = head dates
+              amnt = trialBalanceQty ledger d acc
               amntText = qtyToNormallyPositive decimalSep (aAccountType acc) amnt
-              isActive = isAccountActive ledger dates acc
+              isActive = isAccountActive ledger d acc
           in (amnt, amntText, isActive)
 
         addTotal :: [Tree QuantityInfo] -> [Tree NodeRows]

@@ -32,11 +32,12 @@ balanceSheetReport atp ledger today =
       $ fmap snd
       <$> singleQuantityReport atp ledger today serializeNode
 
-  where serializeNode :: DateSpan -> Account -> (Quantity, T.Text, Bool)
+  where serializeNode :: [DateSpan] -> Account -> (Quantity, T.Text, Bool)
         serializeNode dates acc =
-          let amnt = balanceSheetQty ledger dates acc
+          let d = head dates
+              amnt = balanceSheetQty ledger d acc
               amntText = qtyToNormallyPositive decimalSep (aAccountType acc) amnt
-              isActive = isAccountActive ledger dates acc
+              isActive = isAccountActive ledger d acc
                       || acc == lEarningAccount ledger
                       || acc == lOpeningAccount ledger
           in (amnt, amntText, isActive)

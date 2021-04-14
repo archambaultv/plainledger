@@ -25,9 +25,9 @@ import Data.Bifunctor
 import Plainledger.Journal
 import Plainledger.Report.Ledger
 import Data.Functor ((<&>))
-import Data.Maybe ( mapMaybe )
+import Data.Maybe ( mapMaybe, maybeToList, fromMaybe )
 
-data AccountTreeParam = 
+data AccountTreeParam =
   AccountTreeParam {
     atReportPeriod :: ReportPeriod,
     atCompareAnotherPeriod :: Maybe CompareAnotherPeriod,
@@ -90,57 +90,58 @@ reportPeriods :: ReportPeriod ->
                  Maybe CompareAnotherPeriod ->
                  Day ->
                  Ledger ->
-                 Maybe [DateSpan]
-reportPeriods p Nothing today l = (:[]) <$> reportPeriodToSpan p today l
-reportPeriods p (Just (CustomCompare xs)) today l = (:xs) <$> reportPeriodToSpan p today l
+                 [DateSpan]
+reportPeriods p Nothing today l = maybeToList $ reportPeriodToSpan p today l
+reportPeriods p (Just (CustomCompare xs)) today l =
+  maybe [] (:xs) $ reportPeriodToSpan p today l
 reportPeriods p (Just (PreviousYear i)) today l =
   let sp = reportPeriodToSpan p today l
       x = take i [1..]
       substract n (s,e) = (addGregorianYearsClip (negate n) s,
                            addGregorianYearsClip (negate n) e)
       foo = \z -> z : map (`substract` z) x
-  in sp <&> foo
+  in fromMaybe [] (sp <&> foo)
 reportPeriods p (Just (PreviousPeriod i)) today l =
   let sp = reportPeriodToSpan p today l
       x = take i [1..]
       foo = \z -> z : mapMaybe (previousPeriod p z) x
-  in sp <&> foo
+  in fromMaybe [] (sp <&> foo)
 
 previousPeriod :: ReportPeriod -> DateSpan -> Integer -> Maybe DateSpan
 previousPeriod AllDates _ _ = Nothing
 previousPeriod (CustomPeriod _ _) (d1, d2) i =
   let nbDays = diffDays d2 d1
-  in Just (addDays (i * nbDays) d1, addDays (i * nbDays) d2)  
+  in Just (addDays (i * nbDays) d1, addDays (i * nbDays) d2)
 previousPeriod (FromBeginningUntil _) _ _ = Nothing
-previousPeriod (Month _) (d1, d2) i = 
-  Just (addGregorianMonthsClip (negate i) d1, 
+previousPeriod (Month _) (d1, d2) i =
+  Just (addGregorianMonthsClip (negate i) d1,
    toEndOfMonth $ addGregorianMonthsClip (negate i) d2)
-previousPeriod (MonthToDate _) (d1, d2) i = 
-  Just (addGregorianMonthsClip (negate i) d1, 
+previousPeriod (MonthToDate _) (d1, d2) i =
+  Just (addGregorianMonthsClip (negate i) d1,
    addGregorianMonthsClip (negate i) d2)
-previousPeriod (CalendarQuarter _) (d1, d2) i = 
-  Just (addGregorianMonthsClip (3 * negate i) d1, 
+previousPeriod (CalendarQuarter _) (d1, d2) i =
+  Just (addGregorianMonthsClip (3 * negate i) d1,
    toEndOfMonth $ addGregorianMonthsClip (3 * negate i) d2)
-previousPeriod (CalendarQuarterToDate _) (d1, d2) i = 
-  Just (addGregorianMonthsClip (3 * negate i) d1, 
+previousPeriod (CalendarQuarterToDate _) (d1, d2) i =
+  Just (addGregorianMonthsClip (3 * negate i) d1,
    addGregorianMonthsClip (3 * negate i) d2)
-previousPeriod (FiscalQuarter _) (d1, d2) i = 
-  Just (addGregorianMonthsClip (3 * negate i) d1, 
+previousPeriod (FiscalQuarter _) (d1, d2) i =
+  Just (addGregorianMonthsClip (3 * negate i) d1,
    toEndOfMonth $ addGregorianMonthsClip (3 * negate i) d2)
-previousPeriod (FiscalQuarterToDate _) (d1, d2) i = 
-  Just (addGregorianMonthsClip (3 * negate i) d1, 
+previousPeriod (FiscalQuarterToDate _) (d1, d2) i =
+  Just (addGregorianMonthsClip (3 * negate i) d1,
    addGregorianMonthsClip (3 * negate i) d2)
-previousPeriod (CalendarYear _) (d1, d2) i = 
-  Just (addGregorianYearsClip (negate i) d1, 
+previousPeriod (CalendarYear _) (d1, d2) i =
+  Just (addGregorianYearsClip (negate i) d1,
    addGregorianYearsClip (negate i) d2)
-previousPeriod (CalendarYearToDate _) (d1, d2) i = 
-  Just (addGregorianYearsClip (negate i) d1, 
+previousPeriod (CalendarYearToDate _) (d1, d2) i =
+  Just (addGregorianYearsClip (negate i) d1,
    addGregorianYearsClip (negate i) d2)
-previousPeriod (FiscalYear _) (d1, d2) i = 
-  Just (addGregorianYearsClip (negate i) d1, 
+previousPeriod (FiscalYear _) (d1, d2) i =
+  Just (addGregorianYearsClip (negate i) d1,
    addGregorianYearsClip (negate i) d2)
-previousPeriod (FiscalYearToDate _) (d1, d2) i = 
-  Just (addGregorianYearsClip (negate i) d1, 
+previousPeriod (FiscalYearToDate _) (d1, d2) i =
+  Just (addGregorianYearsClip (negate i) d1,
    addGregorianYearsClip (negate i) d2)
 previousPeriod Last30Days (d1, d2) i =
   let nbDays = 30 * negate i

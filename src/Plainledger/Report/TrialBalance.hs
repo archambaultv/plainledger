@@ -40,16 +40,17 @@ trialBalanceReport period cp showRow ledger today =
     $ accountTreeReport atp ledger today serializeNode
 
   where
-    serializeNode :: DateSpan -> 
+    serializeNode :: [DateSpan] -> 
                      Account -> 
                      [(DebitCreditQty, NodeRows)] -> 
                      Maybe (DebitCreditQty, NodeRows)
     serializeNode dates acc children = 
-          let number = T.pack $ maybe "" show $ aNumber acc
+          let d = head dates
+              number = T.pack $ maybe "" show $ aNumber acc
               name = aDisplayName acc
-              amnt = trialBalanceQty ledger dates acc
+              amnt = trialBalanceQty ledger d acc
               amntText = qtyToDebitCredit decimalSep (aAccountType acc) amnt
-              isActive = isAccountActive ledger dates acc
+              isActive = isAccountActive ledger d acc
               line = [number, name] ++ amntText
               total = newTotal amnt (map fst children)
           in   case (isActive, showRow) of
