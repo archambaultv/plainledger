@@ -35,12 +35,14 @@ balanceSheetTestTree =
     [ runReportOk "Journal-01" (FiscalYear 0) Nothing ShowNonZero 
       (read "2018-12-31") "Balance Sheet 2018.csv",
       runReportOk "Journal-01" (FiscalYear 0) Nothing ShowNonZero 
-      (read "2019-12-31") "Balance Sheet 2019.csv"
+      (read "2019-12-31") "Balance Sheet 2019.csv",
+      runReportOk "Journal-01" (FiscalYear 0) (Just (PreviousPeriod 1)) ShowNonZero 
+      (read "2019-12-31") "Balance Sheet 2018 - 2019.csv"
     ]
 
 runReportOk :: String -> 
                ReportPeriod -> 
-               (Maybe CompareAnotherPeriod) -> 
+               Maybe CompareAnotherPeriod -> 
                ShowRow ->
                Day ->
                String -> 

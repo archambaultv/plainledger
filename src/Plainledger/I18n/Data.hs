@@ -70,6 +70,8 @@ data I18nText
   | TReportBalanceSheetName
   | TReportIncomeStatementName
   | TReportDateSpan (Maybe (Day, Day))
+  | TReportMonthSpan Day
+  | TReportYearSpan Day
   | TReportAccNumber
   | TReportAccName
   | TReportDebit 

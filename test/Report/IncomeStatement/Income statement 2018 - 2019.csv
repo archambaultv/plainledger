@@ -1,0 +1,23 @@
+La compagnie Plainledger
+État des résultats
+Du 2018-01-01 au 2019-12-31
+
+;2019;2018
+Revenu
+  Salaire compagnie Foo Bar (4152);2500;10000
+  Revenu de location (4153);1000;1000
+Total Revenu;3500;11000
+
+Dépense
+  Dépenses courantes (5000)
+    Nourriture (5002);220,00;123,45
+    Taxes (5003);649,58;2298,32
+    Vêtements (5006);450;187
+    Divertissements (5010);0;400
+  Total Dépenses courantes;1319,58;3008,77
+  Dépenses non catégorisées (5011);0;670
+Total Dépense;1319,58;3678,77
+
+Bénéfices;2180,42;7321,23
+
+Rapport généré le 2019-12-31
