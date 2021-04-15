@@ -24,8 +24,8 @@ balanceSheetReport :: AccountTreeParam ->
                       Day ->
                       [ReportRow]
 balanceSheetReport atp ledger today =
-  let bodyHeader = standardColumnHeader atp lang ledger today -- ["", i18nText lang TReportTotal]
-  in standardFormat atp ledger today TReportBalanceSheetName bodyHeader
+  let bodyHeader = "" : standardDateHeader atp lang ledger today
+  in standardFormat atp ledger today TReportBalanceSheetName [bodyHeader]
       $ addIndentation
       $ take 3 -- Take only the first 3 top account
       $ fmap snd

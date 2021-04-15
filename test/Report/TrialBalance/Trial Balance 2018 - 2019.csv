@@ -1,0 +1,22 @@
+La compagnie Plainledger
+Balance de vérification
+Du 2018-01-01 au 2019-12-31
+
+;;2019;;2018
+Numéro;Compte;Débit;Crédit;Débit;Crédit
+1001;Compte chèque;12386,10;;9835,68;
+1051;Maison 123 rue principale;275000;;275000;
+2051;Marge de crédit;;6183,45;;5963,45
+2001;My credit card;358;;508;
+2002;Hypothèque;;164375;;164375
+3001;Solde d'ouverture;;115005,23;;107684
+4152;Salaire compagnie Foo Bar;;2500;;10000
+4153;Revenu de location;;1000;;1000
+5002;Nourriture;220,00;;123,45;
+5003;Taxes;649,58;;2298,32;
+5006;Vêtements;450;;187;
+5010;Divertissements;;;400;
+5011;Dépenses non catégorisées;;;670;
+;Total;289063,68;289063,68;289022,45;289022,45
+
+Rapport généré le 2019-12-31

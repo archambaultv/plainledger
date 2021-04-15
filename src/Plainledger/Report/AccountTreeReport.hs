@@ -22,9 +22,10 @@ module Plainledger.Report.AccountTreeReport (
   addIndentation,
   NodeRows,
   singleQuantityReport,
+  toKeepOrNotToKeep2,
   toKeepOrNotToKeep,
   QuantityInfo,
-  standardColumnHeader
+  standardDateHeader
   )
 where
 
@@ -53,7 +54,7 @@ standardFormat :: AccountTreeParam ->
                   Ledger ->
                   Day ->
                   I18nText ->
-                  ReportRow ->
+                  [ReportRow] ->
                   [Tree NodeRows] ->
                   [ReportRow]
 standardFormat param ledger today reportType bodyHeader ts =
@@ -69,7 +70,7 @@ standardFormat param ledger today reportType bodyHeader ts =
 
   in header
      ++ [emptyRow]
-     ++ (bodyHeader : body)
+     ++ (bodyHeader ++ body)
      ++ [emptyRow]
      ++ footer
 
@@ -148,29 +149,29 @@ accountTreeReport atp ledger today serializeNode =
   serialize dates t = bottomUp (serializeNode dates) t
 
 -- | The column header
-standardColumnHeader :: AccountTreeParam -> Language -> Ledger ->
+standardDateHeader :: AccountTreeParam -> Language -> Ledger ->
                         Day ->[T.Text]
-standardColumnHeader atp lang ledger today =
+standardDateHeader atp lang ledger today =
   let mc = atCompareAnotherPeriod atp
       p = atReportPeriod atp
       dateSpan = reportPeriods p mc today ledger
-  in "" : standardColumnHeader' p lang dateSpan
+  in standardDateHeader' p lang dateSpan
 
-standardColumnHeader' :: ReportPeriod ->
+standardDateHeader' :: ReportPeriod ->
                       Language ->
                       [DateSpan] ->
                       [T.Text]                      
-standardColumnHeader' (Month _) lang ds = 
+standardDateHeader' (Month _) lang ds = 
   map (i18nText lang . TReportMonthSpan . fst) ds
-standardColumnHeader' (CalendarYear _) lang ds = 
+standardDateHeader' (CalendarYear _) lang ds = 
   map (i18nText lang . TReportYearSpan . snd) ds
-standardColumnHeader' (CalendarYearToDate _) lang ds = 
+standardDateHeader' (CalendarYearToDate _) lang ds = 
   map (i18nText lang . TReportYearSpan . snd) ds
-standardColumnHeader' (FiscalYear _) lang ds = 
+standardDateHeader' (FiscalYear _) lang ds = 
   map (i18nText lang . TReportYearSpan . snd) ds
-standardColumnHeader' (FiscalYearToDate _) lang ds = 
+standardDateHeader' (FiscalYearToDate _) lang ds = 
   map (i18nText lang . TReportYearSpan . snd) ds
-standardColumnHeader' _ lang ds = 
+standardDateHeader' _ lang ds = 
   map (i18nText lang . TReportDateSpan . Just) ds
 
 -- For reports where the quantity to display for each account
@@ -233,14 +234,25 @@ singleQuantityReport atp ledger today serializeNode =
         lang = jfLanguage $ lJournalFile ledger
         showRow = atShowRow atp
 
+toKeepOrNotToKeep2 :: Bool -> ShowRow -> Bool -> a -> a -> a
+toKeepOrNotToKeep2 isActive showRow isZero keepValue rejectValue =
+  case (isActive, showRow) of
+    (_, ShowAll) -> keepValue
+    (False, _) -> rejectValue
+    (True, ShowNonZero) | isZero -> keepValue
+    (True, _) -> keepValue
+
 toKeepOrNotToKeep :: Bool -> ShowRow -> Bool -> Bool -> a -> Maybe a
 toKeepOrNotToKeep isActive showRow emptyChildren isZero x =
-  case (isActive, showRow) of
-    (_, ShowAll) -> Just x
-    (False, _) -> if emptyChildren then Nothing else Just x
-    (True, ShowNonZero) | isZero ->
-      if emptyChildren then Nothing else Just x
-    (True, _) -> Just x
+  toKeepOrNotToKeep2 isActive showRow isZero (Just x)
+   (if emptyChildren then Nothing else Just x)
+
+  -- case (isActive, showRow) of
+  --   (_, ShowAll) -> Just x
+  --   (False, _) -> if emptyChildren then Nothing else Just x
+  --   (True, ShowNonZero) | isZero ->
+  --     if emptyChildren then Nothing else Just x
+  --   (True, _) -> Just x
 
 trialBalanceQty :: Ledger -> DateSpan -> Account -> Quantity
 trialBalanceQty ledger dateSpan acc =

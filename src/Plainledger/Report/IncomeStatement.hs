@@ -27,8 +27,8 @@ incomeStatementReport :: AccountTreeParam ->
                         Day ->
                         [ReportRow]
 incomeStatementReport atp ledger today = 
-  let bodyHeader = standardColumnHeader atp lang ledger today -- ["", i18nText lang TReportTotal]
-  in standardFormat atp ledger today TReportIncomeStatementName  bodyHeader
+  let bodyHeader = "" : standardDateHeader atp lang ledger today
+  in standardFormat atp ledger today TReportIncomeStatementName [bodyHeader]
     $ addIndentation
     $ addTotal
     $ drop 3
