@@ -1,5 +1,5 @@
 name:                plainledger
-version:             0.5.0.0
+version:             0.6.0.0
 github:              "archambaultv/plainledger"
 license:             OtherLicense # OBSD
 author:              "Vincent Archambault-Bouffard"
