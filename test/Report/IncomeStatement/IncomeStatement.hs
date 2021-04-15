@@ -35,7 +35,9 @@ incomeStatementTestTree =
     [ runReportOk "Journal-01" (FiscalYear 0) Nothing ShowNonZero 
       (read "2018-12-31") "Income Statement 2018.csv",
       runReportOk "Journal-01" (FiscalYear 0) Nothing ShowNonZero 
-      (read "2019-12-31") "Income Statement 2019.csv"
+      (read "2019-12-31") "Income Statement 2019.csv",
+      runReportOk "Journal-01" (FiscalYear 0) (Just (PreviousYear 1)) ShowNonZero 
+      (read "2019-12-31") "Income Statement 2018 - 2019.csv"
     ]
 
 runReportOk :: String -> 

@@ -14,6 +14,7 @@ module Plainledger.I18n.En_CA
   en_CAText,
 ) where
 
+import Data.Time
 import Data.List ( intercalate )
 import Plainledger.I18n.Data ( I18nText(..) )
 import Plainledger.Error
@@ -68,8 +69,12 @@ en_CAText (TReportDateSpan (Just (d1, d2))) = "From "
                                             ++ show d1
                                             ++ " to "
                                             ++ show d2
-
-
+en_CAText (TReportMonthSpan d) = 
+  let (y,m,_) = toGregorian d
+  in monthToString m ++ " " ++ show y
+en_CAText (TReportYearSpan d) = 
+  let (y,_,_) = toGregorian d
+  in show y
 en_CAText TReportAccNumber = "Number"
 en_CAText TReportAccName = "Account"
 en_CAText TReportDebit  = "Debit"
@@ -77,6 +82,21 @@ en_CAText TReportCredit = "Credit"
 en_CAText TReportTotal = "Total"
 en_CAText TReportEarnings = "Earnings"
 en_CAText (TReportGeneratedOn d) = "Reports generated on " ++ show d
+
+monthToString :: Int -> String
+monthToString 1 = "January"
+monthToString 2 = "February"
+monthToString 3 = "March"
+monthToString 4 = "April"
+monthToString 5 = "May"
+monthToString 6 = "June"
+monthToString 7 = "July"
+monthToString 8 = "August"
+monthToString 9 = "September"
+monthToString 10 = "October"
+monthToString 11 = "November"
+monthToString 12 = "December"
+monthToString _ = error "Wrong month number"
 
 -- | Pretty print the error message and add the source file information
 printError :: Error -> String

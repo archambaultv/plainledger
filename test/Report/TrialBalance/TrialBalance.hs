@@ -38,12 +38,14 @@ trialBalanceTestTree =
       (read "2019-12-31") "Trial Balance 2019 - 01.csv",
       -- With transactions on the start date (2019-01-01)
       runReportOk "Journal-02" (FiscalYear 0) Nothing ShowActive 
-      (read "2019-12-31") "Trial Balance 2019 - 02.csv"
+      (read "2019-12-31") "Trial Balance 2019 - 02.csv",
+      runReportOk "Journal-01" (FiscalYear 0) (Just (PreviousPeriod 1)) ShowActive 
+      (read "2019-12-31") "Trial Balance 2018 - 2019.csv"
     ]
 
 runReportOk :: String -> 
                ReportPeriod -> 
-               (Maybe CompareAnotherPeriod) -> 
+               Maybe CompareAnotherPeriod -> 
                ShowRow ->
                Day ->
                String -> 
@@ -65,7 +67,7 @@ printErr err = T.unpack
              $ map (i18nText En_CA . TError ) err
 
 getTrialBalanceReport :: ReportPeriod -> 
-                         (Maybe CompareAnotherPeriod) -> 
+                         Maybe CompareAnotherPeriod -> 
                          ShowRow ->
                          Day ->
                          String -> 

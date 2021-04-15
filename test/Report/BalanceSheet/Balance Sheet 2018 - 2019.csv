@@ -1,0 +1,26 @@
+La compagnie Plainledger
+Bilan
+Du 2018-01-01 au 2019-12-31
+
+;2019;2018
+Actif
+  Actif court terme
+    Compte chèque (1001);12386,10;9835,68
+  Total Actif court terme;12386,10;9835,68
+  Maison 123 rue principale (1051);275000;275000
+Total Actif;287386,10;284835,68
+
+Passif
+  Marge de crédit (2051);6183,45;5963,45
+  My credit card (2001);-358;-508
+  Passif Long Terme
+    Hypothèque (2002);164375;164375
+  Total Passif Long Terme;164375;164375
+Total Passif;170200,45;169830,45
+
+Capital
+  Solde d'ouverture (3001);115005,23;107684
+  Bénéfice (3002);2180,42;7321,23
+Total Capital;117185,65;115005,23
+
+Rapport généré le 2019-12-31
