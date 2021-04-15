@@ -115,6 +115,8 @@ printErrorType (ParseDateErr s)
   = "Erreur de lecture de la date \"" ++ s ++ "\".\nLes dates doivent être dans le format YYYY-MM-DD."
 printErrorType (ParseIntErr s)
   = "Erreur de lecture du nombre entier \"" ++ s ++ "\"."
+printErrorType (ParsePosIntErr s)
+  = "Erreur de lecture du nombre positif \"" ++ s ++ "\"."
 printErrorType (ParseCharErr s)
   = "Erreur de lecture du caractère \"" ++ s ++ "\"."
 printErrorType (ParseAmountErr s)

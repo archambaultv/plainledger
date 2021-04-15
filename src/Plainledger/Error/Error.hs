@@ -42,6 +42,7 @@ data ErrorType
 
   | ParseDateErr String
   | ParseIntErr String
+  | ParsePosIntErr String
   | ParseCharErr String
   | ParseAmountErr String
   | ParseAmountExponentErr String

@@ -115,6 +115,8 @@ printErrorType (ParseDateErr s)
   = "Unable to parse date \"" ++ s ++ "\".\nDate must be in the YYYY-MM-DD format."
 printErrorType (ParseIntErr s)
   = "Cannot parse \"" ++ s ++ "\" as an integer."
+printErrorType (ParsePosIntErr s)
+  = "Cannot parse \"" ++ s ++ "\" as a positive number."
 printErrorType (ParseCharErr s)
   = "Cannot parse \"" ++ s ++ "\" as a character."
 printErrorType (ParseAmountErr s)

@@ -20,10 +20,15 @@ import Plainledger.CLI.Command
 import Plainledger.Journal
 import Plainledger.I18n.I18n
 import Plainledger.Report
+import qualified Data.Text as T
 
 dateReader :: ReadM Day
 dateReader = eitherReader
            $ \s -> first (i18nString En_CA . TError . head) (parseISO8601M s)
+
+posIntReader :: ReadM Int
+posIntReader = eitherReader
+              $ \s -> first (i18nString En_CA . TError . head) (parsePositiveInt $ T.pack s)
 
 startDate :: Parser Day
 startDate = option dateReader
@@ -37,7 +42,7 @@ endDate = option dateReader
    ( short 'e'
   <> long "end"
   <> help "All transactions in the journal file after this date are ignored"
-  <> metavar "END")
+  <> metavar "END") 
 
 
 parseDates :: Maybe Day -> Maybe Day -> ReportPeriod
@@ -45,6 +50,11 @@ parseDates Nothing Nothing = AllDates
 parseDates (Just d1) Nothing = SinceDateUntilTheEnd d1
 parseDates Nothing (Just d2) = FromBeginningUntil d2
 parseDates (Just d1) (Just d2) = CustomPeriod d1 d2
+
+comparePeriod :: Parser CompareAnotherPeriod 
+comparePeriod 
+    = PreviousPeriod <$> option posIntReader (long "previous-period")
+    <|> PreviousYear <$> option posIntReader (long "previous-year")
 
 period :: Parser ReportPeriod
 period =  Month <$> option auto (long "month")
@@ -119,7 +129,7 @@ transactionsCommand = Command
                    <*> csvFile
                    <*> (Transactions
                        <$> period
-                       <*> pure Nothing
+                       <*> optional comparePeriod
                        <*> txnDecodeOption)
 
 transactionsInfo :: ParserInfo Command
@@ -140,7 +150,7 @@ trialBalanceCommand = Command
                    <*> csvFile
                    <*> (TrialBalance
                        <$> period
-                       <*> pure Nothing
+                       <*> optional comparePeriod
                        <*> showRowOption)
 
 trialBalanceInfo :: ParserInfo Command
@@ -155,7 +165,7 @@ balanceSheetCommand = Command
                    <*> csvFile
                    <*> (BalanceSheet
                        <$> period
-                       <*> pure Nothing
+                       <*> optional comparePeriod
                        <*> showRowOption
                        <*> pure Nothing
                        <*> pure comparisonColumnsDefault )
@@ -171,7 +181,7 @@ incomeStatementCommand = Command
                    <*> csvFile
                    <*> (IncomeStatement
                        <$> period
-                       <*> pure Nothing
+                       <*> optional comparePeriod
                        <*> showRowOption
                        <*> pure Nothing
                        <*> pure comparisonColumnsDefault)

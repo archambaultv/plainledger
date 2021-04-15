@@ -13,6 +13,7 @@ module Plainledger.Journal.Amount
   Quantity,
   AmountDescriptor,
   parseAmount,
+  parsePositiveInt,
   writeAmount,
   amountReservedChar
   )
@@ -74,6 +75,13 @@ amountReservedChar = ['(',')','e','+','-']
 -- € -12
 -- €-12
 
+parsePositiveInt :: (MonadError Errors m) => T.Text -> m Int
+parsePositiveInt t =
+  let (n, r) = T.break (not . isDigit) t
+      n1 = strToInt n
+  in if T.null r && n1 > 0
+     then return n1
+     else throwError $ mkErrorNoPos $ ParsePosIntErr $ T.unpack t
 
 parseAmount :: MonadError Errors m => AmountDescriptor -> T.Text -> m Quantity
 parseAmount d t = 
@@ -205,15 +213,15 @@ parseNumber (sep, thousandSep, _) x = do
           = first (negate . strToInt) <$> parseInt (T.tail y)
         parseSignedInt y = first strToInt <$> parseInt y
 
-        strToInt :: (Integral n) => T.Text -> n
-        strToInt y = T.foldl' 
-                     (\t v -> 10 * t + fromIntegral (ord v - ord '0')) 
-                     0
-                     y
-
         notNull :: T.Text -> m ()
         notNull "" = throwError $ ParseAmountErr ""
         notNull _ = return ()
+
+strToInt :: (Integral n) => T.Text -> n
+strToInt y = T.foldl' 
+              (\t v -> 10 * t + fromIntegral (ord v - ord '0')) 
+              0
+              y
 
 writeAmount :: Char -> Quantity -> T.Text
 writeAmount c a = T.pack
